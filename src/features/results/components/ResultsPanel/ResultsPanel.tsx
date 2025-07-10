@@ -1,19 +1,18 @@
-// src/features/results/components/ResultsPanel/ResultsPanel.tsx
-
 import React from 'react';
 import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
+import { containerClass } from './styles';
 
 interface ResultsPanelProps {
   viewMode: ViewMode;
   results: ResultItem[];
-  groupedResults?: GroupedResult[]; // only used in groupByVideo mode
+  groupedResults?: GroupedResult[];
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({ viewMode, results, groupedResults = [] }) => {
   return (
-    <div className="space-y-4">
+    <div className={containerClass}>
       {viewMode === 'sortByConfidence' ? (
         <SortedByConfidenceView results={results} />
       ) : (
