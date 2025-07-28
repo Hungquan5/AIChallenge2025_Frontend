@@ -1,68 +1,81 @@
-import React from 'react';
-import { containerClass, labelClass, inputClass } from './styles';
+import React, { useRef } from 'react';
+import type { RefObject } from 'react';
+import { containerClass } from './styles';
+import type { Query } from '../../types';
+import QueryItem from './QueryItem';
 
 interface QueryListProps {
-  queries: string[];
-  onQueriesChange: (queries: string[]) => void;
-  maxQueries?: number;  // Optional maximum number of queries
+  queries: Query[];
+  onQueriesChange: (queries: Query[]) => void;
+  maxQueries?: number;
+  firstInputRef?: RefObject<HTMLTextAreaElement>;
 }
 
-const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQueries }) => {
-  const handleQueryChange = (index: number, value: string) => {
+const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQueries, firstInputRef }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const updateQuery = (index: number, updated: Partial<Query>) => {
     const newQueries = [...queries];
-    newQueries[index] = value;
+    newQueries[index] = { ...newQueries[index], ...updated };
     onQueriesChange(newQueries);
   };
 
-  const addQuery = () => {
-    if (maxQueries && queries.length >= maxQueries) {
-      return; // Don't add more queries if we've reached the maximum
-    }
-    onQueriesChange([...queries, '']);
+  const insertQueryAfter = (index: number) => {
+    if (maxQueries && queries.length >= maxQueries) return;
+    const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'};
+    const updated = [...queries.slice(0, index + 1), newQuery, ...queries.slice(index + 1)];
+    onQueriesChange(updated);
+    // Focus vào textarea mới sau khi nó được render
+    setTimeout(() => {
+      const textareas = containerRef.current?.querySelectorAll('textarea');
+      if (textareas && textareas.length > index + 1) {
+        (textareas[index + 1] as HTMLTextAreaElement).focus();
+      }
+    }, 0);
   };
 
   const removeQuery = (index: number) => {
-    const newQueries = queries.filter((_, i) => i !== index);
-    onQueriesChange(newQueries);
+    if (queries.length <= 1) return;
+    const updated = queries.filter((_, i) => i !== index);
+    onQueriesChange(updated);
+  };
+
+  const handleNext = (index: number) => {
+    const textareas = containerRef.current?.querySelectorAll('textarea');
+    if (textareas) {
+      const nextIndex = (index + 1) % textareas.length;
+      (textareas[nextIndex] as HTMLTextAreaElement)?.focus();
+    }
+  };
+
+  const handlePrev = (index: number) => {
+    const textareas = containerRef.current?.querySelectorAll('textarea');
+    if (textareas) {
+      const prevIndex = index === 0 ? textareas.length - 1 : index - 1;
+      (textareas[prevIndex] as HTMLTextAreaElement)?.focus();
+    }
   };
 
   return (
-    <div className={containerClass}>
-      <div className="flex items-center justify-between mb-2">
-        <label className={labelClass}>Search Queries</label>
-        {(!maxQueries || queries.length < maxQueries) && (
-          <button
-            onClick={addQuery}
-            className="px-2 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
-            type="button"
-          >
-            Add Query
-          </button>
-        )}
-      </div>
-      <div className="space-y-2">
+    <div className={containerClass} ref={containerRef}>
+      <div className="space-y-4">
         {queries.map((query, index) => (
-          <div key={index} className="flex gap-2">
-            <textarea
-              value={query}
-              onChange={(e) => handleQueryChange(index, e.target.value)}
-              placeholder={maxQueries === 1 ? "Enter search text..." : `Query ${index + 1}...`}
-              className={`${inputClass} h-16 resize-none flex-1`}
-            />
-            {queries.length > 1 && (
-              <button
-                onClick={() => removeQuery(index)}
-                className="px-2 self-start text-gray-400 hover:text-red-500"
-                type="button"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          <QueryItem
+            key={index}
+            index={index}
+            query={query}
+            onUpdate={updateQuery}
+            onInsertAfter={insertQueryAfter}
+            onRemove={removeQuery}
+            disableRemove={queries.length === 1}
+            onNext={() => handleNext(index)}
+            onPrev={() => handlePrev(index)}
+            inputRef={index === 0 ? firstInputRef : undefined}
+          />
         ))}
       </div>
     </div>
   );
 };
 
-export default QueryList; 
+export default QueryList;

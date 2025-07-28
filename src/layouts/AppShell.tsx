@@ -7,15 +7,17 @@ interface AppShellProps {
 
 const AppShell: React.FC<AppShellProps> = ({ leftPanel, rightPanel }) => {
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      {/* Left Panel - very narrow */}
-      <aside className="w-[15%] h-screen bg-white/10 backdrop-blur-md border-r border-white/20 p-3 overflow-y-auto">
+    <div className="flex min-h-screen max-h-screen bg-[#FDF5E6] text-black">
+      {/* Left Panel */}
+      <aside className="w-[18%] h-screen bg-white/70 backdrop-blur-sm border-r border-gray-300 overflow-y-auto text-black pl-1 pr-0 pb-1 pt-1">
         {leftPanel}
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-10 overflow-y-auto">
-        {rightPanel}
+      {/* Right Panel with independent scroll */}
+      <main className="flex-1 h-screen overflow-hidden">
+        <div className="h-full overflow-y-auto text-black">
+          {rightPanel}
+        </div>
       </main>
     </div>
   );

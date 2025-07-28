@@ -1,59 +1,115 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import './App.css';
 import AppShell from './layouts/AppShell';
 import InputPanel from './features/search/components/InputPanel/InputPanel';
 import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
+import TopControlBar from './layouts/TopControlBar';
+import ShortcutsHelp from './components/ShortcutsHelp';
+import { useShortcuts } from './utils/shortcuts';
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
+import type { SearchMode } from './features/search/types';
 
 const App: React.FC = () => {
   const [results, setResults] = useState<ResultItem[]>([]);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
+  const [searchMode, setSearchMode] = useState<SearchMode>('normal');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  
+  const inputPanelRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
-  const handleSearch = (mockData: ResultItem[]) => {
-    setResults(mockData);
-    const grouped = mockData.reduce((acc, item) => {
+  const handleSearch = (newResults: ResultItem[]) => {
+    setResults(newResults);
+    const grouped = newResults.reduce((acc, item) => {
       const group = acc.find(g => g.videoId === item.videoId);
-      group ? group.items.push(item) : acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
+      if (group) {
+        group.items.push(item);
+      } else {
+        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
+      }
       return acc;
     }, [] as GroupedResult[]);
     setGroupedResults(grouped);
   };
 
-  const leftPanel = <InputPanel onSearch={handleSearch} />;
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
+  };
+
+  // Register shortcuts
+  useShortcuts({
+    TOGGLE_VIEW_MODE: toggleViewMode,
+    SWITCH_TO_NORMAL: () => setSearchMode('normal'),
+    SWITCH_TO_CHAIN: () => setSearchMode('chain'),
+    FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
+    NEXT_RESULT: () => {
+      const currentFocus = document.activeElement;
+      const results = resultsRef.current?.querySelectorAll('.result-item');
+      if (results?.length) {
+        const currentIndex = Array.from(results).indexOf(currentFocus as Element);
+        const nextIndex = currentIndex < results.length - 1 ? currentIndex + 1 : 0;
+        (results[nextIndex] as HTMLElement)?.focus();
+      }
+    },
+    PREV_RESULT: () => {
+      const currentFocus = document.activeElement;
+      const results = resultsRef.current?.querySelectorAll('.result-item');
+      if (results?.length) {
+        const currentIndex = Array.from(results).indexOf(currentFocus as Element);
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : results.length - 1;
+        (results[prevIndex] as HTMLElement)?.focus();
+      }
+    },
+  });
+
+  const leftPanel = (
+    <div ref={inputPanelRef} tabIndex={-1}>
+      <InputPanel 
+        onSearch={handleSearch} 
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
+      />
+    </div>
+  );
 
   const rightPanel = (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Search Results</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setViewMode('sortByConfidence')}
-            className={`px-4 py-2 rounded-lg text-sm ${
-              viewMode === 'sortByConfidence'
-                ? 'bg-purple-600 text-white'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-            }`}
-          >
-            Sort by Confidence
-          </button>
-          <button
-            onClick={() => setViewMode('groupByVideo')}
-            className={`px-4 py-2 rounded-lg text-sm ${
-              viewMode === 'groupByVideo'
-                ? 'bg-purple-600 text-white'
-                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-            }`}
-          >
-            Group by Video
-          </button>
-        </div>
+      <TopControlBar
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onShowShortcuts={() => setShowShortcuts(true)}
+      />
+      <div ref={resultsRef}>
+        <ResultsPanel
+          viewMode={viewMode}
+          results={results}
+          groupedResults={groupedResults}
+        />
       </div>
-
-      <ResultsPanel viewMode={viewMode} results={results} groupedResults={groupedResults} />
     </>
   );
 
-  return <AppShell leftPanel={leftPanel} rightPanel={rightPanel} />;
+  return (
+    <>
+      <AppShell leftPanel={leftPanel} rightPanel={rightPanel} />
+      {showShortcuts && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowShortcuts(false)}
+            >
+              ✕
+            </button>
+            <ShortcutsHelp />
+          </div>
+        </div>
+      )}
+    </>
+  );
 };
 
 export default App;

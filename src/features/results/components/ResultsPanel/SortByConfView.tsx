@@ -2,31 +2,22 @@ import React, { useState, useCallback, useMemo } from 'react';
 import type { ResultItem } from '../../types';
 import {
   gridClass,
-  cardClass,
-  imageClass,
-  imageContainerClass,
-  imageOverlayClass,
-  contentClass,
-  titleClass,
-  confidenceClass,
-  timestampClass,
   noResultsClass,
+  noResultsHintClass,
+  noResultsTitleClass,
 } from './styles';
+import ResultCard from './ResultCard';
 
 interface Props {
   results: ResultItem[];
+  onResultClick?: (item: ResultItem) => void;
 }
 
-const SortedByConfidenceView: React.FC<Props> = ({ results }) => {
+const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
-  // Memoize sorted results
-  const sorted = useMemo(() => 
-    [...results].sort((a, b) => b.confidence - a.confidence),
-    [results]
-  );
+  const sorted = useMemo(() => [...results].sort((a, b) => b.confidence - a.confidence), [results]);
 
-  // Optimize image loading handler
   const handleImageLoad = useCallback((id: string) => {
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
@@ -34,40 +25,29 @@ const SortedByConfidenceView: React.FC<Props> = ({ results }) => {
   if (results.length === 0) {
     return (
       <div className={noResultsClass}>
-        <p>No results found</p>
-        <p className="text-sm mt-2">Try adjusting your search terms</p>
+        <p className={noResultsTitleClass}>No results found</p>
+        <p className={noResultsHintClass}>Try adjusting your search terms</p>
       </div>
     );
   }
 
   return (
     <div className={gridClass}>
-      {sorted.map((item) => (
-        <div key={item.id} className={`${cardClass} group`}>
-          <div className={imageContainerClass}>
-            <img
-              src={item.thumbnail}
-              alt={item.title}
-              loading="lazy"
-              decoding="async"
-              className={`${imageClass} ${!loadedImages.has(item.id) ? 'opacity-0' : 'opacity-100'}`}
-              onLoad={() => handleImageLoad(item.id)}
-            />
-            <div className={imageOverlayClass} />
-            {!loadedImages.has(item.id) && (
-              <div className="absolute inset-0 bg-white/10 animate-pulse" />
-            )}
-          </div>
-          <div className={contentClass}>
-            <h3 className={titleClass}>{item.title}</h3>
-            <p className={confidenceClass}>{(item.confidence * 100).toFixed(1)}%</p>
-            <p className={timestampClass}>{item.timestamp}</p>
-          </div>
-        </div>
+      {sorted.map(item => (
+        <ResultCard
+          key={item.id}
+          id={item.id}
+          thumbnail={item.thumbnail}
+          title={item.title}
+          confidence={item.confidence}
+          timestamp={item.timestamp}
+          loaded={loadedImages.has(item.id)}
+          onLoad={handleImageLoad}
+          onClick={onResultClick ? () => onResultClick(item) : undefined}
+        />
       ))}
     </div>
   );
 };
 
-// Prevent unnecessary re-renders
 export default React.memo(SortedByConfidenceView);

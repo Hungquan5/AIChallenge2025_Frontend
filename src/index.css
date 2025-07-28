@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+textarea::-webkit-scrollbar {
+  width: 6px;
+}
+textarea::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 100, 100, 0.4);
+  border-radius: 4px;
+}
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
