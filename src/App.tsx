@@ -15,7 +15,6 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
   const [searchMode, setSearchMode] = useState<SearchMode>('normal');
   const [showShortcuts, setShowShortcuts] = useState(false);
-  
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -63,15 +62,20 @@ const App: React.FC = () => {
     },
   });
 
+  // Create InputPanel instance to get both content and search button
+  const inputPanelInstance = InputPanel({
+    onSearch: handleSearch,
+    searchMode: searchMode,
+    onSearchModeChange: setSearchMode,
+  });
+
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
-      <InputPanel 
-        onSearch={handleSearch} 
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
-      />
+      {inputPanelInstance.panelContent}
     </div>
   );
+
+  const searchButton = inputPanelInstance.searchButton;
 
   const rightPanel = (
     <>
@@ -94,7 +98,11 @@ const App: React.FC = () => {
 
   return (
     <>
-      <AppShell leftPanel={leftPanel} rightPanel={rightPanel} />
+      <AppShell 
+        leftPanel={leftPanel} 
+        rightPanel={rightPanel}
+        searchButton={searchButton}
+      />
       {showShortcuts && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="relative">

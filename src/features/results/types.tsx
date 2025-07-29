@@ -5,6 +5,7 @@ export interface ResultItem {
   thumbnail: string;
   confidence: number;
   timestamp: string;
+  filename?: string; // Optional, used for fallback
 }
 
 export interface GroupedResult {

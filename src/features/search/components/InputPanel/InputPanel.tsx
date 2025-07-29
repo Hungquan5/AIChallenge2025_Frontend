@@ -1,7 +1,6 @@
-// InputPanel.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
-import { containerClass, searchButtonClass } from './styles';
+import { searchButtonClass,containerClass } from './styles';
 import type { ResultItem, Query, SearchMode } from '../../types';
 import { searchByText } from '../SearchRequest/searchApi';
 import { useShortcuts } from '../../../../utils/shortcuts';
@@ -12,8 +11,7 @@ interface InputPanelProps {
   onSearchModeChange?: (mode: SearchMode) => void;
 }
 
-const InputPanel: React.FC<InputPanelProps> = ({ onSearch, searchMode, onSearchModeChange }) => {
-  const [queries, setQueries] = useState<Query[]>([
+const InputPanel = ({ onSearch, searchMode, onSearchModeChange }: InputPanelProps) => {  const [queries, setQueries] = useState<Query[]>([
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'},
   ]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +25,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onSearch, searchMode, onSearchM
   }, [queries]);
 
   useEffect(() => {
-    setTimeout(focusFirstTextarea, 0); // focus on first render
+    setTimeout(focusFirstTextarea, 0);
   }, []);
 
   const triggerSearch = async () => {
@@ -71,11 +69,9 @@ const InputPanel: React.FC<InputPanelProps> = ({ onSearch, searchMode, onSearchM
   };
 
   const focusFirstTextarea = () => {
-    // Tìm textarea đầu tiên trong container
     const textarea = containerRef.current?.querySelector('textarea');
     if (textarea) {
       textarea.focus();
-      // Đặt con trỏ vào cuối text
       const length = textarea.value.length;
       textarea.setSelectionRange(length, length);
     }
@@ -116,30 +112,30 @@ const InputPanel: React.FC<InputPanelProps> = ({ onSearch, searchMode, onSearchM
     };
   }, []);
 
-  return (
-    <div className="flex flex-col h-full" ref={containerRef}>
-      <div
-        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent"
-        style={{ scrollbarGutter: 'stable' }}
-      >
+  // Create search button component
+  const SearchButton = () => (
+    <button
+      ref={searchButtonRef}
+      onClick={triggerSearch}
+      className={searchButtonClass + ' w-full'}
+      disabled={loading}
+    >
+      {loading ? 'Searching...' : 'Search'}
+    </button>
+  );
+
+  return {
+    // Return both the panel content and search button separately
+    panelContent: (
+      <div className={containerClass} ref={containerRef}>
         <QueryList 
           queries={queries} 
           onQueriesChange={setQueries}
         />
       </div>
-
-      <div className="px-1 py-1">
-        <button
-          ref={searchButtonRef}
-          onClick={triggerSearch}
-          className={searchButtonClass + ' w-full'}
-          disabled={loading}
-        >
-          {loading ? 'Searching...' : 'Search'}
-        </button>
-      </div>
-    </div>
-  );
+    ),
+    searchButton: <SearchButton />
+  };
 };
 
 export default InputPanel;
