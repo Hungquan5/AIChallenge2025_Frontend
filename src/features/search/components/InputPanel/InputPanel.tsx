@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
 import { searchButtonClass,containerClass } from './styles';
-import type { ResultItem, Query, SearchMode } from '../../types';
+import type { ResultItem, Query } from '../../types';
 import { searchByText } from '../SearchRequest/searchApi';
 import { useShortcuts } from '../../../../utils/shortcuts';
 
 interface InputPanelProps {
   onSearch: (results: ResultItem[]) => void;
-  searchMode: SearchMode;
-  onSearchModeChange?: (mode: SearchMode) => void;
 }
 
-const InputPanel = ({ onSearch, searchMode, onSearchModeChange }: InputPanelProps) => {  const [queries, setQueries] = useState<Query[]>([
+const InputPanel = ({ onSearch }: InputPanelProps) => {  const [queries, setQueries] = useState<Query[]>([
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'},
   ]);
   const [loading, setLoading] = useState(false);
@@ -43,7 +41,7 @@ const InputPanel = ({ onSearch, searchMode, onSearchModeChange }: InputPanelProp
 
     setLoading(true);
     try {
-      const results = await searchByText(trimmedQueries, searchMode);
+      const results = await searchByText(trimmedQueries);
       onSearch(results);
     } catch (error) {
       console.error('Search error:', error);
@@ -82,8 +80,6 @@ const InputPanel = ({ onSearch, searchMode, onSearchModeChange }: InputPanelProp
     ADD_QUERY: addNewQuery,
     REMOVE_QUERY: removeLastQuery,
     CLEAR_SEARCH: clearAllQueries,
-    SWITCH_TO_NORMAL: () => onSearchModeChange?.('normal'),
-    SWITCH_TO_CHAIN: () => onSearchModeChange?.('chain'),
     FOCUS_SEARCH: focusFirstTextarea,
   });
 

@@ -1,5 +1,3 @@
-export type SearchMode = 'normal' | 'chain';
-
 export interface ResultItem {
     id: string;
     videoId: string;

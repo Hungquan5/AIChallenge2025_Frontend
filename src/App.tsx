@@ -7,13 +7,11 @@ import TopControlBar from './layouts/TopControlBar';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
-import type { SearchMode } from './features/search/types';
 
 const App: React.FC = () => {
   const [results, setResults] = useState<ResultItem[]>([]);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
-  const [searchMode, setSearchMode] = useState<SearchMode>('normal');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -39,8 +37,6 @@ const App: React.FC = () => {
   // Register shortcuts
   useShortcuts({
     TOGGLE_VIEW_MODE: toggleViewMode,
-    SWITCH_TO_NORMAL: () => setSearchMode('normal'),
-    SWITCH_TO_CHAIN: () => setSearchMode('chain'),
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
     NEXT_RESULT: () => {
       const currentFocus = document.activeElement;
@@ -64,9 +60,7 @@ const App: React.FC = () => {
 
   // Create InputPanel instance to get both content and search button
   const inputPanelInstance = InputPanel({
-    onSearch: handleSearch,
-    searchMode: searchMode,
-    onSearchModeChange: setSearchMode,
+    onSearch: handleSearch
   });
 
   const leftPanel = (
@@ -80,8 +74,6 @@ const App: React.FC = () => {
   const rightPanel = (
     <>
       <TopControlBar
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onShowShortcuts={() => setShowShortcuts(true)}

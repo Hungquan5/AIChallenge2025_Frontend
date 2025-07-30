@@ -1,18 +1,13 @@
 import React from 'react';
 import type { ViewMode } from '../features/results/types';
-import type { SearchMode } from '../features/search/types';
 
 interface Props {
-  searchMode: SearchMode;
-  onSearchModeChange: (mode: SearchMode) => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onShowShortcuts: () => void;
 }
 
 const TopControlBar: React.FC<Props> = ({
-  searchMode,
-  onSearchModeChange,
   viewMode,
   onViewModeChange,
   onShowShortcuts,
@@ -20,15 +15,6 @@ const TopControlBar: React.FC<Props> = ({
   return (
     <div className="flex justify-between items-center p-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
       <div className="flex gap-4">
-        <select
-          value={searchMode}
-          onChange={(e) => onSearchModeChange(e.target.value as SearchMode)}
-          className="px-3 py-1 border border-[var(--border-color)] rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent transition-all"
-        >
-          <option value="normal">Normal Search</option>
-          <option value="chain">Chain Search</option>
-        </select>
-
         <div className="flex gap-2">
           <button
             onClick={() => onViewModeChange('sortByConfidence')}
