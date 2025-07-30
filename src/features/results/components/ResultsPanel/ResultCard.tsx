@@ -11,6 +11,7 @@ import {
   timestampClass,
 } from './styles';
 
+// 1. Update the Props interface to accept onContextMenu
 interface Props {
   id: string;
   thumbnail: string;
@@ -20,11 +21,31 @@ interface Props {
   loaded: boolean;
   onLoad: (id: string) => void;
   onClick?: () => void;
+  // Add the onContextMenu prop for the right-click event
+  onContextMenu?: (event: React.MouseEvent) => void;
 }
 
-const ResultCard: React.FC<Props> = ({ id, thumbnail, title, confidence, timestamp, loaded, onLoad, onClick }) => {
+// 2. Destructure onContextMenu from the component's props
+const ResultCard: React.FC<Props> = ({
+  id,
+  thumbnail,
+  title,
+  confidence,
+  timestamp,
+  loaded,
+  onLoad,
+  onClick,
+  onContextMenu, // Destructure it here
+}) => {
   return (
-    <div className={`${cardClass} group result-item`} tabIndex={0} onClick={onClick} style={{ cursor: onClick ? 'pointer' : undefined }}>
+    // 3. Apply the onContextMenu handler to the root div of the component
+    <div
+      className={`${cardClass} group result-item`}
+      tabIndex={0}
+      onClick={onClick}
+      onContextMenu={onContextMenu} // Apply the handler here
+      style={{ cursor: onClick ? 'pointer' : undefined }}
+    >
       <div className={imageContainerClass}>
         <img
           src={thumbnail}

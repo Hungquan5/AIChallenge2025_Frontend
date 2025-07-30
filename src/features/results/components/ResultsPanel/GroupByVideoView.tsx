@@ -14,9 +14,10 @@ import ResultCard from './ResultCard';
 interface Props {
   groupedResults: GroupedResult[];
   onResultClick?: (item: ResultItem) => void;
+  onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
 }
 
-const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick }) => {
+const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const handleImageLoad = useCallback((id: string) => {
@@ -52,6 +53,8 @@ const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick }) 
                 loaded={loadedImages.has(item.id)}
                 onLoad={handleImageLoad}
                 onClick={onResultClick ? () => onResultClick(item) : undefined}
+                // Add the onContextMenu event handler to the ResultCard
+                onContextMenu={(event) => onRightClick(item, event)}
               />
             ))}
           </div>

@@ -214,7 +214,7 @@ export default function FrameCarousel({
         </div>
       );
     }
-
+    
     return (
       <div style={containerStyle} onClick={() => handleFrameClick(frameIndex)}>
         <img

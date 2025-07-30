@@ -1,3 +1,4 @@
+// src/features/results/components/SortedByConfidenceView.tsx
 import React, { useState, useCallback, useMemo } from 'react';
 import type { ResultItem } from '../../types';
 import {
@@ -11,9 +12,12 @@ import ResultCard from './ResultCard';
 interface Props {
   results: ResultItem[];
   onResultClick?: (item: ResultItem) => void;
+  // 1. Accept the onRightClick prop from the parent component
+  onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
 }
 
-const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick }) => {
+// 2. Destructure the new onRightClick prop
+const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick, onRightClick }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const sorted = useMemo(() => [...results].sort((a, b) => b.confidence - a.confidence), [results]);
@@ -44,6 +48,9 @@ const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick }) => 
           loaded={loadedImages.has(item.id)}
           onLoad={handleImageLoad}
           onClick={onResultClick ? () => onResultClick(item) : undefined}
+          // 3. Add the onContextMenu event handler to the ResultCard
+          // This will trigger the function passed down from ResultsPanel
+          onContextMenu={(event) => onRightClick(item, event)}
         />
       ))}
     </div>

@@ -1,10 +1,10 @@
 // src/features/results/components/ResultsPanel.tsx
-import React, { useRef, useCallback } from 'react';
+import React, { useState,useRef, useCallback } from 'react';
 import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
-
+import VideoPanel from '../../../detail_info/components/VideoPanel/VideoPanel';
 // We no longer import FrameCarousel or its related hooks here.
 
 interface ResultsPanelProps {
@@ -22,6 +22,15 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onResultClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [modalData, setModalData] = useState<ResultItem | null>(null);
+
+  const handleRightClick = (item: ResultItem, event: React.MouseEvent) => {
+    event.preventDefault();
+    setModalData(item);
+  };
+  const closeModal = () => {
+    setModalData(null);
+  };
 
   // Keyboard shortcut logic for navigating results remains unchanged.
   const focusNextResult = useCallback(() => {
@@ -53,17 +62,25 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   useShortcuts({
     NEXT_RESULT: focusNextResult,
     PREV_RESULT: focusPrevResult,
-  });
+    });
 
-  return (
-    // The `relative` class is no longer needed.
+     return (
     <div className="min-h-full" ref={containerRef}>
       {viewMode === 'sortByConfidence' ? (
-        <SortedByConfidenceView results={results} onResultClick={onResultClick} />
+        <SortedByConfidenceView results={results} onResultClick={onResultClick} onRightClick={handleRightClick} />
       ) : (
-        <GroupedByVideoView groupedResults={groupedResults} onResultClick={onResultClick} />
+        <GroupedByVideoView groupedResults={groupedResults} onResultClick={onResultClick} onRightClick={handleRightClick} />
       )}
-      {/* The FrameCarousel is no longer rendered here */}
+      
+      {/* This section is now much simpler */}
+      {modalData && (
+        <VideoPanel
+          // Pass the raw data instead of a pre-built URL
+          videoId={modalData.videoId}
+          timestamp={modalData.timestamp}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 };

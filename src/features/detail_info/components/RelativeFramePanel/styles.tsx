@@ -1,34 +1,34 @@
 // src/features/frame-carousel/components/styles.ts
 
-// A reusable focus ring style for accessibility on interactive elements
-const focusRingClass = 'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 focus:ring-cyan-400';
+  // A reusable focus ring style for accessibility on interactive elements
+  const focusRingClass = 'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 focus:ring-cyan-400';
 
-// === Main Carousel Container ===
-// Enhanced with a subtle gradient background and a colorful top border.
-export const containerClass = `
-  absolute inset-x-0 bottom-0 h-[35vh]
-  bg-gradient-to-t from-slate-900/90 via-slate-950/85 to-black/80
-  backdrop-blur-xl
-  border-t-2 border-blue-500/20
-  shadow-2xl shadow-black/60
-  transition-all duration-300 ease-out
-`;
+  // === Main Carousel Container ===
+  // Enhanced with a subtle gradient background and a colorful top border.
+  export const containerClass = `
+    absolute inset-x-0 bottom-0 h-[35vh]
+    bg-gradient-to-t from-slate-900/90 via-slate-950/85 to-black/80
+    backdrop-blur-xl
+    border-t-2 border-blue-500/20
+    shadow-2xl shadow-black/60
+    transition-all duration-300 ease-out
+  `;
 
-// === Close Button ===
-// Made slightly more distinct with a brighter hover effect.
-export const closeButtonClass = `
-  absolute top-3 right-3 z-20
-  flex items-center justify-center
-  w-8 h-8
-  bg-white/10 hover:bg-white/25 active:bg-white/15
-  rounded-full
-  text-white/70 hover:text-white
-  transition-all duration-200 ease-out
-  hover:scale-110 active:scale-100
-  ${focusRingClass}
-`;
+  // === Close Button ===
+  // Made slightly more distinct with a brighter hover effect.
+  export const closeButtonClass = `
+    absolute top-3 right-3 z-20
+    flex items-center justify-center
+    w-8 h-8
+    bg-white/10 hover:bg-white/25 active:bg-white/15
+    rounded-full
+    text-white/70 hover:text-white
+    transition-all duration-200 ease-out
+    hover:scale-110 active:scale-100
+    ${focusRingClass}
+  `;
 
-// === Loading State ===
+  // === Loading State ===
 // No major changes, this is already clean and effective.
 export const loadingOverlayClass = `
   absolute inset-0 z-30
