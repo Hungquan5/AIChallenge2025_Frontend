@@ -1,3 +1,4 @@
+// src/features/results/components/GroupedByVideoView.tsx
 import React, { useState, useCallback } from 'react';
 import type { GroupedResult, ResultItem } from '../../types';
 import {
@@ -8,16 +9,19 @@ import {
   noResultsClass,
   noResultsHintClass,
   noResultsTitleClass,
+  imageClass
 } from './styles';
 import ResultCard from './ResultCard';
 
 interface Props {
   groupedResults: GroupedResult[];
-  onResultClick?: (item: ResultItem) => void;
+  onResultClick: (item: ResultItem) => void;
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
 }
 
-const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick }) => {
+// ✅ FIX 1: Destructure `onSimilaritySearch` from the component's props
+const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick, onSimilaritySearch }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const handleImageLoad = useCallback((id: string) => {
@@ -53,8 +57,10 @@ const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, on
                 loaded={loadedImages.has(item.id)}
                 onLoad={handleImageLoad}
                 onClick={onResultClick ? () => onResultClick(item) : undefined}
-                // Add the onContextMenu event handler to the ResultCard
                 onContextMenu={(event) => onRightClick(item, event)}
+                // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
+                onSimilaritySearch={onSimilaritySearch}
+                imageClassName={imageClass} // Use the imported class for image styling
               />
             ))}
           </div>

@@ -6,18 +6,19 @@ import {
   noResultsClass,
   noResultsHintClass,
   noResultsTitleClass,
+  imageClass
 } from './styles';
 import ResultCard from './ResultCard';
 
 interface Props {
   results: ResultItem[];
-  onResultClick?: (item: ResultItem) => void;
-  // 1. Accept the onRightClick prop from the parent component
+  onResultClick: (item: ResultItem) => void;
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
 }
 
-// 2. Destructure the new onRightClick prop
-const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick, onRightClick }) => {
+// ✅ FIX 1: Destructure `onSimilaritySearch` from the component's props
+const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick, onRightClick, onSimilaritySearch }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const sorted = useMemo(() => [...results].sort((a, b) => b.confidence - a.confidence), [results]);
@@ -48,9 +49,10 @@ const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick, onRig
           loaded={loadedImages.has(item.id)}
           onLoad={handleImageLoad}
           onClick={onResultClick ? () => onResultClick(item) : undefined}
-          // 3. Add the onContextMenu event handler to the ResultCard
-          // This will trigger the function passed down from ResultsPanel
           onContextMenu={(event) => onRightClick(item, event)}
+          // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
+          onSimilaritySearch={onSimilaritySearch}
+          imageClassName={imageClass} // Use the imported class for image styling
         />
       ))}
     </div>

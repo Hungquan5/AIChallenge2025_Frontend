@@ -7,7 +7,9 @@ import TopControlBar from './layouts/TopControlBar';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
-
+import {  fileToBase64, } from './utils/fileConverter';
+import {searchByText} from './features/search/components/SearchRequest/searchApi';
+import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
 // NEW: Import the carousel component and its state management hooks
 import FrameCarousel from './features/detail_info/components/RelativeFramePanel/FrameCarousel';
 import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
@@ -63,6 +65,36 @@ const App: React.FC = () => {
     }, [] as GroupedResult[]);
     setGroupedResults(grouped);
   };
+const handleSimilarityResults = (newResults: ResultItem[]) => {
+    // This will replace the current results with the new ones from the similarity search
+    setResults(newResults);
+    const grouped = newResults.reduce((acc, item) => {
+      const group = acc.find(g => g.videoId === item.videoId);
+      if (group) {
+        group.items.push(item);
+      } else {
+        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
+      }
+      return acc;
+    }, [] as GroupedResult[]);
+    setGroupedResults(grouped);
+    resultsRef.current?.scrollTo(0, 0);
+  };
+  const handleSimilaritySearch = async (imageSrc: string, cardId: string) => {
+    console.log(`Starting similarity search for card: ${cardId} with image: ${imageSrc}`);
+    
+    // 1. TODO: Call your API service here to get new results.
+    // This is a placeholder for your actual data fetching logic.
+    // const newResults = await myApi.searchByImage(imageSrc);
+    await performSimilaritySearch(imageSrc,cardId,  
+        (newResults: ResultItem[]) => {
+        // 3. Close the carousel if it's open, as the context is changing.
+        handleCarouselClose();
+        // 4. Call the state update function with the new data.
+        handleSimilarityResults(newResults);
+      }) // Example API call
+
+  };
 
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
@@ -100,9 +132,9 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
           viewMode={viewMode}
           results={results}
           groupedResults={groupedResults}
-          // NEW: Pass the click handler down to the ResultsPanel.
-          // When a result is clicked, it will now call `handleResultClick` from useKeyframeLoader.
           onResultClick={handleResultClick}
+          // NEW: Pass the new handler to the ResultsPanel
+          onSimilaritySearch={handleSimilaritySearch}
         />
       </div>
     </>
@@ -110,7 +142,7 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
 
   // NEW: Conditionally render the carousel overlay based on the lifted state.
   const carouselOverlay = carouselFrames && activeFrameId !== null ? (
-    <FrameCarousel
+     <FrameCarousel
       frames={carouselFrames}
       activeFrameId={activeFrameId}
       onClose={handleCarouselClose}
@@ -118,6 +150,8 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
       onPrev={navigateToPrevFrame}
       onFrameChange={handleFrameChange}
       isLoading={isLoading || isLoadingBatch}
+      // FINAL STEP: Pass the handler to the carousel
+      onSimilaritySearch={handleSimilaritySearch} 
     />
   ) : null;
 

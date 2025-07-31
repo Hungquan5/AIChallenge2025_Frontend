@@ -7,8 +7,8 @@ export const gridClass = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid
 
 // === Card ===
 export const cardClass = 'bg-white/80 rounded-sm border border-gray-500 overflow-hidden hover:border-yellow-500/50';
-export const imageContainerClass = 'relative bg-black/10 h-33';
-export const imageClass = 'w-full h-full object-contain';
+export const imageContainerClass = 'relative bg-black/10 aspect-video';
+export const imageClass = 'w-full h-full   object-cover object-center transition-all duration-500 ease-out';
 
 export const imageOverlayClass =
   'absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity';

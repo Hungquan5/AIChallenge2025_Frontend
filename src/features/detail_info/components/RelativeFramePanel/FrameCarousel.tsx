@@ -22,6 +22,7 @@ interface FrameCarouselProps {
   onPrev?: () => Promise<void>;
   onFrameChange?: (frameId: string | number) => void;
   isLoading?: boolean;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void; 
 }
 
 const FrameCarousel: React.FC<FrameCarouselProps> = ({
@@ -32,6 +33,7 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
   onPrev,
   onFrameChange,
   isLoading,
+  onSimilaritySearch, // Destructure the new prop
 }) => {
   const { swiperRef, onSlideChange, handleKeyDown } = useSwiperNavigation({
     frames,
@@ -122,7 +124,12 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
           return (
             <SwiperSlide key={frame.timestamp} className="!w-auto">
               {/* Pass the isActive prop down to the slide component */}
-              <FrameItemSlide frame={frame} isActive={isActive} />
+             <FrameItemSlide
+                frame={frame}
+                isActive={isActive}
+                // Pass the handler down to the slide
+                onSimilaritySearch={onSimilaritySearch}
+              />
             </SwiperSlide>
           );
         })}
