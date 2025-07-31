@@ -22,7 +22,7 @@ const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQuer
 
   const insertQueryAfter = (index: number) => {
     if (maxQueries && queries.length >= maxQueries) return;
-    const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'};
+    const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null };
     const updated = [...queries.slice(0, index + 1), newQuery, ...queries.slice(index + 1)];
     onQueriesChange(updated);
     // Focus vào textarea mới sau khi nó được render

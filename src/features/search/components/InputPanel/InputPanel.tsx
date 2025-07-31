@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
 import { searchButtonClass,containerClass } from './styles';
-import type { ResultItem, Query } from '../../types';
+import type { ResultItem, Query,SearchMode,ApiQuery } from '../../types';
 import { searchByText } from '../SearchRequest/searchApi';
 import { useShortcuts } from '../../../../utils/shortcuts';
-
+import { fileToBase64 } from '../../../../utils/fileConverter';
 interface InputPanelProps {
   onSearch: (results: ResultItem[]) => void;
 }
 
-const InputPanel = ({ onSearch }: InputPanelProps) => {  const [queries, setQueries] = useState<Query[]>([
-    { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'},
+
+const InputPanel = ({ onSearch }: InputPanelProps) => {
+  const [queries, setQueries] = useState<Query[]>([
+    // The initial query no longer has a 'mode' field
+    { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
   ]);
   const [loading, setLoading] = useState(false);
   const debounceTimeoutRef = useRef<number | null>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const chainSearchButtonRef = useRef<HTMLButtonElement>(null);
   const queriesRef = useRef<Query[]>(queries);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -26,46 +30,87 @@ const InputPanel = ({ onSearch }: InputPanelProps) => {  const [queries, setQuer
     setTimeout(focusFirstTextarea, 0);
   }, []);
 
-  const triggerSearch = async () => {
-    const trimmedQueries = queries.map((q) => ({
-      ...q,
-      text: q.text.trim(),
-      asr: q.asr.trim(),
-      ocr: q.ocr.trim(),
-    }));
+const handleSearch = async (searchMode: SearchMode = 'normal') => {
+    setLoading(true);  
+  // 2. Prepare the payload for the API by inferring query type
+  const apiQueriesPromises = queries.map(async (q): Promise<ApiQuery> => {
+      // Base query with shared fields
+      const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
+        asr: q.asr.trim(),
+        ocr: q.ocr.trim(),
+        origin: q.origin.trim(),
+        obj: q.obj,
+        lang: q.lang,
+      };
 
-    if (trimmedQueries.every((q) => !q.text && !q.asr && !q.ocr && !q.obj && !q.origin)) {
-      alert('Please enter at least one search field');
-      return;
-    }
+      // INFERENCE LOGIC: If an imageFile exists, it's an image query.
+      // Otherwise, it's a text query.
+      if (q.imageFile) {
+        let image: string | undefined = "";
+        try {
+          image = await fileToBase64(q.imageFile);
+        } catch (error) {
+          console.error(`Failed to convert imageFile to base64:`, error);
+          // Handle error appropriately, maybe skip this query or show a message
+        }
+        return {
+          ...baseApiQuery,
+          text: '', // Ensure text is empty for image queries
+          image: image,
+        };
+      } else {
+        // This is a text-based query
+        return {
+          ...baseApiQuery,
+          text: q.text.trim(),
+          image: "", // Ensure image is undefined
+        };
+      }
+    });
 
-    setLoading(true);
-    try {
-      const results = await searchByText(trimmedQueries);
-      onSearch(results);
-    } catch (error) {
-      console.error('Search error:', error);
-      alert('Search failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  };
 
+  const apiQueries = await Promise.all(apiQueriesPromises);
+  console.log('All API queries:', apiQueries);
+
+  // 3. Validate content
+  const isSearchable = apiQueries.some(q => 
+      q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image
+  );
+
+  if (!isSearchable) {
+    alert('Please enter a query, upload an image, or specify other search criteria.');
+    return;
+  }
+  
+  console.log('Final payload being sent:', apiQueries);
+  setLoading(true);
+  
+  try {
+    const results = await searchByText(apiQueries, searchMode);
+    onSearch(results);
+  } catch (error) {
+    const action = searchMode === 'chain' ? 'Chain search' : 'Search';
+    console.error(`${action} error:`, error);
+    alert(`${action} failed: ` + (error instanceof Error ? error.message : 'Unknown error'));
+  } finally {
+    setLoading(false);
+  }
+};
   const addNewQuery = () => {
-    setQueries(prev => [...prev, { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'}]);
+    // Add new query without 'mode'
+    setQueries(prev => [...prev, { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
   };
-
   const removeLastQuery = () => {
     if (queries.length > 1) {
       setQueries(prev => prev.slice(0, -1));
     }
   };
-
-  const clearAllQueries = () => {
-    setQueries([{ text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori'}]);
+ const clearAllQueries = () => {
+    // Clear queries without 'mode'
+    setQueries([{ text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
     setTimeout(focusFirstTextarea, 0);
   };
-
+  
   const focusFirstTextarea = () => {
     const textarea = containerRef.current?.querySelector('textarea');
     if (textarea) {
@@ -112,16 +157,25 @@ const InputPanel = ({ onSearch }: InputPanelProps) => {  const [queries, setQuer
   const SearchButton = () => (
     <button
       ref={searchButtonRef}
-      onClick={triggerSearch}
+      onClick={() => handleSearch('normal')}
       className={searchButtonClass + ' w-full'}
       disabled={loading}
     >
       {loading ? 'Searching...' : 'Search'}
     </button>
   );
+    const ChainSearchButton = () => (
+    <button
+      ref={chainSearchButtonRef}
+      onClick={() => handleSearch('chain')}
+      className={searchButtonClass + ' w-full'}
+      disabled={loading}
+    >
+      {loading ? 'Chaining...' : 'Chain Search'}
+    </button>
+  );
 
-  return {
-    // Return both the panel content and search button separately
+    return {
     panelContent: (
       <div className={containerClass} ref={containerRef}>
         <QueryList 
@@ -130,8 +184,10 @@ const InputPanel = ({ onSearch }: InputPanelProps) => {  const [queries, setQuer
         />
       </div>
     ),
-    searchButton: <SearchButton />
+    searchButton: <SearchButton />,
+    chainSearchButton: <ChainSearchButton /> // ✅ CORRECT KEY
   };
+
 };
 
 export default InputPanel;

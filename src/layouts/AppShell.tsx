@@ -5,11 +5,12 @@ interface AppShellProps {
   leftPanel: React.ReactNode;
   rightPanel: React.ReactNode;
   searchButton: React.ReactNode;
+  chainSearchButton: React.ReactNode; // NEW: Optional prop for the chain search button
   // Add a new optional prop for the carousel overlay
   carouselOverlay?: React.ReactNode;
 }
 
-const AppShell: React.FC<AppShellProps> = ({ leftPanel, rightPanel, searchButton, carouselOverlay }) => {
+const AppShell: React.FC<AppShellProps> = ({ leftPanel, rightPanel, searchButton, chainSearchButton, carouselOverlay }) => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 text-slate-900">
       {/* Left Panel - No changes needed here */}
@@ -17,9 +18,13 @@ const AppShell: React.FC<AppShellProps> = ({ leftPanel, rightPanel, searchButton
         <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
           {leftPanel}
         </div>
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white/98 via-white/95 to-transparent backdrop-blur-sm border-t border-slate-200/40">
-          {searchButton}
-        </div>
+<div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white/98 via-white/95 to-transparent backdrop-blur-sm border-t border-slate-200/40">
+  <div className="flex gap-2">
+    {searchButton}
+    {chainSearchButton}
+  </div>
+</div>
+
       </aside>
 
       {/* Right-side Container */}

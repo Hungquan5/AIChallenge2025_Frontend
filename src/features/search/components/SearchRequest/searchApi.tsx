@@ -1,5 +1,5 @@
 // src/components/SearchRequest/searchApi.ts
-import type { ResultItem, SearchMode, Query } from '../../types';
+import type { ResultItem, SearchMode, ApiQuery } from '../../types';
 
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
@@ -31,36 +31,11 @@ export const translateText = async (text: string): Promise<string> => {
 };
 
 export const searchByText = async (
-  queries: Query[],
+  queries: ApiQuery[],
   mode: SearchMode = 'normal'
 ): Promise<ResultItem[]> => {
-  if (
-    !queries.length ||
-    queries.every(
-      (q) => !q.text?.trim() && !q.asr?.trim() && !q.ocr?.trim() && !q.obj
-    )
-  ) {
-    throw new Error('Search queries cannot be empty');
-  }
 
-  const translatedQueries: Query[] = await Promise.all(
-  queries.map(async (q) => {
-    const alreadyTranslated = !!q.origin;
-    const originalText = alreadyTranslated ? q.origin : q.text?.trim() || '';
-    const translated = alreadyTranslated
-      ? q.text
-      : originalText
-      ? await translateText(originalText)
-      : '';
 
-    return {
-      ...q,
-      origin: originalText,
-      text: translated,
-      obj: q.obj ?? [],
-    };
-  })
-);
 
   const endpoint =
     mode === 'chain'
@@ -70,7 +45,8 @@ export const searchByText = async (
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(translatedQueries),
+    // The received 'queries' are sent directly in the body.
+    body: JSON.stringify(queries),
   });
 
   if (!res.ok) {

@@ -75,17 +75,18 @@ const App: React.FC = () => {
     // ... other shortcuts
   });
 
-  const inputPanelInstance = InputPanel({
-    onSearch: handleSearch
-  });
+
+const inputPanelInstance = InputPanel({
+    onSearch: handleSearch,
+});
+const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
+
 
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
       {inputPanelInstance.panelContent}
     </div>
   );
-
-  const searchButton = inputPanelInstance.searchButton;
 
   const rightPanel = (
     <>
@@ -123,12 +124,13 @@ const App: React.FC = () => {
   return (
     <>
       <AppShell
-        leftPanel={leftPanel}
-        rightPanel={rightPanel}
-        searchButton={searchButton}
-        // NEW: Pass the carousel overlay to the AppShell.
-        carouselOverlay={carouselOverlay}
-      />
+  leftPanel={leftPanel}
+  rightPanel={rightPanel}
+  searchButton={searchButton}
+  chainSearchButton={chainSearchButton} // ✅ Pass it in
+  carouselOverlay={carouselOverlay}
+/>
+
       {showShortcuts && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="relative">

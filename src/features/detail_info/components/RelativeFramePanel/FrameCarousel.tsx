@@ -9,7 +9,8 @@ import 'swiper/css/navigation';
 import type { FrameItem } from '../../types';
 import FrameItemSlide from './FrameItemSlide';
 import useSwiperNavigation from '../../hooks/useSwiperNavigation';
-import * as styles from  './styles';
+import * as styles from './styles';
+
 export const getImageUrl = (videoId: string, thumbnail: string) =>
   `http://localhost:1406/dataset/full_batch1/${videoId}/keyframes/${thumbnail}`;
 
@@ -40,7 +41,6 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
     onPrev,
   });
   
-  // --- THIS IS THE CORRECTED PART ---
   // Effect to handle reaching the beginning or end for infinite loading
   useEffect(() => {
     const swiperInstance = swiperRef.current;
@@ -51,14 +51,13 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
         onNext?.();
       };
 
-      // NEW: Handler for reaching the beginning
+      // Handler for reaching the beginning
       const handleReachBeginning = () => {
         console.log('[Carousel] Reached BEGINNING, calling onPrev.');
         onPrev?.();
       };
 
       swiperInstance.on('reachEnd', handleReachEnd);
-      // NEW: Register the event listener for the beginning
       swiperInstance.on('reachBeginning', handleReachBeginning);
 
       // Cleanup function to remove BOTH listeners
@@ -69,9 +68,9 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
         }
       };
     }
-    // NEW: Add onPrev to the dependency array
   }, [onNext, onPrev, swiperRef]);
-useEffect(() => {
+
+  useEffect(() => {
     const swiper = swiperRef.current;
     // When frames are prepended, find the new index of the active slide
     const newIndex = frames.findIndex(f => f.timestamp === activeFrameId.toString());
@@ -81,14 +80,14 @@ useEffect(() => {
       // Teleport to that slide without an animation. This prevents the "jump".
       swiper.slideTo(newIndex, 0); 
     }
-  }, [frames, activeFrameId, swiperRef]); // Rerun whenever the frames array changes
+  }, [frames, activeFrameId, swiperRef]);
 
   const initialSlideIndex = frames.findIndex(f => f.timestamp === activeFrameId.toString());
 
   return (
-    // Main container is now absolute, at the bottom, and uses modern styles
+    // Compact container with reduced height
     <div
-      className="absolute inset-x-0 bottom-0 h-[35vh] bg-slate-900/80 backdrop-blur-lg border-t border-white/10 shadow-2xl"
+      className="absolute inset-x-0 bottom-0 h-[20vh] bg-slate-900/80 backdrop-blur-lg border-t border-white/10 shadow-xl"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
@@ -113,11 +112,11 @@ useEffect(() => {
         className="w-full h-full"
         wrapperClass={styles.swiperWrapperClass}
         slidesPerView={'auto'}
-        spaceBetween={20}
+        spaceBetween={12}
         centeredSlides={true}
       >
         {frames.map((frame) => {
-          // NEW: Determine if this specific slide is the active one
+          // Determine if this specific slide is the active one
           const isActive = frame.timestamp === activeFrameId.toString();
 
           return (

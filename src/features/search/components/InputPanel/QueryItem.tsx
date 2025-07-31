@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef,useEffect, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Query } from '../../types';
 import { translateText } from '../SearchRequest/searchApi';
@@ -6,6 +6,36 @@ import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
 import {
   inputClass,
   labelClass,
+  queryItemContainerClass,
+  modeToggleButtonClass,
+  modeToggleActiveClass,
+  modeToggleInactiveClass,
+  textModeActiveColor,
+  imageModeActiveColor,
+  featureToggleButtonClass,
+  featureToggleActiveClass,
+  featureToggleInactiveClass,
+  ocrActiveColor,
+  asrActiveColor,
+  objActiveColor,
+  featureSectionClass,
+  featureTitleClass,
+  featureDividerClass,
+  featureGridClass,
+  uploadAreaClass,
+  uploadIconClass,
+  uploadTextClass,
+  uploadedImageClass,
+  featureInputLabelClass,
+  featureInputClass,
+  ocrInputClass,
+  asrInputClass,
+  objInputClass,
+  bottomControlsClass,
+  languageToggleClass,
+  actionButtonClass,
+  removeButtonClass,
+  addButtonClass,
 } from './styles';
 
 interface QueryItemProps {
@@ -21,14 +51,42 @@ interface QueryItemProps {
   inputRef?: RefObject<HTMLTextAreaElement>;
 }
 
-const ToggleButton = ({ active, label, onClick, bg }: { active: boolean; label: string; onClick: () => void; bg: string }) => (
+const ModeToggleButton = ({ active, icon, onClick, activeColor }: {
+  active: boolean;
+  icon: string;
+  onClick: () => void;
+  activeColor: string;
+}) => (
   <button
-    className={`px-2 py-1 rounded-md ${
-      active ? `${bg} text-black` : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-    } text-sm hover:brightness-105 transition-all hover:-translate-y-0.5`}
+    className={`
+      ${modeToggleButtonClass}
+      ${active
+        ? `${activeColor} ${modeToggleActiveClass}`
+        : modeToggleInactiveClass
+      }
+    `}
     onClick={onClick}
   >
-    {label}
+    {icon}
+  </button>
+);
+const FeatureToggleButton = ({ active, icon, onClick, activeColor }: { 
+  active: boolean; 
+  icon: string; 
+  onClick: () => void; 
+  activeColor: string; 
+}) => (
+  <button
+    className={`
+      ${featureToggleButtonClass}
+      ${active 
+        ? `${activeColor} ${featureToggleActiveClass}` 
+        : featureToggleInactiveClass
+      }
+    `}
+    onClick={onClick}
+  >
+    {icon}
   </button>
 );
 
@@ -43,11 +101,56 @@ const QueryItem: React.FC<QueryItemProps> = ({
   onPrev,
   inputRef,
 }) => {
-  const [showASR, setShowASR] = useState(false);
+  const [displayMode, setDisplayMode] = useState<'text' | 'image'>(
+    query.imageFile ? 'image' : 'text'
+  );
+  
+ const [queryMode, setQueryMode] = useState<'text' | 'image'>(
+    query.imageFile ? 'image' : 'text'
+  );  const [showASR, setShowASR] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [showOBJ, setShowOBJ] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const localTextareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = inputRef || localTextareaRef;
+  useEffect(() => {
+    // Sync local state if the query from the parent changes (e.g., clearing all)
+    setImageFile(query.imageFile || null);
+    setDisplayMode(query.imageFile ? 'image' : 'text');
+  }, [query.imageFile]);
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // When an image is uploaded, it automatically becomes an image query.
+      // Clear text fields and update the parent with the file.
+      onUpdate(index, {
+        imageFile: file,
+        text: '',
+        origin: '',
+        // You might want to decide if OCR/ASR/OBJ should also be cleared
+        // ocr: '',
+        // asr: '',
+      });
+    }
+  };
+
+// Also ensure that when switching to image mode, the state is properly managed
+const handleModeToggle = (newMode: 'text' | 'image') => {
+    setQueryMode(newMode);
+
+    if (newMode === 'text') {
+      // If switching to text mode, clear the image file.
+      onUpdate(index, { imageFile: null });
+    } else {
+      // If switching to image mode, clear all text-related fields.
+      onUpdate(index, {
+        text: '',
+        origin: '',
+        lang: 'ori', // Reset language
+      });
+    }
+  };
+
 
   const handleBlur = async () => {
     if (query.lang !== 'eng') {
@@ -90,87 +193,161 @@ const QueryItem: React.FC<QueryItemProps> = ({
   };
 
   return (
-    <div className="p-3 border border-[var(--border-color)] rounded-lg shadow-md space-y-2 bg-[var(--bg-secondary)]" tabIndex={0}>
-      <div className="flex gap-2 mb-2">
-        <ToggleButton active={showOCR} label="📄 OCR" onClick={() => setShowOCR(prev => !prev)} bg="bg-red-100" />
-        <ToggleButton active={showASR} label="🎤 ASR" onClick={() => setShowASR(prev => !prev)} bg="bg-blue-100" />
-        <ToggleButton active={showOBJ} label="🧝 OBJ" onClick={() => setShowOBJ(prev => !prev)} bg="bg-green-100" />
+    <div className={queryItemContainerClass} tabIndex={0}>
+      
+      {/* === Mode and Feature Toggles === */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+           <ModeToggleButton
+            active={queryMode === 'text'}
+            icon="📝"
+            onClick={() => handleModeToggle('text')}
+            activeColor={textModeActiveColor}
+          />
+          <ModeToggleButton
+            active={queryMode === 'image'}
+            icon="🖼️"
+            onClick={() => handleModeToggle('image')}
+            activeColor={imageModeActiveColor}
+          />
+        </div>
+
+        <div className={featureGridClass}>
+          <FeatureToggleButton 
+            active={showOCR} 
+            icon="📄" 
+            onClick={() => setShowOCR(prev => !prev)} 
+            activeColor={ocrActiveColor}
+          />
+          <FeatureToggleButton 
+            active={showASR} 
+            icon="🎤" 
+            onClick={() => setShowASR(prev => !prev)} 
+            activeColor={asrActiveColor}
+          />
+          <FeatureToggleButton 
+            active={showOBJ} 
+            icon="🎯" 
+            onClick={() => setShowOBJ(prev => !prev)} 
+            activeColor={objActiveColor}
+          />
+        </div>
       </div>
 
-      <textarea
-        ref={textareaRef}
-        value={query.lang === 'eng' ? query.text : query.origin}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
-        placeholder="Enter your query..."
-        className={`${inputClass} resize-none flex-1 scrollbar-thin scrollbar-thumb-[var(--border-color)] scrollbar-track-[var(--bg-tertiary)]`}
-        rows={7}
-      />
+      {/* === Query Content === */}
+      <div className="space-y-3">
+        {queryMode === 'text' && (
+          <textarea
+            ref={textareaRef}
+            value={query.lang === 'eng' ? query.text : query.origin}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            placeholder="Enter your query..."
+            className={`${inputClass} resize-none flex-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100`}
+            rows={7}
+          />
+        )}
 
-      {showOCR && (
-        <input
-          type="text"
-          value={query.ocr}
-          onChange={(e) => onUpdate(index, { ocr: e.target.value })}
-          placeholder="OCR input"
-          className="w-full p-2 rounded-md bg-red-100 border border-[var(--border-color)] text-sm text-black placeholder-gray-700"
-        />
-      )}
+        {queryMode === 'image' && (
+          <div className="space-y-3">
+            <label
+              htmlFor={`file-upload-${index}`}
+              className={uploadAreaClass}
+            >
+              <div className="flex flex-col items-center">
+                <span className={uploadIconClass}>
+                  {imageFile ? '🔄' : '📸'}
+                </span>
+                <span className={uploadTextClass}>
+                  {imageFile ? 'Change Image' : 'Click to upload image'}
+                </span>
+              </div>
+              <input
+                id={`file-upload-${index}`}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
 
-      {showASR && (
-        <input
-          type="text"
-          value={query.asr}
-          onChange={(e) => onUpdate(index, { asr: e.target.value })}
-          placeholder="ASR input"
-          className="w-full p-2 rounded-md bg-blue-100 border border-[var(--border-color)] text-sm text-black placeholder-gray-700"
-        />
-      )}
+            {imageFile && (
+              <div className="flex justify-center">
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt="Uploaded preview"
+                  className={uploadedImageClass}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
-      {showOBJ && (
-        <div className="flex gap-2 items-center">
+        {/* === Feature Input Fields === */}
+        {showOCR && (
+          <input
+            type="text"
+            value={query.ocr}
+            onChange={(e) => onUpdate(index, { ocr: e.target.value })}
+            placeholder="OCR input..."
+            className={`${featureInputClass} ${ocrInputClass}`}
+          />
+        )}
+
+        {showASR && (
+          <input
+            type="text"
+            value={query.asr}
+            onChange={(e) => onUpdate(index, { asr: e.target.value })}
+            placeholder="ASR input..."
+            className={`${featureInputClass} ${asrInputClass}`}
+          />
+        )}
+
+        {showOBJ && (
           <input
             type="text"
             value={query.obj?.[0] || ''}
             onChange={(e) => onUpdate(index, { obj: [e.target.value] })}
-            placeholder="ex: person=8 bicycle<=2 motorcycle=1"
-            className="w-full p-2 rounded-md bg-green-100 border border-[var(--border-color)] text-sm text-black placeholder-gray-700"
+            placeholder="ex: person=8 bicycle<=2"
+            className={`${featureInputClass} ${objInputClass}`}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="flex justify-between items-center mt-2">
+      {/* === Bottom Controls === */}
+      <div className={bottomControlsClass}>
         <div>
-          {(query.text || query.origin) && (
+          {(query.text || query.origin) && queryMode === 'text' && (
             <button
               onClick={() => {
                 const newLang = query.lang === 'eng' ? 'ori' : 'eng';
                 onUpdate(index, { lang: newLang });
               }}
-              className="text-xs bg-[var(--bg-tertiary)] text-[var(--text-primary)] px-2 py-1 rounded hover:bg-[var(--bg-secondary)] transition-all hover:-translate-y-0.5"
+              className={languageToggleClass}
             >
-              {query.lang === 'eng' ? 'ENG' : 'ORI'}
+              {query.lang === 'eng' ? '🇺🇸 ENG' : '🌐 ORI'}
             </button>
           )}
         </div>
 
-        <div className="flex gap-2 ml-4">
+        <div className="flex gap-2">
           {!disableRemove && (
             <button
               onClick={() => onRemove(index)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#E53E3E] text-white hover:bg-[#C53030] transition-all hover:-translate-y-0.5"
+              className={`${actionButtonClass} ${removeButtonClass}`}
               title="Remove query"
             >
-              −
+              ✕
             </button>
           )}
           <button
             onClick={() => onInsertAfter(index)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--accent-color)] text-[var(--bg-primary)] hover:bg-[var(--accent-hover)] transition-all hover:-translate-y-0.5"
+            className={`${actionButtonClass} ${addButtonClass}`}
             title="Add query after"
           >
-            +
+            ✚
           </button>
         </div>
       </div>
@@ -178,4 +355,4 @@ const QueryItem: React.FC<QueryItemProps> = ({
   );
 };
 
-export default QueryItem;
+export default QueryItem; 

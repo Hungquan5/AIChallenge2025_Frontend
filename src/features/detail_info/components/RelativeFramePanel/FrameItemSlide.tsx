@@ -12,7 +12,7 @@ interface FrameItemSlideProps {
 }
 
 const FrameItemSlide: React.FC<FrameItemSlideProps> = ({ frame, isActive }) => {
-  // Combine the base class with either the active or inactive class.
+  // Combine the base class with either the active or inactive class
   const wrapperClasses = `
     ${styles.slideContentWrapperClass}
     ${isActive ? styles.activeSlideClass : styles.inactiveSlideClass}
@@ -21,7 +21,7 @@ const FrameItemSlide: React.FC<FrameItemSlideProps> = ({ frame, isActive }) => {
   return (
     <div className={wrapperClasses}>
       <div className={styles.imageContainerClass}>
-        {/* NEW: Conditionally render the glow effect only for the active slide */}
+        {/* Conditionally render the glow effect only for the active slide */}
         {isActive && <div className={styles.activeImageGlowClass}></div>}
         
         <img
@@ -33,24 +33,6 @@ const FrameItemSlide: React.FC<FrameItemSlideProps> = ({ frame, isActive }) => {
             target.src = '/fallback.jpg';
           }}
         />
-      </div>
-      
-      {/* 
-        This info panel will now animate automatically because the active slide's
-        wrapper will always have `group-hover` styles effectively applied, 
-        and the inactive slides will reveal it on manual hover.
-      */}
-      <div className={`${styles.infoPanelClass} ${isActive && 'opacity-100 translate-y-0'}`}>
-        <div className={styles.infoContentClass}>
-          <div className={styles.infoSectionClass}>
-            <span className={styles.infoLabelClass}>Time:</span>
-            <span className={styles.infoValueClass}>{frame.timestamp}</span>
-          </div>
-          <div className={styles.infoSectionClass}>
-            <span className={styles.infoLabelClass}>Conf:</span>
-            <span className={styles.infoValueClass}>{frame.confidence.toFixed(2)}</span>
-          </div>
-        </div>
       </div>
     </div>
   );

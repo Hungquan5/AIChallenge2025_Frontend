@@ -1,23 +1,39 @@
+// src/types.ts
+
 export interface ResultItem {
-    id: string;
-    videoId: string;
-    title: string;
-    thumbnail: string;
-    confidence: number;
-    timestamp: string;
+  id: string;
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  confidence: number;
+  timestamp: string;
 }
 
 export interface Query {
-  text: string;        // nội dung chính (được tự động dịch sang tiếng anh)
-  asr: string;         // automatic speech recognition input
-  ocr: string;         // OCR text
-  origin: string;      // nội dung gốc (chưa dịch)
-  obj?: string[];      // optional list of objects (e.g., ["car", "man"])
-  lang?: 'ori' | 'eng';      // nội dung chọn để vector search
+  text: string;
+  asr: string;
+  ocr: string;
+  origin: string;
+  obj: string[];
+  lang: 'eng' | 'ori';
+  imageFile?: File | null;
 }
 
 export interface GroupedResult {
-    videoId: string;
-    videoTitle: string;
-    items: ResultItem[];
+  videoId: string;
+  videoTitle: string;
+  items: ResultItem[];
+}
+
+export type SearchMode = 'normal' | 'chain';
+
+// Define a separate type for the API payload
+export interface ApiQuery {
+  text: string;
+  asr: string;
+  ocr: string;
+  origin: string;
+  obj: string[];
+  lang: 'eng' | 'ori';
+  image: string; // For the base64 encoded image
 }
