@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import React, { useEffect, useRef, useState } from 'react';
-import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
+import { isShortcut, SHORTCUTS, useShortcuts } from '../../../../utils/shortcuts';
 import type { Query } from '../../types';
 import { translateText } from '../SearchRequest/searchApi';
 import {
@@ -171,20 +171,21 @@ const handleModeToggle = (newMode: 'text' | 'image') => {
   };
 
 
-  const handleBlur = async () => {
-    if (query.lang !== 'eng') {
-      const inputText = query.origin.trim();
-      if (!inputText || query.text) return;
-
-      try {
-        const translated = await translateText(inputText);
-        onUpdate(index, { text: translated, lang: 'eng' });
-      } catch (err) {
-        console.error('Translation failed:', err);
-      }
+  const handleLanguageToggle = () => {
+    const newLang = query.lang === 'eng' ? 'ori' : 'eng';
+    if (newLang === 'eng' && query.origin && !query.text) {
+      translateText(query.origin.trim())
+        .then(translated => {
+          onUpdate(index, { text: translated, lang: newLang });
+        })
+        .catch(err => {
+          console.error('Translation failed:', err);
+          onUpdate(index, { lang: newLang }); // Fallback to just switch lang
+        });
+    } else {
+      onUpdate(index, { lang: newLang });
     }
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isShortcut(e, SHORTCUTS.NEW_QUERY)) {
       e.preventDefault();
@@ -261,7 +262,6 @@ const handleModeToggle = (newMode: 'text' | 'image') => {
             value={query.lang === 'eng' ? query.text : query.origin}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
             placeholder="Enter your query..."
             className={`${inputClass} resize-none flex-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100`}
             rows={7}
@@ -339,15 +339,27 @@ const handleModeToggle = (newMode: 'text' | 'image') => {
       <div className={bottomControlsClass}>
         <div>
           {(query.text || query.origin) && queryMode === 'text' && (
-            <button
-              onClick={() => {
-                const newLang = query.lang === 'eng' ? 'ori' : 'eng';
-                onUpdate(index, { lang: newLang });
-              }}
-              className={languageToggleClass}
-            >
-              {query.lang === 'eng' ? '🇺🇸 ENG' : '🌐 ORI'}
-            </button>
+           <button
+  onClick={async () => {
+    const newLang = query.lang === 'eng' ? 'ori' : 'eng';
+
+    if (newLang === 'eng' && query.origin && !query.text) {
+      try {
+        const translated = await translateText(query.origin.trim());
+        onUpdate(index, { text: translated, lang: newLang });
+      } catch (err) {
+        console.error('Translation failed:', err);
+        onUpdate(index, { lang: newLang }); // fallback to just switch lang
+      }
+    } else {
+      onUpdate(index, { lang: newLang });
+    }
+  }}
+  className={languageToggleClass}
+>
+  {query.lang === 'eng' ? '🇺🇸 ENG' : '🌐 ORI'}
+</button>
+
           )}
         </div>
 

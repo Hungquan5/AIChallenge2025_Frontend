@@ -12,6 +12,7 @@ export const SHORTCUTS = {
   CLEAR_SEARCH: { key: 'Escape', modifier: 'none' },
   ADD_QUERY: { key: 'n', modifier: 'Alt' },
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
+  TRANSLATE_QUERY: { key: 't', modifier: 'Alt' },
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
   

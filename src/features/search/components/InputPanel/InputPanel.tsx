@@ -31,9 +31,12 @@ const InputPanel = ({ onSearch }: InputPanelProps) => {
   }, []);
 
 const handleSearch = async (searchMode: SearchMode = 'normal') => {
+
     setLoading(true);  
+    
   // 2. Prepare the payload for the API by inferring query type
   const apiQueriesPromises = queries.map(async (q): Promise<ApiQuery> => {
+    
       // Base query with shared fields
       const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
         asr: q.asr.trim(),

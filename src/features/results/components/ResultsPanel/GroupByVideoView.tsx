@@ -12,6 +12,7 @@ import {
   imageClass
 } from './styles';
 import ResultCard from './ResultCard';
+import { submitToDres } from '../../../submit/components/SubmitAPI';
 
 interface Props {
   groupedResults: GroupedResult[];
@@ -58,6 +59,8 @@ const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, on
                 onLoad={handleImageLoad}
                 onClick={onResultClick ? () => onResultClick(item) : undefined}
                 onContextMenu={(event) => onRightClick(item, event)}
+                onSubmit={() => submitToDres(item)} // Call the submit function with the item
+
                 // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
                 onSimilaritySearch={onSimilaritySearch}
                 imageClassName={imageClass} // Use the imported class for image styling
