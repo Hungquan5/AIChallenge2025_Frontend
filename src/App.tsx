@@ -95,7 +95,11 @@ const handleSimilarityResults = (newResults: ResultItem[]) => {
       }) // Example API call
 
   };
-
+  // selected for submission
+  const handleResultMiddleClick = (imageSrc: string, cardId: string) => {
+    //select the image for submission
+    console.log(`Selected card for submission: ${cardId} with image: ${imageSrc}`);
+  }
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
   };

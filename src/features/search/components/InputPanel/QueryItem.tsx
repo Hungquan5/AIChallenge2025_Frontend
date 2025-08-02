@@ -1,41 +1,36 @@
-import React, { useRef,useEffect, useState } from 'react';
 import type { RefObject } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
 import type { Query } from '../../types';
 import { translateText } from '../SearchRequest/searchApi';
-import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
 import {
-  inputClass,
-  labelClass,
-  queryItemContainerClass,
-  modeToggleButtonClass,
-  modeToggleActiveClass,
-  modeToggleInactiveClass,
-  textModeActiveColor,
-  imageModeActiveColor,
-  featureToggleButtonClass,
-  featureToggleActiveClass,
-  featureToggleInactiveClass,
-  ocrActiveColor,
-  asrActiveColor,
-  objActiveColor,
-  featureSectionClass,
-  featureTitleClass,
-  featureDividerClass,
-  featureGridClass,
-  uploadAreaClass,
-  uploadIconClass,
-  uploadTextClass,
-  uploadedImageClass,
-  featureInputLabelClass,
-  featureInputClass,
-  ocrInputClass,
-  asrInputClass,
-  objInputClass,
-  bottomControlsClass,
-  languageToggleClass,
   actionButtonClass,
-  removeButtonClass,
   addButtonClass,
+  asrActiveColor,
+  asrInputClass,
+  bottomControlsClass,
+  featureGridClass,
+  featureInputClass,
+  featureToggleActiveClass,
+  featureToggleButtonClass,
+  featureToggleInactiveClass,
+  imageModeActiveColor,
+  inputClass,
+  languageToggleClass,
+  modeToggleActiveClass,
+  modeToggleButtonClass,
+  modeToggleInactiveClass,
+  objActiveColor,
+  objInputClass,
+  ocrActiveColor,
+  ocrInputClass,
+  queryItemContainerClass,
+  removeButtonClass,
+  textModeActiveColor,
+  uploadAreaClass,
+  uploadedImageClass,
+  uploadIconClass,
+  uploadTextClass
 } from './styles';
 
 interface QueryItemProps {
@@ -133,6 +128,30 @@ const QueryItem: React.FC<QueryItemProps> = ({
       });
     }
   };
+
+
+
+  
+// Hover your mouse over the address bar, selecting everything in there,
+// ready for you to enter a new address or search.
+useEffect(() => {
+  const handleGlobalKeyDown = (e: KeyboardEvent) => {
+    if (isShortcut(e, SHORTCUTS.NAVIGATE_SEARCH)) {
+      e.preventDefault();
+      if (queryMode === 'text' && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select(); // Select all text
+      }
+    }
+  };
+
+  window.addEventListener('keydown', handleGlobalKeyDown);
+  return () => {
+    window.removeEventListener('keydown', handleGlobalKeyDown);
+  };
+}, [queryMode, textareaRef]);
+
+
 
 // Also ensure that when switching to image mode, the state is properly managed
 const handleModeToggle = (newMode: 'text' | 'image') => {

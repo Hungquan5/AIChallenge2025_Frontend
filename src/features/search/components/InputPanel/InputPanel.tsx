@@ -79,11 +79,11 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
 
   if (!isSearchable) {
     alert('Please enter a query, upload an image, or specify other search criteria.');
+    setLoading(false);
     return;
   }
   
   console.log('Final payload being sent:', apiQueries);
-  setLoading(true);
   
   try {
     const results = await searchByText(apiQueries, searchMode);
@@ -122,6 +122,12 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
 
   // Register shortcuts
   useShortcuts({
+    TRIGGER_CHAIN_SEARCH: () => {
+      if (chainSearchButtonRef.current) {
+        chainSearchButtonRef.current.click();
+      } 
+    },
+
     ADD_QUERY: addNewQuery,
     REMOVE_QUERY: removeLastQuery,
     CLEAR_SEARCH: clearAllQueries,

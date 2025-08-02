@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 export const SHORTCUTS = {
   // Search shortcuts
   TRIGGER_SEARCH: { key: 'Enter', modifier: 'Ctrl/Cmd' },
+  TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   NEW_QUERY: { key: 'Enter', modifier: 'none' },
   NEXT_CELL: { key: 'Tab', modifier: 'none' },
   PREV_CELL: { key: 'Tab', modifier: 'Shift' },
@@ -11,7 +12,6 @@ export const SHORTCUTS = {
   CLEAR_SEARCH: { key: 'Escape', modifier: 'none' },
   ADD_QUERY: { key: 'n', modifier: 'Alt' },
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
-  
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
   
@@ -21,6 +21,7 @@ export const SHORTCUTS = {
   
   // Navigation shortcuts
   FOCUS_SEARCH: { key: 'f', modifier: 'Alt' },
+  NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, // Chưa làm gì với cái này
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
 } as const;

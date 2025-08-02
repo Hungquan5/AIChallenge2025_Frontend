@@ -6,7 +6,6 @@ import {
   imageContainerClass,
   imageOverlayClass,
 } from './styles';
-
 interface Props {
   imageClassName?: string; // ✅ fixed name  
   id: string;
@@ -19,6 +18,7 @@ interface Props {
   onClick?: () => void;
   onContextMenu?: (event: React.MouseEvent) => void;
   onSimilaritySearch?: (imageSrc: string, cardId: string) => void; // New prop for similarity search
+  onSubmit?: () => void; // Optional submit handler
   priority?: boolean;
   alt?: string;
   showConfidence?: boolean;
@@ -39,6 +39,7 @@ const ResultCard: React.FC<Props> = ({
   onClick,
   onContextMenu,
   onSimilaritySearch,
+  onSubmit,
   priority = false,
   alt,
   showConfidence = false,
@@ -48,7 +49,8 @@ const ResultCard: React.FC<Props> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-
+  // Maintain a local state for selection for submition
+  const [isSelectedState, setIsSelectedState] = useState(isSelected);
   const handleImageLoad = useCallback(() => {
     onLoad(id);
   }, [id, onLoad]);
@@ -56,29 +58,42 @@ const ResultCard: React.FC<Props> = ({
   const handleImageError = useCallback(() => {
     setImageError(true);
   }, []);
-
-  // components/ResultCard.tsx
-
+// Handle submit action, either from onSubmit using middleclick
+const handelSubmit = useCallback(() => {
+  if (onSubmit) {
+    console.log('Submitting result:', id);
+    onSubmit();
+  } else if (onClick) {
+    onClick();
+  }
+}, [onSubmit, onClick]);
 const handleClick = useCallback((e: React.MouseEvent) => {
   if (disabled) {
     e.preventDefault();
     return;
   }
 
-  // Check for Ctrl+click (or Cmd+click on Mac) for similarity search
-  if ((e.ctrlKey || e.metaKey) && onSimilaritySearch) {
-    // PREVENT the default browser action (like opening a link in a new tab)
-    e.preventDefault(); 
-    // STOP the event from bubbling up to parent elements like SwiperSlide
-    e.stopPropagation(); 
-    
-    onSimilaritySearch(thumbnail, id);
-    return; // Exit the function
+  // Middle click (mouse button 1) triggers submit
+  if (e.button === 1) {
+    e.preventDefault();
+    handelSubmit(); // <-- Use your defined function
+    return;
   }
 
-  // If it wasn't a Ctrl+Click, proceed with the normal onClick behavior
-  onClick?.();
-}, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
+  // Ctrl/Cmd + Left Click triggers similarity search
+  if ((e.ctrlKey || e.metaKey) && e.button === 0 && onSimilaritySearch) {
+    e.preventDefault();
+    e.stopPropagation();
+    onSimilaritySearch(thumbnail, id);
+    return;
+  }
+
+  // Regular Left Click
+  if (e.button === 0) {
+    onClick?.();
+  }
+}, [disabled, handelSubmit, onClick, onSimilaritySearch, thumbnail, id]);
+
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return;
@@ -143,7 +158,7 @@ const handleClick = useCallback((e: React.MouseEvent) => {
     <div
       className={cardClasses}
       tabIndex={disabled ? -1 : 0}
-      onClick={handleClick}
+      onMouseDown={handleClick}
       onContextMenu={handleContextMenu}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}

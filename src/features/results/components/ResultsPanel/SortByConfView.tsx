@@ -9,7 +9,7 @@ import {
   imageClass
 } from './styles';
 import ResultCard from './ResultCard';
-
+import { submitToDres } from '../../../submit/components/SubmitAPI';  
 interface Props {
   results: ResultItem[];
   onResultClick: (item: ResultItem) => void;
@@ -52,6 +52,7 @@ const SortedByConfidenceView: React.FC<Props> = ({ results, onResultClick, onRig
           onContextMenu={(event) => onRightClick(item, event)}
           // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
           onSimilaritySearch={onSimilaritySearch}
+          onSubmit={() => submitToDres(item)} // Call the submit function with the item
           imageClassName={imageClass} // Use the imported class for image styling
         />
       ))}

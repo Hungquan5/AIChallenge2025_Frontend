@@ -5,6 +5,7 @@
   --color-medium: #3A4750;    /* Medium gray */
   --color-accent: #F6C90E;    /* Vibrant yellow */
   --color-light: #EEEEEE;     /* Light gray */
+  
 
   /* Derived colors for UI */
   --bg-primary: var(--color-dark);

@@ -42,8 +42,104 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   };
 
   // Keyboard shortcut logic can remain
-  const focusNextResult = useCallback(() => { /* ... */ }, []);
-  const focusPrevResult = useCallback(() => { /* ... */ }, []);
+ const focusNextResult = () => {
+
+
+
+    const container = containerRef.current;
+
+
+    if (!container) return;
+
+
+
+
+
+    const items = container.querySelectorAll('.result-item');
+
+
+    const currentFocus = document.activeElement;
+
+
+    const currentIndex = Array.from(items).indexOf(currentFocus as Element);
+
+
+    
+
+
+    if (currentIndex === -1 && items.length > 0) {
+
+
+      // No item focused, focus first item
+
+
+      (items[0] as HTMLElement).focus();
+
+
+    } else if (currentIndex < items.length - 1) {
+
+
+      // Focus next item
+
+
+      (items[currentIndex + 1] as HTMLElement).focus();
+
+
+    }
+
+
+  };
+
+
+
+
+
+  const focusPrevResult = () => {
+
+
+    const container = containerRef.current;
+
+
+    if (!container) return;
+
+
+
+
+
+    const items = container.querySelectorAll('.result-item');
+
+
+    const currentFocus = document.activeElement;
+
+
+    const currentIndex = Array.from(items).indexOf(currentFocus as Element);
+
+
+    
+
+
+    if (currentIndex === -1 && items.length > 0) {
+
+
+      // No item focused, focus last item
+
+
+      (items[items.length - 1] as HTMLElement).focus();
+
+
+    } else if (currentIndex > 0) {
+
+
+      // Focus previous item
+
+
+      (items[currentIndex - 1] as HTMLElement).focus();
+
+
+    }
+
+
+  };
   useShortcuts({ NEXT_RESULT: focusNextResult, PREV_RESULT: focusPrevResult });
 
   return (
