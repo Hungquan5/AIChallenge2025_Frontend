@@ -67,3 +67,32 @@ export const searchByText = async (
     thumbnail: adjustThumbnail(item.thumbnail),
   }));
 };
+export const searchBySingleQuery = async (
+  query: ApiQuery
+): Promise<ResultItem[]> => {
+  const endpoint = '/embeddings/stage';
+
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([query]), // The endpoint expects an array of queries
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(
+      `Failed to search: ${
+        errorData ? JSON.stringify(errorData) : res.statusText
+      }`
+    );
+  }
+
+  const data: ResultItem[] = await res.json();
+  console.log('Single query search results:', { data });
+
+  return data.map((item, index) => ({
+    ...item,
+    id: String(index),
+    thumbnail: adjustThumbnail(item.thumbnail),
+  }));
+};

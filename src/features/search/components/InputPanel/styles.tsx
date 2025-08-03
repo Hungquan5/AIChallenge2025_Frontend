@@ -7,8 +7,8 @@ export const emptyTextClass = 'text-sm text-slate-500 font-medium';
 
 // === Layout ===
 export const containerClass = `
-  p-3
-  margin-0
+p-1  
+margin-0
   space-y-3
   bg-[var(--bg-primary)]
   backdrop-blur-sm
@@ -32,8 +32,8 @@ export const queryItemContainerClass = `
 // === TextInputBox ===
 export const inputClass = `
   w-full
-  px-3
-  py-2.5
+  px-1.5
+  py-1.5
   rounded-xl
   border-0
   bg-white/90
@@ -127,13 +127,16 @@ export const fileInputClass = 'hidden';
 export const uploadAreaClass = `
   block cursor-pointer 
   border-2 border-dashed border-purple-200/80 
-  rounded-2xl p-6 text-center 
+  rounded-2xl p-6 text-center // Padding removed, will be handled by flex
   bg-gradient-to-br from-purple-50/50 to-pink-50/30 
   backdrop-blur-sm
   hover:border-purple-300/60 
   hover:bg-gradient-to-br hover:from-purple-100/50 hover:to-pink-100/40
-  transition-all duration-300 group 
+  transition-all duration-300
   shadow-sm hover:shadow-lg
+  aspect-video // <-- ADD THIS: Gives the container a 16:9 aspect ratio
+  flex items-center justify-center // <-- ADD THIS: Centers the prompt text
+  overflow-hidden // <-- ADD THIS: Ensures the image corners are rounded
 `;
 
 export const uploadIconClass = `
@@ -147,13 +150,19 @@ export const uploadTextClass = `
   group-hover:text-purple-800 
   transition-colors
 `;
+// ... other styles
 
 export const uploadedImageClass = `
-  max-w-xs max-h-64 
-  rounded-xl shadow-lg 
-  border border-slate-200/60
+  absolute            // <-- ADD THIS
+  inset-0             // <-- ADD THIS
+  w-full              // <-- ADD THIS
+  h-full              // <-- ADD THIS
+  object-cover        // <-- CHANGE THIS: Fills the area, may crop edges
+  transition-all 
+  duration-300 
+  group-hover:scale-105 // Optional: nice zoom effect
 `;
-
+// ... other styles
 // === Feature Input Fields ===
 export const featureInputLabelClass = '';
 
@@ -193,7 +202,8 @@ export const bottomControlsClass = `
 `;
 
 export const languageToggleClass = `
-  px-3 py-1.5 
+  w-16
+  px-1 py-1 
   text-xs font-semibold 
   bg-gradient-to-br from-slate-100/80 to-white/80 
   text-slate-700 

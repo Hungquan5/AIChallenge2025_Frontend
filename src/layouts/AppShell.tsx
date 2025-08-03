@@ -14,8 +14,7 @@ const AppShell: React.FC<AppShellProps> = ({ leftPanel, rightPanel, searchButton
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 text-slate-900">
       {/* Left Panel - No changes needed here */}
-      <aside className="w-[320px] min-w-[320px] max-w-[400px] h-screen bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative">
-        <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+      <aside className="w-[240px] min-w-[240px] max-w-[400px] h-screen bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative">        <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
           {leftPanel}
         </div>
 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white/98 via-white/95 to-transparent backdrop-blur-sm border-t border-slate-200/40">

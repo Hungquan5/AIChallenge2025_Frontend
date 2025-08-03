@@ -5,14 +5,17 @@ import type { Query } from '../../types';
 import QueryItem from './QueryItem';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { translateText } from '../SearchRequest/searchApi';
+import type { ResultItem } from '../../types';
 interface QueryListProps {
   queries: Query[];
   onQueriesChange: (queries: Query[]) => void;
   maxQueries?: number;
   firstInputRef?: RefObject<HTMLTextAreaElement>;
+  onSingleSearchResult: (results: ResultItem[]) => void; // Add this
+
 }
 
-const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQueries, firstInputRef }) => {
+const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQueries, firstInputRef, onSingleSearchResult }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const updateQuery = (index: number, updated: Partial<Query>) => {
@@ -83,6 +86,7 @@ const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQuer
       <div className="space-y-4">
         {queries.map((query, index) => (
           <QueryItem
+          onSingleSearchResult={onSingleSearchResult}
             key={index}
             index={index}
             query={query}

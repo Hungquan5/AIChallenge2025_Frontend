@@ -224,6 +224,7 @@ const handleTranslateAll = async () => {
         <QueryList 
           queries={queries} 
           onQueriesChange={setQueries}
+          onSingleSearchResult={onSearch}
         />
       </div>
     ),
