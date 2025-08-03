@@ -36,6 +36,7 @@ import {
 interface QueryItemProps {
   index: number;
   query: Query;
+  onFocus?: () => void;
   onUpdate: (index: number, updated: Partial<Query>) => void;
   onInsertAfter: (index: number) => void;
   onRemove: (index: number) => void;
@@ -89,6 +90,7 @@ const QueryItem: React.FC<QueryItemProps> = ({
   index,
   query,
   onUpdate,
+  onFocus,
   onInsertAfter,
   onRemove,
   disableRemove,
@@ -152,7 +154,6 @@ useEffect(() => {
 }, [queryMode, textareaRef]);
 
 
-
 // Also ensure that when switching to image mode, the state is properly managed
 const handleModeToggle = (newMode: 'text' | 'image') => {
     setQueryMode(newMode);
@@ -170,22 +171,6 @@ const handleModeToggle = (newMode: 'text' | 'image') => {
     }
   };
 
-
-  const handleLanguageToggle = () => {
-    const newLang = query.lang === 'eng' ? 'ori' : 'eng';
-    if (newLang === 'eng' && query.origin && !query.text) {
-      translateText(query.origin.trim())
-        .then(translated => {
-          onUpdate(index, { text: translated, lang: newLang });
-        })
-        .catch(err => {
-          console.error('Translation failed:', err);
-          onUpdate(index, { lang: newLang }); // Fallback to just switch lang
-        });
-    } else {
-      onUpdate(index, { lang: newLang });
-    }
-  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isShortcut(e, SHORTCUTS.NEW_QUERY)) {
       e.preventDefault();
@@ -265,6 +250,7 @@ const handleModeToggle = (newMode: 'text' | 'image') => {
             placeholder="Enter your query..."
             className={`${inputClass} resize-none flex-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100`}
             rows={7}
+            onFocus={onFocus}
           />
         )}
 

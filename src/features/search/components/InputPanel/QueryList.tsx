@@ -1,9 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef,useState } from 'react';
 import type { RefObject } from 'react';
 import { containerClass } from './styles';
 import type { Query } from '../../types';
 import QueryItem from './QueryItem';
-
+import { useShortcuts } from '../../../../utils/shortcuts';
+import { translateText } from '../SearchRequest/searchApi';
 interface QueryListProps {
   queries: Query[];
   onQueriesChange: (queries: Query[]) => void;
@@ -19,6 +20,7 @@ const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQuer
     newQueries[index] = { ...newQueries[index], ...updated };
     onQueriesChange(newQueries);
   };
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   const insertQueryAfter = (index: number) => {
     if (maxQueries && queries.length >= maxQueries) return;
@@ -33,7 +35,27 @@ const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQuer
       }
     }, 0);
   };
-
+  useShortcuts({
+    TRANSLATE_QUERY: () => {
+      if (focusedIndex === null) return;
+  
+      const current = queries[focusedIndex];
+      const newLang = current.lang === 'eng' ? 'ori' : 'eng';
+  
+      if (newLang === 'eng' && current.origin && !current.text) {
+        translateText(current.origin.trim())
+          .then((translated) => {
+            updateQuery(focusedIndex, { text: translated, lang: newLang });
+          })
+          .catch((err) => {
+            console.error('Translation failed:', err);
+            updateQuery(focusedIndex, { lang: newLang });
+          });
+      } else {
+        updateQuery(focusedIndex, { lang: newLang });
+      }
+    }
+  })  
   const removeQuery = (index: number) => {
     if (queries.length <= 1) return;
     const updated = queries.filter((_, i) => i !== index);
@@ -64,6 +86,7 @@ const QueryList: React.FC<QueryListProps> = ({ queries, onQueriesChange, maxQuer
             key={index}
             index={index}
             query={query}
+            onFocus={()=> setFocusedIndex(index)}
             onUpdate={updateQuery}
             onInsertAfter={insertQueryAfter}
             onRemove={removeQuery}

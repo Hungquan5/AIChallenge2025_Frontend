@@ -8,7 +8,7 @@ import { fileToBase64 } from '../../../../utils/fileConverter';
 interface InputPanelProps {
   onSearch: (results: ResultItem[]) => void;
 }
-
+import { translateText } from '../SearchRequest/searchApi';
 
 const InputPanel = ({ onSearch }: InputPanelProps) => {
   const [queries, setQueries] = useState<Query[]>([
@@ -122,20 +122,54 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
       textarea.setSelectionRange(length, length);
     }
   };
+  // ✅ ADD THIS ENTIRE HANDLER FUNCTION
+const handleTranslateAll = async () => {
+  if (queries.length < 2) {
+    // Don't do anything if there's only one query
+    return; 
+  }
+
+  setLoading(true);
+
+  try {
+    const translationPromises = queries.map(q => {
+      // Only translate original-language queries that have text content
+      if (q.lang === 'ori' && q.origin && !q.imageFile) {
+        return translateText(q.origin.trim()).then(translated => ({
+          ...q,
+          text: translated,
+          lang: 'eng' as const, // Ensure the type is 'eng'
+        }));
+      }
+      // For all other cases, return the query unmodified
+      return Promise.resolve(q);
+    });
+
+    const translatedQueries = await Promise.all(translationPromises);
+    setQueries(translatedQueries);
+
+  } catch (error) {
+    console.error('Failed to translate all queries:', error);
+    alert('An error occurred during the bulk translation.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Register shortcuts
-  useShortcuts({
-    TRIGGER_CHAIN_SEARCH: () => {
-      if (chainSearchButtonRef.current) {
-        chainSearchButtonRef.current.click();
-      } 
-    },
-
-    ADD_QUERY: addNewQuery,
-    REMOVE_QUERY: removeLastQuery,
-    CLEAR_SEARCH: clearAllQueries,
-    FOCUS_SEARCH: focusFirstTextarea,
-  });
+ // Register shortcuts
+ useShortcuts({
+  TRANSLATE_ALL_QUERIES: handleTranslateAll, // ✅ ADD THIS LINE
+  TRIGGER_CHAIN_SEARCH: () => {
+    if (chainSearchButtonRef.current) {
+      chainSearchButtonRef.current.click();
+    } 
+  },
+  ADD_QUERY: addNewQuery,
+  REMOVE_QUERY: removeLastQuery,
+  CLEAR_SEARCH: clearAllQueries,
+  FOCUS_SEARCH: focusFirstTextarea,
+});
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

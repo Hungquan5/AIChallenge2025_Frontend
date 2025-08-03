@@ -13,6 +13,8 @@ export const SHORTCUTS = {
   ADD_QUERY: { key: 'n', modifier: 'Alt' },
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
   TRANSLATE_QUERY: { key: 't', modifier: 'Alt' },
+  TRANSLATE_ALL_QUERIES: { key: 't', modifier: 'Alt+Shift' }, // ✅ ADD THIS LINE
+
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
   
@@ -22,7 +24,7 @@ export const SHORTCUTS = {
   
   // Navigation shortcuts
   FOCUS_SEARCH: { key: 'f', modifier: 'Alt' },
-  NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, // Chưa làm gì với cái này
+  NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, 
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
 } as const;
@@ -30,23 +32,37 @@ export const SHORTCUTS = {
 type ShortcutKey = keyof typeof SHORTCUTS;
 
 // Helper function để kiểm tra phím tắt
+// ✅ REPLACE the existing isShortcut with this updated version
 export const isShortcut = (event: KeyboardEvent | React.KeyboardEvent, shortcut: typeof SHORTCUTS[ShortcutKey]): boolean => {
-  const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-  const isAlt = event.altKey;
-  const isShift = event.shiftKey;
-  
-  if (shortcut.modifier === 'Ctrl/Cmd') {
-    return isCtrlOrCmd && event.key === shortcut.key;
-  } else if (shortcut.modifier === 'Alt') {
-    return isAlt && event.key === shortcut.key;
-  } else if (shortcut.modifier === 'Shift') {
-    return isShift && event.key === shortcut.key;
-  } else {
-    return !isCtrlOrCmd && !isAlt && !isShift && event.key === shortcut.key;
+  if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) {
+    return false;
   }
+
+  const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+
+  const modifiersPressed = {
+    'Ctrl/Cmd': isCtrlOrCmd,
+    'Alt': event.altKey,
+    'Shift': event.shiftKey,
+  };
+
+  const requiredModifiers = shortcut.modifier.split('+').filter(m => m !== 'none');
+  const allModifierKeys = ['Ctrl/Cmd', 'Alt', 'Shift'];
+
+  for (const modKey of allModifierKeys) {
+    const isRequired = requiredModifiers.includes(modKey);
+    const isPressed = modifiersPressed[modKey as keyof typeof modifiersPressed];
+
+    if (isRequired !== isPressed) {
+      return false; // Modifier state does not match
+    }
+  }
+  
+  return true;
 };
 
-// Hook để đăng ký phím tắt
+
+// Hook để đăng ký phím tắt (no changes needed here)
 export const useShortcuts = (handlers: {
   [K in ShortcutKey]?: () => void;
 }): void => {
@@ -63,4 +79,4 @@ export const useShortcuts = (handlers: {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlers]);
-}; 
+};
