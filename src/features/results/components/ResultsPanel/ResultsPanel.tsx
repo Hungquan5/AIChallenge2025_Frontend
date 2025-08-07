@@ -5,8 +5,6 @@ import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import VideoPanel from '../../../detail_info/components/VideoPanel/VideoPanel';
-// REMOVE useSimilaritySearch import if it's not used elsewhere
-// import { useSimilaritySearch } from '../../../search/components/SimilaritySearch/SimilaritySearch';
 
 interface ResultsPanelProps {
   viewMode: ViewMode;
@@ -15,6 +13,9 @@ interface ResultsPanelProps {
   onResultClick: (item: ResultItem) => void;
   // This prop is now the single source of truth for triggering a search.
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  currentUser: string; // The name of the current user for broadcasting
+  sendMessage: (message: string) => void; // WebSocket send function
+
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -23,6 +24,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   groupedResults = [],
   onResultClick,
   onSimilaritySearch, // We will use THIS prop directly.
+  currentUser, sendMessage,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalData, setModalData] = useState<ResultItem | null>(null);
@@ -156,6 +158,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           onRightClick={handleRightClick}
           // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
+          currentUser={currentUser}
+          sendMessage={sendMessage}
         />
       ) : (
         <GroupedByVideoView

@@ -3,9 +3,9 @@ import { useEffect } from 'react';
 // Định nghĩa các phím tắt
 export const SHORTCUTS = {
   // Search shortcuts
-  TRIGGER_SEARCH: { key: 'Enter', modifier: 'Ctrl/Cmd' },
-  TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
-  NEW_QUERY: { key: 'Enter', modifier: 'none' },
+TRIGGER_SEARCH: { key: 'Enter', modifier: 'none' },
+TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
+  NEW_QUERY: { key: 'Enter', modifier: 'Ctrl/Cmd' },
   NEXT_CELL: { key: 'Tab', modifier: 'none' },
   PREV_CELL: { key: 'Tab', modifier: 'Shift' },
   NEW_LINE: { key: 'Enter', modifier: 'Shift' },

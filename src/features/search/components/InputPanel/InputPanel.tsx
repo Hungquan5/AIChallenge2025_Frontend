@@ -165,36 +165,41 @@ const handleTranslateAll = async () => {
       chainSearchButtonRef.current.click();
     } 
   },
+  TRIGGER_SEARCH: () => { 
+    if (searchButtonRef.current) {
+      searchButtonRef.current.click();
+    }
+  },
   ADD_QUERY: addNewQuery,
   REMOVE_QUERY: removeLastQuery,
   CLEAR_SEARCH: clearAllQueries,
   FOCUS_SEARCH: focusFirstTextarea,
 });
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        searchButtonRef.current?.focus();
-        if (debounceTimeoutRef.current !== null) {
-          clearTimeout(debounceTimeoutRef.current);
-        }
-        debounceTimeoutRef.current = window.setTimeout(() => {
-          setTimeout(() => {
-            searchButtonRef.current?.click();
-          }, 0);
-        }, 400);
-      }
-    };
+  // useEffect(() => {
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     if (e.key === 'Enter') {
+  //       e.preventDefault();
+  //       searchButtonRef.current?.focus();
+  //       if (debounceTimeoutRef.current !== null) {
+  //         clearTimeout(debounceTimeoutRef.current);
+  //       }
+  //       debounceTimeoutRef.current = window.setTimeout(() => {
+  //         setTimeout(() => {
+  //           searchButtonRef.current?.click();
+  //         }, 0);
+  //       }, 400);
+  //     }
+  //   };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (debounceTimeoutRef.current !== null) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
+  //   window.addEventListener('keydown', handleKeyDown);
+  //   return () => {
+  //     window.removeEventListener('keydown', handleKeyDown);
+  //     if (debounceTimeoutRef.current !== null) {
+  //       clearTimeout(debounceTimeoutRef.current);
+  //     }
+  //   };
+  // }, []);
 
   // Create search button component
   const SearchButton = () => (

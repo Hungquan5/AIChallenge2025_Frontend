@@ -19,6 +19,7 @@ interface Props {
   onContextMenu?: (event: React.MouseEvent) => void;
   onSimilaritySearch?: (imageSrc: string, cardId: string) => void; // New prop for similarity search
   onSubmit?: () => void; // Optional submit handler
+  onSending?:() =>void ;
   priority?: boolean;
   alt?: string;
   showConfidence?: boolean;
@@ -40,6 +41,7 @@ const ResultCard: React.FC<Props> = ({
   onContextMenu,
   onSimilaritySearch,
   onSubmit,
+  onSending,
   priority = false,
   alt,
   showConfidence = false,
@@ -59,7 +61,7 @@ const ResultCard: React.FC<Props> = ({
     setImageError(true);
   }, []);
 // Handle submit action, either from onSubmit using middleclick
-const handelSubmit = useCallback(() => {
+const handleSubmit = useCallback(() => {
   if (onSubmit) {
     console.log('Submitting result:', id);
     onSubmit();
@@ -67,6 +69,14 @@ const handelSubmit = useCallback(() => {
     onClick();
   }
 }, [onSubmit, onClick]);
+const handleSending = useCallback(()=> {
+  if (onSending){
+    console.log('Sending Result:', id);
+    onSending();
+  } else if (onClick){
+    onClick();
+  }
+}, [onSending,onClick])
 const handleClick = useCallback((e: React.MouseEvent) => {
   if (disabled) {
     e.preventDefault();
@@ -76,8 +86,14 @@ const handleClick = useCallback((e: React.MouseEvent) => {
   // Middle click (mouse button 1) triggers submit
   if (e.button === 1) {
     e.preventDefault();
-    handelSubmit(); // <-- Use your defined function
+    handleSending(); // <-- Use your defined function
     return;
+  }
+
+  if ((e.ctrlKey|| e.metaKey)&& e.button===1){
+    e.preventDefault();
+    e.stopPropagation();
+    handleSubmit();
   }
 
   // Ctrl/Cmd + Left Click triggers similarity search
@@ -92,7 +108,7 @@ const handleClick = useCallback((e: React.MouseEvent) => {
   if (e.button === 0) {
     onClick?.();
   }
-}, [disabled, handelSubmit, onClick, onSimilaritySearch, thumbnail, id]);
+}, [disabled, handleSubmit, onClick, onSimilaritySearch, thumbnail, id]);
 
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

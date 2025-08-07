@@ -10,7 +10,6 @@ const adjustThumbnail = (thumbnail: string): string => {
     ? `${LOCAL_DATASET_URL}${thumbnail.slice(datasetIndex)}`
     : thumbnail;
 };
-
 export const translateText = async (text: string): Promise<string> => {
   const url = "https://translate.googleapis.com/translate_a/single";
   const params = new URLSearchParams({

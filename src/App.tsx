@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef ,useCallback} from 'react';
 import './App.css';
 import AppShell from './layouts/AppShell';
 import InputPanel from './features/search/components/InputPanel/InputPanel';
@@ -7,13 +7,19 @@ import TopControlBar from './layouts/TopControlBar';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
-import {  fileToBase64, } from './utils/fileConverter';
-import {searchByText} from './features/search/components/SearchRequest/searchApi';
+import type { BroadcastImageMessage,WebSocketMessage } from './features/communicate/types';
 import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
 // NEW: Import the carousel component and its state management hooks
 import FrameCarousel from './features/detail_info/components/RelativeFramePanel/FrameCarousel';
 import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
 import { useFrameNavigation } from './features/results/hooks/useFrameNavigation';
+
+// --- NEW IMPORTS FOR WEBSOCKETS AND SESSION ---
+import { useSession } from './features/communicate/hooks/useSession';
+import { useWebSocket } from './features/communicate/hooks/useWebsocket';
+import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
+import { ConnectionStatus } from './features/communicate/components/Communicate/ConnectionStatus';
+import { BroadcastFeed } from './features/communicate/components/Communicate/BroadcastFeed';
 
 const App: React.FC = () => {
   const [results, setResults] = useState<ResultItem[]>([]);
@@ -22,7 +28,9 @@ const App: React.FC = () => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-
+ // --- NEW HOOKS FOR SESSION & WEBSOCKET ---
+ const { user, createSession, isLoading: isSessionLoading } = useSession();
+ const [broadcastMessages, setBroadcastMessages] = useState<BroadcastImageMessage[]>([]);
   // NEW: State management for the FrameCarousel is now lifted up to the App component.
   const {
     carouselFrames,
@@ -51,7 +59,16 @@ const App: React.FC = () => {
     isLoadingBatch,
   });
 
+  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
+    // Check if the incoming message is a broadcasted image
+    console.log("we run to this", message )
+  }, []);
 
+  const { isConnected, sendMessage, reconnect } = useWebSocket({
+    // WebSocket hook is disabled until the username is available
+    username: user?.username || '',
+    onMessage: handleWebSocketMessage,
+  });
   const handleSearch = (newResults: ResultItem[]) => {
     setResults(newResults);
     const grouped = newResults.reduce((acc, item) => {
@@ -111,13 +128,18 @@ const handleSimilarityResults = (newResults: ResultItem[]) => {
     // ... other shortcuts
   });
 
+  // --- RENDER LOGIC ---
+
+  // 1. If there's no user, show the username prompt and nothing else.
 
 const inputPanelInstance = InputPanel({
     onSearch: handleSearch,
 });
 const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
 
-
+if (!user) {
+  return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
+}
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
       {inputPanelInstance.panelContent}
@@ -139,11 +161,12 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
           onResultClick={handleResultClick}
           // NEW: Pass the new handler to the ResultsPanel
           onSimilaritySearch={handleSimilaritySearch}
+          currentUser={user.username}
+          sendMessage={sendMessage}
         />
       </div>
     </>
   );
-
   // NEW: Conditionally render the carousel overlay based on the lifted state.
   const carouselOverlay = carouselFrames && activeFrameId !== null ? (
      <FrameCarousel
@@ -158,7 +181,14 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
       onSimilaritySearch={handleSimilaritySearch} 
     />
   ) : null;
-
+  const broadcastFeedOverlay = (
+    <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
+       {/* pointer-events-none on container allows clicks to go through to content below */}
+      <div className="p-4 pointer-events-auto"> {/* re-enable pointer events for the feed itself */}
+         <BroadcastFeed messages={broadcastMessages} />
+      </div>
+    </div>
+  );
   return (
     <>
       <AppShell
@@ -168,6 +198,7 @@ const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
   chainSearchButton={chainSearchButton} // ✅ Pass it in
   carouselOverlay={carouselOverlay}
 />
+{broadcastFeedOverlay}
 
       {showShortcuts && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
