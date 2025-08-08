@@ -15,6 +15,7 @@ interface ResultsPanelProps {
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
   currentUser: string; // The name of the current user for broadcasting
   sendMessage: (message: string) => void; // WebSocket send function
+  onItemBroadcast?: (item: ResultItem) => void; // Optional prop for broadcasting images
 
 }
 
@@ -24,7 +25,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   groupedResults = [],
   onResultClick,
   onSimilaritySearch, // We will use THIS prop directly.
-  currentUser, sendMessage,
+  currentUser, sendMessage,onItemBroadcast
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalData, setModalData] = useState<ResultItem | null>(null);
