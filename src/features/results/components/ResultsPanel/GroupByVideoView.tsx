@@ -1,5 +1,5 @@
 // src/features/results/components/GroupedByVideoView.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { GroupedResult, ResultItem } from '../../types';
 import {
   groupContainerClass,
@@ -19,16 +19,32 @@ interface Props {
   onResultClick: (item: ResultItem) => void;
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+    // --- NEW PROPS ---
+    currentUser: string; // The name of the current user for broadcasting
+    sendMessage: (message: string) => void; // WebSocket send function
 }
 
 // ✅ FIX 1: Destructure `onSimilaritySearch` from the component's props
-const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick, onSimilaritySearch }) => {
+const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick, onSimilaritySearch,currentUser,sendMessage }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   const handleImageLoad = useCallback((id: string) => {
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
+  const handleSending = useCallback((item: ResultItem) => {
+    // 2. Create and send the WebSocket message
+    const message = {
+      type: 'broadcast_image',
+      payload: {
+        id: item.id,
+        thumbnail: item.thumbnail,
+        title: item.title,
+        submittedBy: currentUser,
+      },
+    };
+    sendMessage(JSON.stringify(message));
 
+  }, [currentUser, sendMessage]);
   if (groupedResults.length === 0) {
     return (
       <div className={noResultsClass}>
@@ -60,7 +76,7 @@ const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, on
                 onClick={onResultClick ? () => onResultClick(item) : undefined}
                 onContextMenu={(event) => onRightClick(item, event)}
                 onSubmit={() => fullSubmissionFlow(item)} // Call the submit function with the item
-
+                onSending={() => handleSending(item)}
                 // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
                 onSimilaritySearch={onSimilaritySearch}
                 imageClassName={imageClass} // Use the imported class for image styling

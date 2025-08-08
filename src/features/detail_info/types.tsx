@@ -1,16 +1,7 @@
 // features/frame-carousel/types/index.ts
-
-export interface FrameItem {
-  id: string;
-  videoId: string;
-  title: string;
-  thumbnail: string;
-  confidence: number;
-  timestamp: string;
-}
-
+import type { ResultItem } from "../results/types";
 export interface FrameCarouselProps {
-  frames: FrameItem[];
+  frames: ResultItem[] ;
   activeFrameId: string | number;
   onClose?: () => void;
   onNext?: () => Promise<void>;

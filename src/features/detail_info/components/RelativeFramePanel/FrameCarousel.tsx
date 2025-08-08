@@ -6,7 +6,7 @@ import { Navigation, Keyboard } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 
-import type { FrameItem } from '../../types';
+import type { ResultItem } from '../../../search/types';
 import FrameItemSlide from './FrameItemSlide';
 import useSwiperNavigation from '../../hooks/useSwiperNavigation';
 import * as styles from './styles';
@@ -15,14 +15,18 @@ export const getImageUrl = (videoId: string, thumbnail: string) =>
   `http://localhost:1406/dataset/full_batch1/${videoId}/keyframes/${thumbnail}`;
 
 interface FrameCarouselProps {
-  frames: FrameItem[];
+  frames: ResultItem[];
   activeFrameId: string | number;
   onClose?: () => void;
   onNext?: () => Promise<void>;
   onPrev?: () => Promise<void>;
   onFrameChange?: (frameId: string | number) => void;
   isLoading?: boolean;
-  onSimilaritySearch: (imageSrc: string, cardId: string) => void; 
+  onResultClick: (item: ResultItem) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  onRightClick?: (item: ResultItem) => void; // Ensure this prop is define
+  currentUser: string; 
+  sendMessage: (message: string) => void; // WebSocket send function
 }
 
 const FrameCarousel: React.FC<FrameCarouselProps> = ({
@@ -32,8 +36,14 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
   onNext,
   onPrev,
   onFrameChange,
+  onRightClick,
   isLoading,
-  onSimilaritySearch, // Destructure the new prop
+  onResultClick,
+
+  onSimilaritySearch,
+  // ✅ Destructure the new props
+  sendMessage,
+  currentUser
 }) => {
   const { swiperRef, onSlideChange, handleKeyDown } = useSwiperNavigation({
     frames,
@@ -129,6 +139,10 @@ const FrameCarousel: React.FC<FrameCarouselProps> = ({
                 isActive={isActive}
                 // Pass the handler down to the slide
                 onSimilaritySearch={onSimilaritySearch}
+                onRightClick= {onRightClick}
+                onClick={onResultClick}
+                currentUser={currentUser} 
+                sendMessage={sendMessage}             
               />
             </SwiperSlide>
           );

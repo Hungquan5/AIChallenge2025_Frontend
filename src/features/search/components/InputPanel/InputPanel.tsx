@@ -36,7 +36,7 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
     
   // 2. Prepare the payload for the API by inferring query type
   const apiQueriesPromises = queries.map(async (q): Promise<ApiQuery> => {
-    
+
       // Base query with shared fields
       const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
         asr: q.asr.trim(),
@@ -63,6 +63,7 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
         };
       } else {
         // This is a text-based query
+        // translate the query
         return {
           ...baseApiQuery,
           text: q.text.trim(),
@@ -124,10 +125,10 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
   };
   // ✅ ADD THIS ENTIRE HANDLER FUNCTION
 const handleTranslateAll = async () => {
-  if (queries.length < 2) {
-    // Don't do anything if there's only one query
-    return; 
-  }
+  // if (queries.length < 2) {
+  //   // Don't do anything if there's only one query
+  //   return; 
+  // }
 
   setLoading(true);
 
@@ -158,24 +159,33 @@ const handleTranslateAll = async () => {
 
   // Register shortcuts
  // Register shortcuts
- useShortcuts({
-  TRANSLATE_ALL_QUERIES: handleTranslateAll, // ✅ ADD THIS LINE
-  TRIGGER_CHAIN_SEARCH: () => {
-    if (chainSearchButtonRef.current) {
-      chainSearchButtonRef.current.click();
-    } 
+useShortcuts({
+  TRANSLATE_ALL_QUERIES: handleTranslateAll,
+  TRIGGER_CHAIN_SEARCH: async () => {
+    // We don't need the 'if (ref.current)' check if we call the function directly
+    await handleTranslateAll();
+    
+    // INSTEAD OF THIS:
+    // chainSearchButtonRef.current.click();
+
+    // DO THIS: Call the search handler directly
+    await handleSearch('chain');
   },
-  TRIGGER_SEARCH: () => { 
-    if (searchButtonRef.current) {
-      searchButtonRef.current.click();
-    }
+  TRIGGER_SEARCH: async () => {
+    await handleTranslateAll();
+
+    // INSTEAD OF THIS:
+    // searchButtonRef.current.click();
+
+    // DO THIS: Call the search handler directly
+    await handleSearch('normal');
   },
   ADD_QUERY: addNewQuery,
   REMOVE_QUERY: removeLastQuery,
   CLEAR_SEARCH: clearAllQueries,
   FOCUS_SEARCH: focusFirstTextarea,
 });
-
+// ...
   // useEffect(() => {
   //   const handleKeyDown = (e: KeyboardEvent) => {
   //     if (e.key === 'Enter') {

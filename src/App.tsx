@@ -17,8 +17,17 @@ import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
 import { ConnectionStatus } from './features/communicate/components/Communicate/ConnectionStatus';
+import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
 
 const App: React.FC = () => {
+  // ✅ 1. Add state to manage the video modal
+  const [videoModalState, setVideoModalState] = useState<{
+    isOpen: boolean;
+    videoId: string | null;
+  }>({
+    isOpen: false,
+    videoId: null,
+  });
   const [results, setResults] = useState<ResultItem[]>([]);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
@@ -131,7 +140,13 @@ const App: React.FC = () => {
 
     sendMessage(JSON.stringify(message));
   }, [user?.username, sendMessage]);
-
+  const handleBroadcastFeedRightClick = useCallback((item: ResultItem, event: React.MouseEvent) => {
+    // We already have a function to open the video panel from the carousel.
+    // It just needs a videoId and a timestamp.
+    if (item.videoId && item.timestamp) {
+      handleOpenVideoPanel(item.videoId, item.timestamp);
+    }
+}, []);
   // Search handlers (unchanged)
   const handleSearch = (newResults: ResultItem[]) => {
     setResults(newResults);
@@ -170,7 +185,36 @@ const App: React.FC = () => {
       handleSimilarityResults(newResults);
     });
   };
+   // ✅ 2. Create state specifically for your VideoPanel
+   const [videoPanelState, setVideoPanelState] = useState<{
+    isOpen: boolean;
+    videoId: string | null;
+    timestamp: string | null; // The panel needs the frame ID as a timestamp
+  }>({
+    isOpen: false,
+    videoId: null,
+    timestamp: null,
+  });
 
+  // --- All your existing hooks (useSession, useKeyframeLoader, etc.) ---
+
+  // ✅ 3. Create handlers to open and close the VideoPanel
+  const handleOpenVideoPanel = useCallback((videoId: string, timestamp: string) => {
+    console.log(`Opening VideoPanel for videoId: ${videoId} at timestamp: ${timestamp}`);
+    setVideoPanelState({ isOpen: true, videoId, timestamp });
+  }, []);
+
+  const handleCloseVideoPanel = useCallback(() => {
+    setVideoPanelState({ isOpen: false, videoId: null, timestamp: null });
+  }, []);
+
+  // ✅ 4. Create the right-click handler to be passed to the carousel
+  // This function receives the entire `frame` object
+  const handleCarouselRightClick = useCallback((item: ResultItem) => {
+    if (item.videoId && item.timestamp) {
+      handleOpenVideoPanel(item.videoId, item.timestamp);
+    }
+  }, [handleOpenVideoPanel]);
   const handleResultMiddleClick = (imageSrc: string, cardId: string) => {
     console.log(`Selected card for submission: ${cardId} with image: ${imageSrc}`);
   };
@@ -199,7 +243,7 @@ const App: React.FC = () => {
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
       {inputPanelInstance.panelContent}
-    </div>
+    </div> 
   );
 
   const rightPanel = (
@@ -224,19 +268,35 @@ const App: React.FC = () => {
     </>
   );
 
-  const carouselOverlay = carouselFrames && activeFrameId !== null ? (
-    <FrameCarousel
-      frames={carouselFrames}
-      activeFrameId={activeFrameId}
-      onClose={handleCarouselClose}
-      onNext={navigateToNextFrame}
-      onPrev={navigateToPrevFrame}
-      onFrameChange={handleFrameChange}
-      isLoading={isLoading || isLoadingBatch}
-      onSimilaritySearch={handleSimilaritySearch}
-    />
-  ) : null;
+ // ✅ 4. Update the carousel overlay to pass the new handler
+ const carouselOverlay = carouselFrames && activeFrameId !== null ? (
+  <FrameCarousel
+    frames={carouselFrames}
+    activeFrameId={activeFrameId}
+    onClose={handleCarouselClose}
+    onNext={navigateToNextFrame}
+    onPrev={navigateToPrevFrame}
+    onFrameChange={handleFrameChange}
+    isLoading={isLoading || isLoadingBatch}
+    onSimilaritySearch={handleSimilaritySearch}
+    onResultClick={handleResultClick}
+    // Pass the right-click handler down
+    onRightClick={handleCarouselRightClick} 
+    // You might need to pass these down too if not already
+    currentUser={user.username}
+    sendMessage={sendMessage}
+  />
+) : null;
 
+  // ✅ 5. Create the modal instance to pass to the AppShell
+// ✅ 6. Create the VideoPanel instance to pass to the AppShell
+const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && videoPanelState.timestamp ? (
+  <VideoPanel
+    videoId={videoPanelState.videoId}
+    timestamp={videoPanelState.timestamp}
+    onClose={handleCloseVideoPanel}
+  />
+  ) : null;
   return (
     <>
       <AppShell
@@ -249,6 +309,11 @@ const App: React.FC = () => {
         isConnected={isConnected}
         activeUsers={activeUsers}
         onRemoveBroadcastMessage={handleRemoveBroadcastMessage}
+        videoModal={videoPanelInstance} 
+        onBroadcastResultClick={handleResultClick}
+        onBroadcastRightClick={handleBroadcastFeedRightClick}
+        onBroadcastSimilaritySearch={handleSimilaritySearch}
+
       />
 
       {/* Shortcuts Modal */}

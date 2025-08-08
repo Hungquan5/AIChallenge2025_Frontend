@@ -83,18 +83,20 @@ const handleClick = useCallback((e: React.MouseEvent) => {
     return;
   }
 
+  if ((e.ctrlKey|| e.metaKey)&& e.button===1 ){
+    e.preventDefault();
+    e.stopPropagation();
+    handleSubmit();
+    return;
+  }
   // Middle click (mouse button 1) triggers submit
   if (e.button === 1) {
     e.preventDefault();
+    e.stopPropagation();
     handleSending(); // <-- Use your defined function
     return;
   }
 
-  if ((e.ctrlKey|| e.metaKey)&& e.button===1){
-    e.preventDefault();
-    e.stopPropagation();
-    handleSubmit();
-  }
 
   // Ctrl/Cmd + Left Click triggers similarity search
   if ((e.ctrlKey || e.metaKey) && e.button === 0 && onSimilaritySearch) {

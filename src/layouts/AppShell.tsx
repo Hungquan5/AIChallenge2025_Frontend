@@ -14,11 +14,18 @@ interface AppShellProps {
   isConnected?: boolean;
   activeUsers?: number;
   onRemoveBroadcastMessage?: (messageId: string, index: number) => void;
+    // ✅ ADD NEW PROP FOR THE VIDEO MODAL
+    videoModal?: React.ReactNode;
+      // ✅ 1. Add the new handler props for the feed
+  onBroadcastResultClick: (item: ResultItem) => void;
+  onBroadcastRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onBroadcastSimilaritySearch: (imageSrc: string, cardId: string) => void;
+
 }
 
 const AppShell: React.FC<AppShellProps> = ({ 
   leftPanel, 
-  rightPanel, 
+  rightPanel,   
   searchButton, 
   chainSearchButton, 
   carouselOverlay,
@@ -26,6 +33,10 @@ const AppShell: React.FC<AppShellProps> = ({
   isConnected = false,
   activeUsers = 0,
   onRemoveBroadcastMessage,
+  videoModal,
+  onBroadcastResultClick,
+  onBroadcastRightClick,
+  onBroadcastSimilaritySearch,
 }) => {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
@@ -63,6 +74,9 @@ const AppShell: React.FC<AppShellProps> = ({
           
           {/* Carousel Overlay */}
           {carouselOverlay}
+                    {/* ✅ RENDER THE VIDEO MODAL HERE */}
+          {/* It will overlay the main content and carousel */}
+          {videoModal}
         </div>
       </div>
 
@@ -136,9 +150,13 @@ const AppShell: React.FC<AppShellProps> = ({
 
             {/* Broadcast Feed Content */}
             <BroadcastFeed 
-              messages={broadcastMessages} 
-              onRemoveMessage={onRemoveBroadcastMessage}
-            />
+            messages={broadcastMessages} 
+            onRemoveMessage={onRemoveBroadcastMessage}
+            // ✅ 3. Pass the handlers down to BroadcastFeed
+            onResultClick={onBroadcastResultClick}
+            onRightClick={onBroadcastRightClick}
+            onSimilaritySearch={onBroadcastSimilaritySearch}
+          />
           </div>
         </div>
       </div>

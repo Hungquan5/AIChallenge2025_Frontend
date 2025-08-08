@@ -169,6 +169,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           onRightClick={handleRightClick}
           // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
+          currentUser={currentUser}
+          sendMessage={sendMessage}
         />
       )}
 
