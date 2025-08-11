@@ -6,6 +6,7 @@ interface BroadcastFeedProps {
 import { ChevronUp, ChevronDown, Users, Wifi, WifiOff } from 'lucide-react';
 
 import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
+import { getImageUrl } from '../../../../utils/getImageURL';
 interface BroadcastFeedProps {
   messages: ResultItem[];
   onRemoveMessage?: (messageId: string, index: number) => void;
@@ -53,55 +54,52 @@ const handleMouseLeave = () => {
       </div>
     );
   }
-
+console.log('BroadcastFeed messages:', messages);
   return (
     <div className="space-y-3 relative">
-      {/* ✅ 4. Use a responsive grid for the cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 p-4 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-        {messages.map((msg, index) => (
-          // This wrapper handles the hover state for the tooltip and the remove button
-          <div
-            key={`${msg.id}-${index}`}
-            className="relative group"
-            onMouseEnter={(e) => handleMouseEnter(msg.id, index, e)}
-            onMouseLeave={handleMouseLeave}
-          >
-            <ResultCard
-              id={msg.id}
-              thumbnail={msg.thumbnail}
-              title={msg.title}
-              // Pass metadata; use optional chaining for safety
-              timestamp={msg.timestamp ?? ''}
-              confidence={msg.confidence ?? 0}
-              loaded={true} // Images in the feed are likely loaded
-              onLoad={() => {}}
-              // ✅ 5. Wire up all the actions to the handlers from props
-              onClick={() => onResultClick(msg)}
-              onContextMenu={(event) => {
-                event.preventDefault(); // Important: prevent default right-click menu
-                onRightClick(msg, event);
-              }}
-              onSimilaritySearch={onSimilaritySearch}
-              // These actions don't make sense for a received message, so we omit them
-              // onSubmit={() => {}}
-              // onSending={() => {}}
-            />
-            
-            {/* ✅ 6. Overlay the remove button on top of the ResultCard */}
-            {/* Only show for messages sent by the current user */}
-            { (
-              <button
-                onClick={(e) => handleRemoveMessage(msg.id, index, e)}
-                className="absolute top-1 right-1 z-10 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 text-xs font-bold hover:scale-110"
-                title="Remove this submission"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 p-1 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+        {messages.map((msg, index) => {
+          // ✅ 2. Construct the full, correct image URL for every message
+          const imageUrl = getImageUrl(msg.videoId, msg.thumbnail);
 
+          return (
+            <div
+              key={`${msg.id}-${index}`}
+              className="relative group"
+              onMouseEnter={(e) => handleMouseEnter(msg.id, index, e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <ResultCard
+                id={msg.id} // Use the last part of the title as a stable ID
+                // ✅ 3. Use the correctly constructed URL
+                thumbnail={imageUrl}
+                title={msg.title}
+                timestamp={msg.timestamp ?? ''}
+                confidence={msg.confidence ?? 0}
+                loaded={true}
+                onLoad={() => {}}
+                onClick={() => onResultClick(msg)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onRightClick(msg, event);
+                }}
+                // ✅ 4. Pass the correct URL to the similarity search handler as well
+                onSimilaritySearch={() => onSimilaritySearch(imageUrl, msg.id)}
+              />
+              
+              { (
+                <button
+                  onClick={(e) => handleRemoveMessage(msg.id, index, e)}
+                  className="absolute top-1 right-1 z-10 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 text-xs font-bold hover:scale-110"
+                  title="Remove this submission"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

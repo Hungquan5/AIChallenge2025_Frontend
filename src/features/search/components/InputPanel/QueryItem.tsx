@@ -387,11 +387,25 @@ const QueryItem: React.FC<QueryItemProps> = ({
     else if (e.key === 'ArrowUp' && e.currentTarget.selectionStart === 0) { e.preventDefault(); onPrev?.(); }
   };
 
+
+  // ✅ MODIFY THIS FUNCTION
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
-    query.lang === 'eng' ? onUpdate(index, { text: value }) : onUpdate(index, { origin: value, text: '' });
+    
+    // Check if we are currently in English mode
+    if (query.lang === 'eng') {
+      // If the user clears the text area, revert the state to 'ori'
+      if (value === '') {
+        onUpdate(index, { text: '', lang: 'ori' });
+      } else {
+        // Otherwise, just update the English text
+        onUpdate(index, { text: value });
+      }
+    } else {
+      // If in original mode, update the origin text and clear any old translation
+      onUpdate(index, { origin: value, text: '' });
+    }
   };
-
   return (
     <div className={`${queryItemContainerClass} ${isItemSearching ? 'opacity-75 pointer-events-none' : ''}`}>
       {/* #1: Loading State Overlay */}

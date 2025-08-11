@@ -38,21 +38,22 @@ const SortedByConfidenceView: React.FC<Props> = ({
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
 // --- NEW HANDLER ---
-  // This function will handle both the existing submission and the new broadcast
-  const handleSending = useCallback((item: ResultItem) => {
-    // 2. Create and send the WebSocket message
+const handleSending = useCallback((item: ResultItem) => {
+    // ✅ FIX: Ensure payload has the same fields as in FrameItemSlide
     const message = {
       type: 'broadcast_image',
       payload: {
-        id: item.id,
+        id: item.id, // Use the stable ID
+        videoId: item.videoId,
         thumbnail: item.thumbnail,
         title: item.title,
+        timestamp: item.timestamp, // Include timestamp for consistency
         submittedBy: currentUser,
       },
     };
     sendMessage(JSON.stringify(message));
+}, [currentUser, sendMessage]);
 
-  }, [currentUser, sendMessage]);
   if (results.length === 0) {
     return (
       <div className={noResultsClass}>

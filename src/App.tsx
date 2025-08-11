@@ -10,9 +10,8 @@ import type { ResultItem, GroupedResult, ViewMode } from './features/results/typ
 import type { BroadcastImageMessage, WebSocketMessage } from './features/communicate/types';
 import ResultCard from './features/results/components/ResultsPanel/ResultCard';
 import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
-import FrameCarousel from './features/detail_info/components/RelativeFramePanel/FrameCarousel';
+import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
 import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
-import { useFrameNavigation } from './features/results/hooks/useFrameNavigation';
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
@@ -28,6 +27,7 @@ const App: React.FC = () => {
     isOpen: false,
     videoId: null,
   });
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true); // Default to on  
   const [results, setResults] = useState<ResultItem[]>([]);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
@@ -37,37 +37,34 @@ const App: React.FC = () => {
   
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-
+  // State to hold the title for the FramesPanel, captured on click
+  const [currentVideoTitle, setCurrentVideoTitle] = useState('');
   // Session and WebSocket hooks
   const { user, createSession, isLoading: isSessionLoading } = useSession();
+ // State for the new FramesPanel
+ const [framesPanelState, setFramesPanelState] = useState<{
+  isOpen: boolean;
+  frames: ResultItem[];
+  videoTitle: string;
+  isLoading: boolean;
+}>({
+  isOpen: false,
+  frames: [],
+  videoTitle: '',
+  isLoading: false,
+});
 
   // Keyframe loader hooks
+   // --- Updated Keyframe Loader Hook ---
+  // The hook now manages the state for the FramesPanel internally.
   const {
-    carouselFrames,
-    activeFrameId,
-    isLoading,
-    isLoadingBatch,
-    currentVideoId,
-    handleResultClick,
-    handleCarouselClose,
-    handleFrameChange,
-    setActiveFrameId,
-    loadMoreFrames,
-    hasMoreNext,
-    hasMorePrev,
+    carouselFrames,    // This is now the array of all frames for the panel.
+    isLoading: isLoadingFrames, // Renamed to avoid conflict.
+    activeFrameId, // ✅ We will use this to highlight the frame
+    handleResultClick: loadFramesForPanel, // Renamed for clarity.
+    handleCarouselClose: closeFramesPanel, // Renamed for clarity.
   } = useKeyframeLoader();
 
-  // Frame navigation hooks
-  const { navigateToNextFrame, navigateToPrevFrame } = useFrameNavigation({
-    currentVideoId,
-    activeFrameId,
-    carouselFrames,
-    setActiveFrameId,
-    loadMoreFrames,
-    hasMoreNext,
-    hasMorePrev,
-    isLoadingBatch,
-  });
 
   // Enhanced WebSocket message handler
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -179,9 +176,9 @@ const App: React.FC = () => {
 
   const handleSimilaritySearch = async (imageSrc: string, cardId: string) => {
     console.log(`Starting similarity search for card: ${cardId} with image: ${imageSrc}`);
+    closeFramesPanel(); 
     
     await performSimilaritySearch(imageSrc, cardId, (newResults: ResultItem[]) => {
-      handleCarouselClose();
       handleSimilarityResults(newResults);
     });
   };
@@ -197,7 +194,20 @@ const App: React.FC = () => {
   });
 
   // --- All your existing hooks (useSession, useKeyframeLoader, etc.) ---
-
+  const handleMasterResultClick = (item: ResultItem) => {
+    // 1. Capture the title of the video that was clicked.
+    setCurrentVideoTitle(item.title);
+    // 2. Trigger the keyframe loader to fetch all frames for that video.
+    loadFramesForPanel(item);
+  };
+  const handleFrameRightClickInPanel = (frame: ResultItem, event: React.MouseEvent) => {
+    event.preventDefault();
+    handleOpenVideoPanel(frame.videoId, frame.timestamp);
+  };
+// --- NEW: Handlers for interactions inside the FramesPanel ---
+const handleFrameClickInPanel = (frame: ResultItem) => {
+  handleOpenVideoPanel(frame.videoId, frame.timestamp);
+};
   // ✅ 3. Create handlers to open and close the VideoPanel
   const handleOpenVideoPanel = useCallback((videoId: string, timestamp: string) => {
     console.log(`Opening VideoPanel for videoId: ${videoId} at timestamp: ${timestamp}`);
@@ -215,74 +225,89 @@ const App: React.FC = () => {
       handleOpenVideoPanel(item.videoId, item.timestamp);
     }
   }, [handleOpenVideoPanel]);
-  const handleResultMiddleClick = (imageSrc: string, cardId: string) => {
-    console.log(`Selected card for submission: ${cardId} with image: ${imageSrc}`);
-  };
+
 
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
   };
-
+ // ✅ --- NEW: Handler for the 'Escape' key shortcut ---
+ const handleCloseModal = useCallback(() => {
+  // The VideoPanel is the top-most modal, so check for it first.
+  if (videoPanelState.isOpen) {
+    handleCloseVideoPanel();
+    return; // Exit after closing one layer
+  }
+  // If the video panel isn't open, check if the frames panel is.
+  if (carouselFrames !== null) {
+    closeFramesPanel();
+  }
+}, [videoPanelState.isOpen, handleCloseVideoPanel, carouselFrames, closeFramesPanel]);
   // Keyboard shortcuts
   useShortcuts({
-    TOGGLE_VIEW_MODE: toggleViewMode,
+    TOGGLE_VIEW_MODE: () => setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence'),
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
+    TOGGLE_AUTO_TRANSLATE: () => setIsAutoTranslateEnabled(prev => !prev),
+    CLOSE_MODAL: handleCloseModal, // Add the new handler here
   });
-
 
   // Create panel components
-  const inputPanelInstance = InputPanel({
-    onSearch: handleSearch,
-  });
-  const { panelContent, searchButton, chainSearchButton } = inputPanelInstance;
+  // Create panel components
+ // ✅ 2. PASS THE NEW STATE TO THE INPUTPANEL INSTANCE
+  const { 
+  panelContent, 
+  searchButton, 
+  chainSearchButton 
+} = InputPanel({
+  onSearch: handleSearch,
+  isAutoTranslateEnabled: isAutoTranslateEnabled, // Pass the state down
+});
+  const leftPanel = (
+    <div ref={inputPanelRef} tabIndex={-1}>
+      {panelContent}
+    </div> 
+  );
   // Show username prompt if no user
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
   }
 
-  const leftPanel = (
-    <div ref={inputPanelRef} tabIndex={-1}>
-      {inputPanelInstance.panelContent}
-    </div> 
-  );
-
   const rightPanel = (
     <>
-      <TopControlBar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onShowShortcuts={() => setShowShortcuts(true)}
-      />
+    {/* ✅ 3. PASS THE STATE AND SETTER TO THE TOPCONTROLBAR */}
+    <TopControlBar
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      onShowShortcuts={() => setShowShortcuts(true)}
+      isAutoTranslateEnabled={isAutoTranslateEnabled}
+      onAutoTranslateChange={setIsAutoTranslateEnabled}
+    />
       <div ref={resultsRef}>
         <ResultsPanel
           viewMode={viewMode}
           results={results}
           groupedResults={groupedResults}
-          onResultClick={handleResultClick}
+          onResultClick={handleMasterResultClick}
           onSimilaritySearch={handleSimilaritySearch}
           currentUser={user.username}
           sendMessage={sendMessage}
-          onItemBroadcast={handleItemBroadcast} // Pass the broadcast handler
+          onItemBroadcast={handleItemBroadcast}
         />
       </div>
     </>
   );
 
  // ✅ 4. Update the carousel overlay to pass the new handler
- const carouselOverlay = carouselFrames && activeFrameId !== null ? (
-  <FrameCarousel
+ const framesPanelInstance = carouselFrames !== null ? (
+  <FramesPanel
     frames={carouselFrames}
-    activeFrameId={activeFrameId}
-    onClose={handleCarouselClose}
-    onNext={navigateToNextFrame}
-    onPrev={navigateToPrevFrame}
-    onFrameChange={handleFrameChange}
-    isLoading={isLoading || isLoadingBatch}
+    videoTitle={currentVideoTitle}
+    isLoading={isLoadingFrames}
+    activeFrameId={activeFrameId} // Pass the active ID for highlighting
+
+    onClose={closeFramesPanel}
+    onFrameClick={handleFrameClickInPanel}
+    onRightClick={handleFrameRightClickInPanel}
     onSimilaritySearch={handleSimilaritySearch}
-    onResultClick={handleResultClick}
-    // Pass the right-click handler down
-    onRightClick={handleCarouselRightClick} 
-    // You might need to pass these down too if not already
     currentUser={user.username}
     sendMessage={sendMessage}
   />
@@ -297,6 +322,11 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
     onClose={handleCloseVideoPanel}
   />
   ) : null;
+    // Show username prompt if no user
+  if (!user) {
+    return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
+  }
+
   return (
     <>
       <AppShell
@@ -304,13 +334,13 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
         rightPanel={rightPanel}
         searchButton={searchButton}
         chainSearchButton={chainSearchButton}
-        carouselOverlay={carouselOverlay}
+        carouselOverlay={framesPanelInstance}
         broadcastMessages={broadcastMessages}
         isConnected={isConnected}
         activeUsers={activeUsers}
         onRemoveBroadcastMessage={handleRemoveBroadcastMessage}
         videoModal={videoPanelInstance} 
-        onBroadcastResultClick={handleResultClick}
+        onBroadcastResultClick={handleMasterResultClick}
         onBroadcastRightClick={handleBroadcastFeedRightClick}
         onBroadcastSimilaritySearch={handleSimilaritySearch}
 

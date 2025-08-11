@@ -12,8 +12,8 @@ TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   CLEAR_SEARCH: { key: '`', modifier: 'none' },
   ADD_QUERY: { key: 'n', modifier: 'Alt' },
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
-  TRANSLATE_QUERY: { key: 't', modifier: 'Alt' },
-  TRANSLATE_ALL_QUERIES: { key: 't', modifier: 'Alt+Shift' }, // ✅ ADD THIS LINE
+  TRANSLATE_QUERY: { key: 'q', modifier: 'Alt' },
+  TOGGLE_AUTO_TRANSLATE: { key: 'q', modifier: 'Alt+Shift' }, // ✅ ADD THIS LINE
 
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
@@ -27,6 +27,9 @@ TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, 
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
+  // ✅ ADD THIS NEW SHORTCUT
+  // Modal and Panel shortcuts
+  CLOSE_MODAL: { key: 'Escape', modifier: 'none' },
 } as const;
 
 type ShortcutKey = keyof typeof SHORTCUTS;

@@ -227,23 +227,6 @@ const handleClick = useCallback((e: React.MouseEvent) => {
           </div>
         </div>
 
-        {/* Similarity search indicator - only show when onSimilaritySearch is provided */}
-        {onSimilaritySearch && (
-          <div className="absolute top-2 right-2">
-            <div className={`
-              backdrop-blur-sm bg-blue-600/80 
-              rounded-full p-1.5 
-              border border-white/20
-              shadow-md
-              transform transition-all duration-300 ease-out
-              ${isHovered ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-1 opacity-0 scale-95'}
-            `}>
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Focus ring for accessibility */}

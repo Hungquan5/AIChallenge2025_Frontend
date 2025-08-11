@@ -7,10 +7,11 @@ import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
 interface InputPanelProps {
   onSearch: (results: ResultItem[]) => void;
+  isAutoTranslateEnabled: boolean; // ✅ 1. ACCEPT THE PROP
 }
 import { translateText } from '../SearchRequest/searchApi';
 
-const InputPanel = ({ onSearch }: InputPanelProps) => {
+const InputPanel = ({ onSearch, isAutoTranslateEnabled }: InputPanelProps) => { // ✅ 2. DESTRUCTURE THE PROP
   const [queries, setQueries] = useState<Query[]>([
     // The initial query no longer has a 'mode' field
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
@@ -31,54 +32,73 @@ const InputPanel = ({ onSearch }: InputPanelProps) => {
   }, []);
 
 const handleSearch = async (searchMode: SearchMode = 'normal') => {
-
-    setLoading(true);  
-    
-  // 2. Prepare the payload for the API by inferring query type
-  const apiQueriesPromises = queries.map(async (q): Promise<ApiQuery> => {
-
-      // Base query with shared fields
-      const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
-        asr: q.asr.trim(),
-        ocr: q.ocr.trim(),
-        origin: q.origin.trim(),
-        obj: q.obj,
-        lang: q.lang,
-      };
-
-      // INFERENCE LOGIC: If an imageFile exists, it's an image query.
-      // Otherwise, it's a text query.
-      if (q.imageFile) {
-        let image: string | undefined = "";
-        try {
-          image = await fileToBase64(q.imageFile);
-        } catch (error) {
-          console.error(`Failed to convert imageFile to base64:`, error);
-          // Handle error appropriately, maybe skip this query or show a message
-        }
+  setLoading(true);  
+  
+  // 1. First, translate all queries that need translation
+  const translationPromises = queries.map(async (q, index) => {
+    // Only translate if it's in original language and has origin text but no English text
+    if (q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
+      try {
+        const translated = await translateText(q.origin.trim());
         return {
-          ...baseApiQuery,
-          text: '', // Ensure text is empty for image queries
-          image: image,
+          ...q,
+          text: translated,
+          lang: 'eng' as const
         };
-      } else {
-        // This is a text-based query
-        // translate the query
-        return {
-          ...baseApiQuery,
-          text: q.text.trim(),
-          image: "", // Ensure image is undefined
-        };
+      } catch (error) {
+        console.error(`Translation failed for query ${index}:`, error);
+        // Return original query if translation fails
+        return q;
       }
-    });
+    }
+    return q;
+  });
 
+  const translatedQueries = await Promise.all(translationPromises);
+  
+  // 2. Update the component state with translated queries
+  setQueries(translatedQueries);
+  
+  // 3. Prepare the payload for the API using the translated queries
+  const apiQueriesPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
+    // Base query with shared fields
+    const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
+      asr: q.asr.trim(),
+      ocr: q.ocr.trim(),
+      origin: q.origin.trim(),
+      obj: q.obj,
+      lang: q.lang,
+    };
+
+    // INFERENCE LOGIC: If an imageFile exists, it's an image query.
+    if (q.imageFile) {
+      let image: string = "";
+      try {
+        image = await fileToBase64(q.imageFile);
+      } catch (error) {
+        console.error(`Failed to convert imageFile to base64:`, error);
+      }
+      return {
+        ...baseApiQuery,
+        text: '', // Ensure text is empty for image queries
+        image: image,
+      };
+    } else {
+      // This is a text-based query - now using the translated text
+      return {
+        ...baseApiQuery,
+        text: q.text.trim(), // This will now contain translated text
+        image: "",
+      };
+    }
+  });
 
   const apiQueries = await Promise.all(apiQueriesPromises);
   console.log('All API queries:', apiQueries);
 
-  // 3. Validate content
+  // 4. Validate content
   const isSearchable = apiQueries.some(q => 
-      q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image
+    q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image
   );
 
   if (!isSearchable) {
@@ -160,24 +180,12 @@ const handleTranslateAll = async () => {
   // Register shortcuts
  // Register shortcuts
 useShortcuts({
-  TRANSLATE_ALL_QUERIES: handleTranslateAll,
   TRIGGER_CHAIN_SEARCH: async () => {
-    // We don't need the 'if (ref.current)' check if we call the function directly
-    await handleTranslateAll();
-    
-    // INSTEAD OF THIS:
-    // chainSearchButtonRef.current.click();
 
-    // DO THIS: Call the search handler directly
     await handleSearch('chain');
   },
   TRIGGER_SEARCH: async () => {
-    await handleTranslateAll();
 
-    // INSTEAD OF THIS:
-    // searchButtonRef.current.click();
-
-    // DO THIS: Call the search handler directly
     await handleSearch('normal');
   },
   ADD_QUERY: addNewQuery,
@@ -233,20 +241,22 @@ useShortcuts({
     </button>
   );
 
-    return {
+
+
+  return {
     panelContent: (
       <div className={containerClass} ref={containerRef}>
         <QueryList 
           queries={queries} 
           onQueriesChange={setQueries}
           onSingleSearchResult={onSearch}
+          isAutoTranslateEnabled={isAutoTranslateEnabled} // ✅ 3. PASS THE PROP DOWN
         />
       </div>
     ),
     searchButton: <SearchButton />,
-    chainSearchButton: <ChainSearchButton /> // ✅ CORRECT KEY
+    chainSearchButton: <ChainSearchButton />
   };
-
 };
 
 export default InputPanel;
