@@ -4,19 +4,18 @@ import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
-import VideoPanel from '../../../detail_info/components/VideoPanel/VideoPanel';
 
 interface ResultsPanelProps {
   viewMode: ViewMode;
   results: ResultItem[];
   groupedResults?: GroupedResult[];
   onResultClick: (item: ResultItem) => void;
-  // This prop is now the single source of truth for triggering a search.
+  // ✅ CHANGED: The prop for handling right-clicks is now received from App.tsx.
+  onResultRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
-  currentUser: string; // The name of the current user for broadcasting
-  sendMessage: (message: string) => void; // WebSocket send function
-  onItemBroadcast?: (item: ResultItem) => void; // Optional prop for broadcasting images
-
+  currentUser: string;
+  sendMessage: (message: string) => void;
+  onItemBroadcast?: (item: ResultItem) => void;
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -24,6 +23,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   results,
   groupedResults = [],
   onResultClick,
+  onResultRightClick, // ✅ Destructure the new handler.
   onSimilaritySearch, // We will use THIS prop directly.
   currentUser, sendMessage,onItemBroadcast
 }) => {
@@ -156,7 +156,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
         <SortedByConfidenceView
           results={results}
           onResultClick={onResultClick}
-          onRightClick={handleRightClick}
+          onRightClick={onResultRightClick}
           // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
           currentUser={currentUser}
@@ -174,13 +174,6 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
         />
       )}
 
-      {modalData && (
-        <VideoPanel
-          videoId={modalData.videoId}
-          timestamp={modalData.timestamp}
-          onClose={closeModal}
-        />
-      )}
     </div>
   );
 };

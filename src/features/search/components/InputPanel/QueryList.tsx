@@ -140,7 +140,7 @@ useEffect(() => {
   };
 
   return (
-    <div className={containerClass} ref={containerRef}>
+    <div ref={containerRef}>
       <div className="space-y-4">
         {queries.map((query, index) => (
           <QueryItem

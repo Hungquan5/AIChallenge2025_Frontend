@@ -37,22 +37,24 @@ const SortedByConfidenceView: React.FC<Props> = ({
   const handleImageLoad = useCallback((id: string) => {
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
-// --- NEW HANDLER ---
-const handleSending = useCallback((item: ResultItem) => {
-    // ✅ FIX: Ensure payload has the same fields as in FrameItemSlide
+  // ✅ FIX: This handler now sends a complete and consistent ResultItem payload
+  const handleSending = useCallback((item: ResultItem) => {
     const message = {
       type: 'broadcast_image',
       payload: {
-        id: item.id, // Use the stable ID
+        // Ensure all fields from the ResultItem type are present
+        id: item.id,
         videoId: item.videoId,
         thumbnail: item.thumbnail,
         title: item.title,
-        timestamp: item.timestamp, // Include timestamp for consistency
-        submittedBy: currentUser,
+        timestamp: item.timestamp,
+        confidence: item.confidence, // Pass confidence as well
+        submittedBy: currentUser, // Add the sender's name
       },
     };
     sendMessage(JSON.stringify(message));
-}, [currentUser, sendMessage]);
+  }, [currentUser, sendMessage]);
+
 
   if (results.length === 0) {
     return (

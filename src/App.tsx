@@ -20,12 +20,14 @@ import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel'
 
 const App: React.FC = () => {
   // ✅ 1. Add state to manage the video modal
-  const [videoModalState, setVideoModalState] = useState<{
+   const [videoPanelState, setVideoPanelState] = useState<{
     isOpen: boolean;
     videoId: string | null;
+    timestamp: string | null; // The panel needs the frame ID as a timestamp
   }>({
     isOpen: false,
     videoId: null,
+    timestamp: null,
   });
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true); // Default to on  
   const [results, setResults] = useState<ResultItem[]>([]);
@@ -64,7 +66,18 @@ const App: React.FC = () => {
     handleResultClick: loadFramesForPanel, // Renamed for clarity.
     handleCarouselClose: closeFramesPanel, // Renamed for clarity.
   } = useKeyframeLoader();
-
+  const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
+    if (!question.trim()) {
+      console.warn('VQA question is empty.');
+      return;
+    }
+    // In a real implementation, you would send this data to your backend API.
+    console.log('Submitting VQA:', {
+      videoId: item.videoId,
+      frameId: item.timestamp, // The original, correct frame ID
+      question: question.trim(),
+    });
+  }, []);
 
   // Enhanced WebSocket message handler
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -73,14 +86,14 @@ const App: React.FC = () => {
     switch (message.type) {
       case 'broadcast_image':
         if (message.payload) {
-          const newMessage = {
-            ...message.payload as ResultItem,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          // ✅ FIX: Do NOT overwrite the original timestamp.
+          // Instead, create a new 'receivedAt' property for display.
+          const newMessage: ResultItem = {
+            ...(message.payload as ResultItem), // Spread the original, untouched payload
           };
-          setBroadcastMessages(prevMessages => [newMessage, ...prevMessages.slice(0, 19)]); // Keep only last 20 messages
+          setBroadcastMessages(prevMessages => [newMessage, ...prevMessages.slice(0, 19)]);
         }
         break;
-      
       
       default:
         console.log('Unknown message type:', message.type);
@@ -144,6 +157,9 @@ const App: React.FC = () => {
       handleOpenVideoPanel(item.videoId, item.timestamp);
     }
 }, []);
+const handleClearBroadcastFeed = useCallback(() => {
+  setBroadcastMessages([]);
+}, []);
   // Search handlers (unchanged)
   const handleSearch = (newResults: ResultItem[]) => {
     setResults(newResults);
@@ -182,17 +198,14 @@ const App: React.FC = () => {
       handleSimilarityResults(newResults);
     });
   };
-   // ✅ 2. Create state specifically for your VideoPanel
-   const [videoPanelState, setVideoPanelState] = useState<{
-    isOpen: boolean;
-    videoId: string | null;
-    timestamp: string | null; // The panel needs the frame ID as a timestamp
-  }>({
-    isOpen: false,
-    videoId: null,
-    timestamp: null,
-  });
 
+// ✅ NEW: Handler to be passed to ResultsPanel for right-clicks.
+const handleResultRightClick = (item: ResultItem, event: React.MouseEvent) => {
+  event.preventDefault(); // Prevent the default browser context menu.
+  if (item.videoId && item.timestamp) {
+    handleOpenVideoPanel(item.videoId, item.timestamp);
+  }
+};
   // --- All your existing hooks (useSession, useKeyframeLoader, etc.) ---
   const handleMasterResultClick = (item: ResultItem) => {
     // 1. Capture the title of the video that was clicked.
@@ -288,6 +301,7 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
           groupedResults={groupedResults}
           onResultClick={handleMasterResultClick}
           onSimilaritySearch={handleSimilaritySearch}
+          onResultRightClick={handleResultRightClick}
           currentUser={user.username}
           sendMessage={sendMessage}
           onItemBroadcast={handleItemBroadcast}
@@ -321,7 +335,7 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
     timestamp={videoPanelState.timestamp}
     onClose={handleCloseVideoPanel}
   />
-  ) : null;
+) : null;
     // Show username prompt if no user
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
@@ -343,6 +357,8 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
         onBroadcastResultClick={handleMasterResultClick}
         onBroadcastRightClick={handleBroadcastFeedRightClick}
         onBroadcastSimilaritySearch={handleSimilaritySearch}
+        onClearBroadcastFeed={handleClearBroadcastFeed}
+        onVqaSubmit={handleVqaSubmit}
 
       />
 

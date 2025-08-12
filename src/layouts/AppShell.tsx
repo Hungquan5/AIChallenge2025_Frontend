@@ -1,7 +1,7 @@
 // AppShell.tsx
 import React,{ useState } from 'react';
 import type { ResultItem } from '../features/search/types';
-import { ChevronUp, ChevronDown, Users, Wifi, WifiOff } from 'lucide-react';
+import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2} from 'lucide-react';
 import { BroadcastFeed } from '../features/communicate/components/Communicate/BroadcastFeed';
 interface AppShellProps {
   leftPanel: React.ReactNode;
@@ -20,6 +20,9 @@ interface AppShellProps {
   onBroadcastResultClick: (item: ResultItem) => void;
   onBroadcastRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onBroadcastSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  onClearBroadcastFeed: () => void;
+  onVqaSubmit: (item: ResultItem, question: string) => void;
+
 
 }
 
@@ -37,6 +40,9 @@ const AppShell: React.FC<AppShellProps> = ({
   onBroadcastResultClick,
   onBroadcastRightClick,
   onBroadcastSimilaritySearch,
+  onClearBroadcastFeed,
+  onVqaSubmit,
+
 }) => {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
@@ -84,6 +90,15 @@ const AppShell: React.FC<AppShellProps> = ({
       <div className="relative z-30">
         {/* Toggle Button */}
         <div className="flex justify-center">
+        {broadcastMessages.length > 0 && (
+              <button
+                onClick={onClearBroadcastFeed}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs text-red-600 hover:bg-red-100/50 rounded-md transition-colors duration-200"
+                title="Clear all submissions from the feed"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           <button
             onClick={toggleBroadcast}
             className={`
@@ -147,6 +162,7 @@ const AppShell: React.FC<AppShellProps> = ({
                 </span>
               )}
             </div>
+ {/* ✅ 4. ADD a dedicated header inside the panel */}
 
             {/* Broadcast Feed Content */}
             <BroadcastFeed 
@@ -156,6 +172,8 @@ const AppShell: React.FC<AppShellProps> = ({
             onResultClick={onBroadcastResultClick}
             onRightClick={onBroadcastRightClick}
             onSimilaritySearch={onBroadcastSimilaritySearch}
+            onVqaSubmit={onVqaSubmit}
+
           />
           </div>
         </div>

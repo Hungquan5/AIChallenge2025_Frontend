@@ -9,12 +9,12 @@ import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';
 
 // Import all the new styles from the dedicated file
 import * as styles from './styles';
+
 interface FramesPanelProps {
   frames: ResultItem[];
   videoTitle: string;
   isLoading: boolean;
-  activeFrameId: string | number | null; // ✅ Add prop to receive the active ID
-
+  activeFrameId: string | number | null;
   onClose: () => void;
   onFrameClick: (item: ResultItem) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
@@ -31,7 +31,6 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
   onFrameClick,
   onSimilaritySearch,
   activeFrameId, // Destructure the new prop
-
   onRightClick,
   currentUser,
   sendMessage,
@@ -44,12 +43,14 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
     };
     sendMessage(JSON.stringify(message));
   };
-
+ // ✅ CHANGED: Replaced fixed positioning with absolute to constrain the overlay.
   // Enhance the base modal style for this specific panel
+
+
   const modalClass = `${styles.modalClass} w-11/12 max-w-7xl h-[85vh] flex flex-col bg-white/90 backdrop-blur-lg`;
   return (
     // The main overlay that covers the screen
-    <div className={styles.overlayClass} onClick={onClose}>
+    <div className={styles.overlayClass } onClick={onClose}>
       {/* The panel itself, stopping click propagation to prevent closing */}
       <div className={modalClass} onClick={(e) => e.stopPropagation()}>
         {/* Panel Header */}
@@ -87,7 +88,7 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                       onContextMenu={(event) => onRightClick(frame, event)}
                       onSimilaritySearch={onSimilaritySearch}
                       onSubmit={() => fullSubmissionFlow(frame)}
-                      onSending={() => { /* ... */ }}
+                      onSending={() => { handleSending(frame) }}
                       showConfidence
                       showTimestamp
                       isSelected={isActive} // ✅ Use the isSelected prop to apply the highlight

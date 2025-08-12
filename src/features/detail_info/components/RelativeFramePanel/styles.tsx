@@ -6,8 +6,8 @@ const focusRingClass = 'focus:outline-none focus:ring-2 focus:ring-offset-2 focu
 // === Main Modal Overlay ===
 // Covers the entire screen with a semi-transparent backdrop.
 // Clicking this will close the modal.
-export const overlayClass = `
-  fixed inset-0 z-40
+export const overlayClass = `absolute  
+ inset-0 z-40
   flex items-center justify-center
   bg-black/70
   backdrop-blur-sm

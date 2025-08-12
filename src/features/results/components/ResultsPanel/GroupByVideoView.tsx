@@ -31,6 +31,8 @@
     const handleImageLoad = useCallback((id: string) => {
       setLoadedImages(prev => new Set([...prev, id]));
     }, []);
+    
+
     const handleSending = useCallback((item: ResultItem) => {
       // 2. Create and send the WebSocket message
       const message = {
