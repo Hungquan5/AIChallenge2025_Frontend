@@ -1,11 +1,14 @@
+// src/layouts/TopControlBar.tsx
+
 import React from 'react';
+// ✅ 1. Import necessary icons
+import { ListChecks, Library, Keyboard, Languages } from 'lucide-react';
 import type { ViewMode } from '../features/results/types';
 
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onShowShortcuts: () => void;
-  // ✅ 1. ADD NEW PROPS FOR THE TOGGLE
   isAutoTranslateEnabled: boolean;
   onAutoTranslateChange: (enabled: boolean) => void;
 }
@@ -22,31 +25,35 @@ const TopControlBar: React.FC<Props> = ({
       <div className="flex items-center gap-4">
         {/* View Mode Toggles */}
         <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-xl">
+          {/* ✅ 2. Add icons to view mode buttons */}
           <button
             onClick={() => onViewModeChange('sortByConfidence')}
-            className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
               viewMode === 'sortByConfidence'
                 ? 'bg-white text-blue-600 shadow-md'
                 : 'bg-transparent text-slate-600 hover:bg-white/70'
             }`}
           >
-            Sort by Confidence
+            <ListChecks className="w-5 h-5" />
+            Conf
           </button>
           <button
             onClick={() => onViewModeChange('groupByVideo')}
-            className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
               viewMode === 'groupByVideo'
                 ? 'bg-white text-blue-600 shadow-md'
                 : 'bg-transparent text-slate-600 hover:bg-white/70'
             }`}
           >
-            Group by Video
+            <Library className="w-5 h-5" />
+            Group
           </button>
         </div>
 
- {/* ✅ 2. ADD THE AUTO-TRANSLATE TOGGLE SWITCH */}
- <div className="border-l border-slate-300/60 pl-4">
+        {/* ✅ 3. Add icon to Auto-Translate toggle label */}
+        <div className="border-l border-slate-300/60 pl-4">
           <label htmlFor="auto-translate-toggle" className="flex items-center cursor-pointer select-none">
+            <Languages className="w-5 h-5 mr-3 text-slate-600" />
             <span className="mr-3 text-sm font-semibold text-slate-700">Auto-Translate</span>
             <div className="relative">
               <input
@@ -63,12 +70,12 @@ const TopControlBar: React.FC<Props> = ({
         </div>
       </div>  
 
-      {/* Shortcuts Button */}
+      {/* ✅ 4. Add icon to Shortcuts Button */}
       <button
         onClick={onShowShortcuts}
         className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
       >
-        <span className="text-base">⌨️</span>
+        <Keyboard className="w-5 h-5" />
         <span>Shortcuts</span>
       </button>
     </div>

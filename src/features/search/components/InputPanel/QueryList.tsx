@@ -31,58 +31,83 @@ const QueryList: React.FC<QueryListProps> = ({
     newQueries[index] = { ...newQueries[index], ...updated };
     onQueriesChange(newQueries);
   };
+  const translationAbortControllerRef = useRef<AbortController | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-// ✅ 3. ADD THE AUTO-TRANSLATE USEEFFECT HOOK
-useEffect(() => {
-  // If the feature is turned off, do nothing.
-  if (!isAutoTranslateEnabled) {
-    return;
-  }
-
-  // Clear any pending translation to avoid race conditions
-  if (debounceTimeoutRef.current) {
-    clearTimeout(debounceTimeoutRef.current);
-  }
-
-  // Set a new timeout to run after the user stops typing
-  debounceTimeoutRef.current = window.setTimeout(async () => {
-    // Find all queries that are in 'ori' mode, have original text, but no translated text yet.
-    const queriesNeedingTranslation = queries.some(
-      q => q.lang === 'ori' && q.origin && !q.text && !q.imageFile
-    );
-
-    if (!queriesNeedingTranslation) {
-      return; // No work to do
+  
+  // ✅ 2. Refactor the auto-translate effect to be cancellable
+  useEffect(() => {
+    if (!isAutoTranslateEnabled) {
+      return;
     }
 
-    // Perform translation for all applicable queries
-    const translationPromises = queries.map(q => {
-      if (q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
-        return translateText(q.origin.trim()).then(translated => ({
-          ...q,
-          text: translated, // Keep original text, just add the translation
-        }));
-      }
-      return Promise.resolve(q); // Return other queries unmodified
-    });
-
-    try {
-      const translatedQueries = await Promise.all(translationPromises);
-      onQueriesChange(translatedQueries);
-    } catch (error) {
-      console.error("Auto-translation failed:", error);
-    }
-
-  }, 700); // 700ms delay after last keystroke
-
-  // Cleanup function to clear timeout if component unmounts
-  return () => {
+    // A. Cancel any previous debounced timeout and abort any ongoing API call
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
-  };
-}, [queries, isAutoTranslateEnabled, onQueriesChange]); // Rerun effect if these change
+    if (translationAbortControllerRef.current) {
+      translationAbortControllerRef.current.abort();
+    }
 
+    // B. Create a new controller for this new potential translation
+    const controller = new AbortController();
+    translationAbortControllerRef.current = controller;
+
+    debounceTimeoutRef.current = window.setTimeout(async () => {
+      const queriesNeedingTranslation = queries.filter(
+        q => q.lang === 'ori' && q.origin && !q.text && !q.imageFile
+      );
+
+      if (queriesNeedingTranslation.length === 0) {
+        return; // No work to do
+      }
+
+      const translationPromises = queriesNeedingTranslation.map(q => 
+        // We assume translateText can accept a signal to be truly cancellable
+        translateText(q.origin.trim() /*, { signal: controller.signal } */)
+          .then(translated => ({
+            origin: q.origin, // Keep track of which original text this belongs to
+            translatedText: translated,
+          }))
+          .catch(error => {
+             // Prevent a single failed translation from breaking the whole batch
+            console.error(`Translation for "${q.origin}" failed:`, error);
+            return null;
+          })
+      );
+
+      try {
+        const results = await Promise.all(translationPromises);
+        
+        // C. Before updating state, check if this operation was cancelled
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        // D. Create the new state based on successful translations
+        const translatedQueries = queries.map(q => {
+          const result = results.find(r => r?.origin === q.origin);
+          if (result) {
+            // Passively add the translation but DON'T change the lang mode.
+            // The user stays in 'ori' mode with a pre-filled translation.
+            return { ...q, text: result.translatedText };
+          }
+          return q;
+        });
+
+        onQueriesChange(translatedQueries);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error("Auto-translation failed:", error);
+        }
+      }
+    }, 700);
+
+    // ✅ 3. Cleanup function: runs when effect re-runs or component unmounts
+    return () => {
+      clearTimeout(debounceTimeoutRef.current!);
+      controller.abort();
+    };
+  }, [queries, isAutoTranslateEnabled, onQueriesChange]);
   const insertQueryAfter = (index: number) => {
     if (maxQueries && queries.length >= maxQueries) return;
     const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null };
@@ -119,10 +144,14 @@ useEffect(() => {
   })  
   const removeQuery = (index: number) => {
     if (queries.length <= 1) return;
+
+    // Immediately stop any pending auto-translation before changing the state
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    if (translationAbortControllerRef.current) translationAbortControllerRef.current.abort();
+
     const updated = queries.filter((_, i) => i !== index);
     onQueriesChange(updated);
   };
-
   const handleNext = (index: number) => {
     const textareas = containerRef.current?.querySelectorAll('textarea');
     if (textareas) {

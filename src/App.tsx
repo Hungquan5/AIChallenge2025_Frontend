@@ -1,22 +1,21 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import './App.css';
-import AppShell from './layouts/AppShell';
-import InputPanel from './features/search/components/InputPanel/InputPanel';
-import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
-import TopControlBar from './layouts/TopControlBar';
 import ShortcutsHelp from './components/ShortcutsHelp';
-import { useShortcuts } from './utils/shortcuts';
-import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
-import type { BroadcastImageMessage, WebSocketMessage } from './features/communicate/types';
-import ResultCard from './features/results/components/ResultsPanel/ResultCard';
-import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
-import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
-import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
+import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
-import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
-import { ConnectionStatus } from './features/communicate/components/Communicate/ConnectionStatus';
+import type { WebSocketMessage } from './features/communicate/types';
+import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
 import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
+import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
+import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
+import type { GroupedResult, ResultItem, ViewMode } from './features/results/types';
+import InputPanel from './features/search/components/InputPanel/InputPanel';
+import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
+import AppShell from './layouts/AppShell';
+import TopControlBar from './layouts/TopControlBar';
+import { useShortcuts } from './utils/shortcuts';
+import { X } from 'lucide-react';
 
 const App: React.FC = () => {
   // ✅ 1. Add state to manage the video modal
@@ -370,7 +369,7 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 p-2"
               onClick={() => setShowShortcuts(false)}
             >
-              ✕
+                            <X className="h-5 w-5" />
             </button>
             <ShortcutsHelp />
           </div>

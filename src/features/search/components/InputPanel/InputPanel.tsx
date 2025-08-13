@@ -9,6 +9,7 @@ interface InputPanelProps {
   onSearch: (results: ResultItem[]) => void;
   isAutoTranslateEnabled: boolean; // ✅ 1. ACCEPT THE PROP
 }
+import { Search, Zap, Loader2 } from 'lucide-react'; 
 import { translateText } from '../SearchRequest/searchApi';
 
 const InputPanel = ({ onSearch, isAutoTranslateEnabled }: InputPanelProps) => { // ✅ 2. DESTRUCTURE THE PROP
@@ -219,25 +220,41 @@ useShortcuts({
   //   };
   // }, []);
 
-  // Create search button component
+  // ✅ 2. Update the SearchButton component to include icons
   const SearchButton = () => (
     <button
       ref={searchButtonRef}
       onClick={() => handleSearch('normal')}
-      className={searchButtonClass + ' w-full'}
+      className={`${searchButtonClass} w-full `}
       disabled={loading}
     >
-      {loading ? 'Searching...' : 'Search'}
+      {loading ? (
+        <>
+          <Loader2 className="animate-spin" />
+        </>
+      ) : (
+        <>
+          <Search className="" />
+        </>
+      )}
     </button>
   );
-    const ChainSearchButton = () => (
+  const ChainSearchButton = () => (
     <button
       ref={chainSearchButtonRef}
       onClick={() => handleSearch('chain')}
-      className={searchButtonClass + ' w-full'}
+      className={`${searchButtonClass} w-full`}
       disabled={loading}
     >
-      {loading ? 'Chaining...' : 'Chain Search'}
+      {loading ? (
+        <>
+          <Loader2 className="hanimate-spin" />
+        </>
+      ) : (
+        <>
+          <Zap className="" />
+        </>
+      )}
     </button>
   );
 

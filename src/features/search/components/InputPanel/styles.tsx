@@ -20,11 +20,11 @@ export const labelClass = 'text-slate-900 font-semibold text-sm tracking-wide up
 
 // === QueryItem Container ===
 export const queryItemContainerClass = `
-  p-3 
+  p-1 
   border border-slate-200/60 
   rounded-xl 
   shadow-sm 
-  space-y-3 
+  space-y-3
   bg-gradient-to-br from-white/90 to-slate-50/50 
   backdrop-blur-sm
 `;
@@ -56,7 +56,7 @@ export const inputClass = `
 // === Mode Toggle Buttons ===
 export const modeToggleButtonClass = `
   flex items-center justify-center
-  w-10 h-10
+  w-8 h-8
   rounded-lg 
   text-lg
   transition-all duration-300 
@@ -85,7 +85,7 @@ export const imageModeActiveColor = 'bg-gradient-to-br from-purple-100/90 to-pin
 // === Feature Toggle Buttons ===
 export const featureToggleButtonClass = `
   flex items-center justify-center
-  w-10 h-10
+  w-8 h-8
   rounded-lg 
   text-lg
   transition-all duration-300 

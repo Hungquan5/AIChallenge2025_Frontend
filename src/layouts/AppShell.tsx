@@ -55,7 +55,7 @@ const AppShell: React.FC<AppShellProps> = ({
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel */}
-        <aside className="w-[240px] min-w-[240px] max-w-[400px] h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative">
+        <aside className="w-[200px] min-w-[200px] max-w-[360px] h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative">
           <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {leftPanel}
           </div>

@@ -1,10 +1,10 @@
-// src/features/communicate/components/Communicate/BroadcastFeed.tsx
 import React, { useState } from 'react';
 import type { ResultItem } from '../../../results/types'; // Correct path to types
-import { Users ,Send} from 'lucide-react';
+import { Users, Send } from 'lucide-react';
 import ResultCard from '../../../results/components/ResultsPanel/ResultCard'; // Correct path to ResultCard
 import { getImageUrl } from '../../../../utils/getImageURL';
 import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';
+
 interface BroadcastFeedProps {
   messages: ResultItem[];
   onRemoveMessage?: (messageId: string, index: number) => void;
@@ -22,8 +22,9 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
   onRightClick,
   onSimilaritySearch,
   onVqaSubmit,
-
 }) => {
+  // ✅ FIX: Manage all VQA inputs in a single state object outside the loop.
+  const [vqaQuestions, setVqaQuestions] = useState<{ [key: string]: string }>({});
 
   const handleRemoveMessage = (messageId: string, index: number, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -44,47 +45,58 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
     <div className="space-y-3 relative">
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 p-1 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {messages.map((msg, index) => {
-          // The imageUrl should already be correct in the payload, but getImageUrl is a good fallback
           const imageUrl = msg.thumbnail.startsWith('http') ? msg.thumbnail : getImageUrl(msg.videoId, msg.thumbnail);
-          const [vqaQuestion, setVqaQuestion] = useState('');
-          const handleLocalVqaSubmit = () => {
-            onVqaSubmit(msg, vqaQuestion);
-            setVqaQuestion(''); // Clear input after submission
-          };
           
+          // ✅ FIX: Handle state change for the specific message input.
+          const handleVqaInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const { value } = e.target;
+            setVqaQuestions(prev => ({
+              ...prev,
+              [msg.id]: value,
+            }));
+          };
+
+          // ✅ FIX: Submit the question for the specific message.
+          const handleLocalVqaSubmit = () => {
+            const question = vqaQuestions[msg.id] || '';
+            if (question.trim()) {
+              onVqaSubmit(msg, question);
+              // Clear the input for this specific message after submission.
+              setVqaQuestions(prev => ({
+                ...prev,
+                [msg.id]: '',
+              }));
+            }
+          };
+
           return (
-            // ✅ FIX: Add a container to show who submitted the item
             <div key={`${msg.id}-${index}`} className="relative group flex flex-col items-center">
               <div className="w-full">
                 <ResultCard
-                  // ✅ FIX: Use the stable msg.id passed over WebSocket
                   id={msg.timestamp}
                   thumbnail={imageUrl}
                   title={msg.title}
                   timestamp={msg.timestamp ?? ''}
                   confidence={msg.confidence ?? 0}
-                  // These props are now passed down correctly
                   onClick={() => onResultClick(msg)}
                   onContextMenu={(event) => onRightClick(msg, event)}
                   onSimilaritySearch={() => onSimilaritySearch(imageUrl, msg.id)}
-                  // Pass a default empty function for onLoad
                   onSubmit={() => fullSubmissionFlow(msg)}
-
                   loaded={true}
                   onLoad={() => {}}
                 />
               </div>
 
-              {/* ✅ REPLACEMENT: VQA Input and Submit Button */}
               <div className="relative w-full mt-1.5" title="Ask a question about this image">
                 <input
                   type="text"
-                  value={vqaQuestion}
-                  onChange={(e) => setVqaQuestion(e.target.value)}
+                  // ✅ FIX: Get the value from the state object.
+                  value={vqaQuestions[msg.id] || ''}
+                  // ✅ FIX: Use the new handler for changes.
+                  onChange={handleVqaInputChange}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleLocalVqaSubmit();
                   }}
-                  // Stop clicks on the input from triggering card actions
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                   placeholder={`VQA: Ask... (By ${msg.submittedBy})`}
@@ -95,14 +107,14 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                     e.stopPropagation();
                     handleLocalVqaSubmit();
                   }}
-                  disabled={!vqaQuestion.trim()}
+                  // ✅ FIX: Disable based on the specific question in the state object.
+                  disabled={!(vqaQuestions[msg.id] || '').trim()}
                   className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-blue-600 disabled:text-gray-300 disabled:cursor-not-allowed"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Remove button remains the same */}
               {onRemoveMessage && (
                 <button
                   onClick={(e) => handleRemoveMessage(msg.id, index, e)}

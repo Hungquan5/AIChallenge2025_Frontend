@@ -4,7 +4,10 @@ import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
 import type { Query, ResultItem } from '../../types';
 import { searchBySingleQuery, translateText } from '../SearchRequest/searchApi';
 import { fileToBase64 } from '../../../../utils/fileConverter'; // Assuming this utility exists
-import { Filter } from 'lucide-react';
+import { 
+  FileText, Image, ScanText, Mic, Target, Filter, Camera, UploadCloud, 
+  Trash2, Globe, Languages, Loader2, Search, Plus, X 
+} from 'lucide-react';
 
 
 import {
@@ -38,11 +41,9 @@ import {
 } from './styles';
 
 // --- ENHANCED COMPONENT DEFINITIONS (Copied from your suggestions) ---
-
-// ✅ FIX: ADD THE MISSING FeatureToggleButton DEFINITION HERE
 const FeatureToggleButton = ({ active, icon, onClick, activeColor }: { 
   active: boolean; 
-  icon: string; 
+  icon: React.ReactNode; // Changed from string
   onClick: () => void; 
   activeColor: string; 
 }) => (
@@ -60,25 +61,23 @@ const FeatureToggleButton = ({ active, icon, onClick, activeColor }: {
   </button>
 );
 
+
 // #1: Loading state is handled inside the main component
 // #2: Enhanced Mode Toggle
+// #2: Enhanced Mode Toggle with Lucide Icons
 const EnhancedModeToggle = ({ mode, onModeChange }: { mode: 'text' | 'image', onModeChange: (newMode: 'text' | 'image') => void }) => (
   <div className="flex items-center gap-1 p-1 bg-slate-100/60 rounded-xl backdrop-blur-sm">
     <button
       className={`${modeToggleButtonClass} ${mode === 'text' ? textModeActiveColor + ' ' + modeToggleActiveClass : modeToggleInactiveClass} transition-all duration-300`}
       onClick={() => onModeChange('text')}
     >
-      <span className="flex items-center gap-1.5">
-        📝
-      </span>
+      <FileText className="w-5 h-5" />
     </button>
     <button
       className={` ${modeToggleButtonClass} ${mode === 'image' ? imageModeActiveColor + ' ' + modeToggleActiveClass : modeToggleInactiveClass} transition-all duration-300`}
       onClick={() => onModeChange('image')}
     >
-      <span className="flex items-center gap-1.5">
-        🖼️
-      </span>
+      <Image className="w-5 h-5" />
     </button>
   </div>
 );
@@ -103,15 +102,15 @@ const EnhancedFeatureToggles = ({ showOCR, showASR, showOBJ, onToggle, query }: 
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <FeatureToggleButton active={showOCR} icon="📄" onClick={() => onToggle('ocr')} activeColor={ocrActiveColor} />
-        <FeatureToggleButton active={showASR} icon="🎤" onClick={() => onToggle('asr')} activeColor={asrActiveColor} />
-        <FeatureToggleButton active={showOBJ} icon="🎯" onClick={() => onToggle('obj')} activeColor={objActiveColor} />
+        {/* Pass Lucide icons as components */}
+        <FeatureToggleButton active={showOCR} icon={<ScanText className="w-5 h-5" />} onClick={() => onToggle('ocr')} activeColor={ocrActiveColor} />
+        <FeatureToggleButton active={showASR} icon={<Mic className="w-5 h-5" />} onClick={() => onToggle('asr')} activeColor={asrActiveColor} />
+        <FeatureToggleButton active={showOBJ} icon={<Target className="w-5 h-5" />} onClick={() => onToggle('obj')} activeColor={objActiveColor} />
       </div>
       {featureCount > 0 && (
         <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-100/60 text-blue-700 text-xs font-medium rounded-full">
-          <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-          <Filter className="w-5 h-5 text-gray-600" />
-
+          <Filter className="w-4 h-4 text-blue-600" />
+          <span>{featureCount} Filter{featureCount > 1 ? 's' : ''}</span>
         </div>
       )}
     </div>
@@ -146,44 +145,39 @@ const EnhancedUploadArea = ({ onImageUpload, imageFile, index }: {
   };
 
   return (
-    // The <label> is now the main container for everything.
     <label
       htmlFor={`file-upload-${index}`}
-      className={`${uploadAreaClass} ${isDragging ? 'border-purple-500/80 bg-purple-50/80 scale-[1.03]' : ''} relative group`} // Added relative and group
+      className={`${uploadAreaClass} ${isDragging ? 'border-purple-500/80 bg-purple-50/80 scale-[1.03]' : ''} relative group`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {imageFile ? (
-        // STATE 1: An image has been uploaded
         <>
           <img 
             src={URL.createObjectURL(imageFile)} 
             alt="Uploaded preview" 
-            className={uploadedImageClass} // This class will make it fill the area
+            className={uploadedImageClass}
           />
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl flex items-center justify-center">
-             {/* This button now sits on top of the image on hover */}
             <button
               onClick={(e) => {
-                e.preventDefault(); // Prevent label from triggering file input
+                e.preventDefault();
                 onImageUpload({ target: { files: null } })
               }}
-              className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-lg"
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-lg"
             >
+              <Trash2 className="" />
               Remove
             </button>
           </div>
         </>
       ) : (
-        // STATE 2: No image, show the upload prompt
-        <div className="flex flex-col items-center pointer-events-none">
-          <span className={uploadIconClass}>{isDragging ? '📤' : '📸'}</span>
-          <span className={uploadTextClass}>{isDragging ? 'Drop image here' : 'Upload & Drag & Drop'}</span>
+        <div className="flex flex-col items-center pointer-events-none text-slate-500">
+            {isDragging ? <UploadCloud className="w-10 h-10 mb-2" /> : <Camera className="w-10 h-10 mb-2" />}
+            <span className={uploadTextClass}>{isDragging ? 'Drop image to upload' : 'Click, or Drag & Drop'}</span>
         </div>
       )}
-
-      {/* The actual file input remains hidden */}
       <input id={`file-upload-${index}`} type="file" accept="image/*" onChange={onImageUpload} className="hidden" />
     </label>
   );
@@ -197,21 +191,46 @@ const SmartLanguageToggle = ({ query, onUpdate, index }: {
   index: number;
 }) => {
   const [isTranslating, setIsTranslating] = useState(false);
+  // ✅ 1. Add a ref to hold the controller for this specific toggle
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // ✅ 2. Add a cleanup effect to abort on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
 
   const handleLanguageToggle = async () => {
     const newLang = query.lang === 'eng' ? 'ori' : 'eng';
+
     if (newLang === 'eng' && query.origin && !query.text) {
+      // ✅ 3. Abort any previous request from this toggle and create a new one
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       setIsTranslating(true);
       try {
         const translated = await translateText(query.origin.trim());
-        onUpdate(index, { text: translated, lang: newLang });
-      } catch (err) {
-        console.error('Translation failed:', err);
-        onUpdate(index, { lang: newLang }); // fallback
+        // ✅ 4. Check if the request was aborted before updating state
+        if (!controller.signal.aborted) {
+          onUpdate(index, { text: translated, lang: newLang });
+        }
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Translation failed:', err);
+          if(!controller.signal.aborted) onUpdate(index, { lang: newLang }); // Fallback
+        }
       } finally {
         setIsTranslating(false);
+        if (abortControllerRef.current === controller) {
+            abortControllerRef.current = null;
+        }
       }
     } else {
+      // This is a simple synchronous state toggle
       onUpdate(index, { lang: newLang });
     }
   };
@@ -220,15 +239,18 @@ const SmartLanguageToggle = ({ query, onUpdate, index }: {
     <button onClick={handleLanguageToggle} disabled={isTranslating} className={`${languageToggleClass} ${isTranslating ? 'opacity-75 cursor-wait' : ''} flex items-center gap-2 justify-center`}>
       {isTranslating ? (
         <>
-          <div className="w-4 h-4 border-2 border-slate-400/50 border-t-slate-600 rounded-full animate-spin"></div>
+          <Loader2 className="animate-spin"/>
           <span className="text-xs">Translating...</span>
         </>
       ) : (
-        <span>{query.lang === 'eng' ? '🇺🇸' : '🌐'}</span>
+        <>
+          {query.lang === 'eng' ? <Globe className="" /> : <Languages className="" />}
+        </>
       )}
     </button>
   );
 };
+
 
 
 // #6: Enhanced Action Buttons
@@ -268,6 +290,7 @@ const ActionButton = ({ onClick, icon, tooltip, variant = 'default', disabled = 
     </div>
   );
 };
+
 
 // #7: Query Status Indicator
 const QueryStatusIndicator = ({ query, mode }: { query: Query; mode: 'text' | 'image' }) => {
