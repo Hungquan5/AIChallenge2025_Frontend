@@ -4,13 +4,20 @@ import React from 'react';
 // ✅ 1. Import necessary icons
 import { ListChecks, Library, Keyboard, Languages } from 'lucide-react';
 import type { ViewMode } from '../features/results/types';
-
+import PaginationControls from '../features/results/components/ResultsPanel/PaginationControls';
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onShowShortcuts: () => void;
   isAutoTranslateEnabled: boolean;
   onAutoTranslateChange: (enabled: boolean) => void;
+  
+  // ✅ 2. Add all pagination-related props
+  currentPage: number;
+  onPageChange: (newPage: number) => void;
+  hasNextPage: boolean;
+  isLoading: boolean;
+  totalResults: number; // To know when to show the controls
 }
 
 const TopControlBar: React.FC<Props> = ({
@@ -19,9 +26,14 @@ const TopControlBar: React.FC<Props> = ({
   onShowShortcuts,
   isAutoTranslateEnabled,
   onAutoTranslateChange,
+  currentPage,
+  onPageChange,
+  hasNextPage,
+  isLoading,
+  totalResults,
 }) => {
   return (
-    <div className="flex justify-between items-center p-4 bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
+    <div className="flex justify-between items-center bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
       <div className="flex items-center gap-4">
         {/* View Mode Toggles */}
         <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-xl">
@@ -69,6 +81,17 @@ const TopControlBar: React.FC<Props> = ({
           </label>
         </div>
       </div>  
+
+      {/* ✅ 4. Add the PaginationControls in the center */}
+      <div className="flex-grow flex justify-center">
+        {(totalResults > 0 || currentPage > 1) && (
+          <PaginationControls
+            currentPage={currentPage}
+            onPageChange={onPageChange}
+            hasNextPage={hasNextPage}
+          />
+        )}
+          </div>
 
       {/* ✅ 4. Add icon to Shortcuts Button */}
       <button

@@ -5,14 +5,24 @@ import type { ResultItem, Query,SearchMode,ApiQuery } from '../../types';
 import { searchByText } from '../SearchRequest/searchApi';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
+// ✅ This is where the fix is.
 interface InputPanelProps {
-  onSearch: (results: ResultItem[]) => void;
-  isAutoTranslateEnabled: boolean; // ✅ 1. ACCEPT THE PROP
+  onSearch: (queries: ApiQuery[], mode: SearchMode) => void;
+  isAutoTranslateEnabled: boolean;
+  isLoading: boolean; // This prop is passed from the parent (App.tsx)
+  
+  // ✅ ADD THIS LINE: Declare that this component expects this prop.
+  onSingleSearchResult: (results: ResultItem[]) => void;
 }
+
 import { Search, Zap, Loader2 } from 'lucide-react'; 
 import { translateText } from '../SearchRequest/searchApi';
-
-const InputPanel = ({ onSearch, isAutoTranslateEnabled }: InputPanelProps) => { // ✅ 2. DESTRUCTURE THE PROP
+const InputPanel = ({ 
+  onSearch, 
+  isAutoTranslateEnabled, 
+  isLoading, 
+  onSingleSearchResult 
+}: InputPanelProps) => {// ✅ 2. DESTRUCTURE THE PROP
   const [queries, setQueries] = useState<Query[]>([
     // The initial query no longer has a 'mode' field
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
@@ -32,95 +42,64 @@ const InputPanel = ({ onSearch, isAutoTranslateEnabled }: InputPanelProps) => { 
     setTimeout(focusFirstTextarea, 0);
   }, []);
 
-const handleSearch = async (searchMode: SearchMode = 'normal') => {
-  setLoading(true);  
-  
-  // 1. First, translate all queries that need translation
-  const translationPromises = queries.map(async (q, index) => {
-    // Only translate if it's in original language and has origin text but no English text
-    if (q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
-      try {
-        const translated = await translateText(q.origin.trim());
-        return {
-          ...q,
-          text: translated,
-          lang: 'eng' as const
-        };
-      } catch (error) {
-        console.error(`Translation failed for query ${index}:`, error);
-        // Return original query if translation fails
-        return q;
-      }
+  const handleSearch = async (searchMode: SearchMode = 'normal') => {
+    setLoading(true);
+
+    // 1. Translation logic (remains the same)
+    const translationPromises = queries.map(async (q) => {
+        // ... (no changes in this block)
+        if (q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
+            try {
+              const translated = await translateText(q.origin.trim());
+              return { ...q, text: translated, lang: 'eng' as const };
+            } catch (error) {
+              console.error(`Translation failed:`, error);
+              return q;
+            }
+          }
+          return q;
+    });
+    const translatedQueries = await Promise.all(translationPromises);
+    setQueries(translatedQueries);
+
+    // 2. Prepare API queries (remains the same)
+    const apiQueriesPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
+        // ... (no changes in this block)
+        const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
+            asr: q.asr.trim(), ocr: q.ocr.trim(), origin: q.origin.trim(),
+            obj: q.obj, lang: q.lang,
+          };
+          if (q.imageFile) {
+            const image = await fileToBase64(q.imageFile);
+            return { ...baseApiQuery, text: '', image };
+          } else {
+            return { ...baseApiQuery, text: q.text.trim(), image: "" };
+          }
+    });
+    const apiQueries = await Promise.all(apiQueriesPromises);
+
+    // 3. Validation (remains the same)
+    const isSearchable = apiQueries.some(q => 
+        q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image
+    );
+    if (!isSearchable) {
+      alert('Please enter a query or specify other search criteria.');
+      setLoading(false);
+      return;
     }
-    return q;
-  });
+    
+    // 4. ⛔️ REMOVED API CALL BLOCK
+    // Instead of calling the API here, we pass the data to the parent component.
+    // The parent will handle the API call, error handling, and state updates.
+    onSearch(apiQueries, searchMode);
 
-  const translatedQueries = await Promise.all(translationPromises);
-  
-  // 2. Update the component state with translated queries
-  setQueries(translatedQueries);
-  
-  // 3. Prepare the payload for the API using the translated queries
-  const apiQueriesPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
-    // Base query with shared fields
-    const baseApiQuery: Omit<ApiQuery, 'text' | 'image'> = {
-      asr: q.asr.trim(),
-      ocr: q.ocr.trim(),
-      origin: q.origin.trim(),
-      obj: q.obj,
-      lang: q.lang,
-    };
-
-    // INFERENCE LOGIC: If an imageFile exists, it's an image query.
-    if (q.imageFile) {
-      let image: string = "";
-      try {
-        image = await fileToBase64(q.imageFile);
-      } catch (error) {
-        console.error(`Failed to convert imageFile to base64:`, error);
-      }
-      return {
-        ...baseApiQuery,
-        text: '', // Ensure text is empty for image queries
-        image: image,
-      };
-    } else {
-      // This is a text-based query - now using the translated text
-      return {
-        ...baseApiQuery,
-        text: q.text.trim(), // This will now contain translated text
-        image: "",
-      };
-    }
-  });
-
-  const apiQueries = await Promise.all(apiQueriesPromises);
-  console.log('All API queries:', apiQueries);
-
-  // 4. Validate content
-  const isSearchable = apiQueries.some(q => 
-    q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image
-  );
-
-  if (!isSearchable) {
-    alert('Please enter a query, upload an image, or specify other search criteria.');
+    // We can set loading to false here, or let the parent control it via a prop.
+    // For simplicity, we'll let the parent handle the global loading state.
+    // The loading state here is now just for the query preparation phase.
     setLoading(false);
-    return;
-  }
-  
-  console.log('Final payload being sent:', apiQueries);
-  
-  try {
-    const results = await searchByText(apiQueries, searchMode);
-    onSearch(results);
-  } catch (error) {
-    const action = searchMode === 'chain' ? 'Chain search' : 'Search';
-    console.error(`${action} error:`, error);
-    alert(`${action} failed: ` + (error instanceof Error ? error.message : 'Unknown error'));
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
+
   const addNewQuery = () => {
     // Add new query without 'mode'
     setQueries(prev => [...prev, { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
@@ -266,8 +245,9 @@ useShortcuts({
         <QueryList 
           queries={queries} 
           onQueriesChange={setQueries}
-          onSingleSearchResult={onSearch}
-          isAutoTranslateEnabled={isAutoTranslateEnabled} // ✅ 3. PASS THE PROP DOWN
+          // Now that InputPanel accepts this prop, it can correctly pass it down to QueryList.
+          onSingleSearchResult={onSingleSearchResult} 
+          isAutoTranslateEnabled={isAutoTranslateEnabled}
         />
       </div>
     ),

@@ -1,22 +1,36 @@
+// src/App.tsx
+
 import React, { useCallback, useRef, useState } from 'react';
 import './App.css';
-import ShortcutsHelp from './components/ShortcutsHelp';
-import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
-import { useSession } from './features/communicate/hooks/useSession';
-import { useWebSocket } from './features/communicate/hooks/useWebsocket';
-import type { WebSocketMessage } from './features/communicate/types';
-import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
-import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
-import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
-import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
-import type { GroupedResult, ResultItem, ViewMode } from './features/results/types';
-import InputPanel from './features/search/components/InputPanel/InputPanel';
-import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
+
+// --- Core Components & Layouts ---
 import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
+import InputPanel from './features/search/components/InputPanel/InputPanel';
+import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
+import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
+import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
+
+// --- Types & API ---
+import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
+import { searchByText } from './features/search/components/SearchRequest/searchApi'; // The API call now lives here.
+import type { ApiQuery,SearchMode } from './features/search/types';
+import type { WebSocketMessage } from './features/communicate/types';
+// --- Hooks & Utilities ---
+import { useSession } from './features/communicate/hooks/useSession';
+import { useWebSocket } from './features/communicate/hooks/useWebsocket';
+import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
 import { useShortcuts } from './utils/shortcuts';
+import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
+
+// --- Other Components ---
+import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
+import ShortcutsHelp from './components/ShortcutsHelp';
 import { X } from 'lucide-react';
 
+
+
+const PAGE_SIZE = 100; // Define your page size, matching the backend default
 const App: React.FC = () => {
   // ✅ 1. Add state to manage the video modal
    const [videoPanelState, setVideoPanelState] = useState<{
@@ -28,16 +42,27 @@ const App: React.FC = () => {
     videoId: null,
     timestamp: null,
   });
-  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true); // Default to on  
-  const [results, setResults] = useState<ResultItem[]>([]);
-  const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
-  const [showShortcuts, setShowShortcuts] = useState(false);
+    // Search Results & View State
+    const [results, setResults] = useState<ResultItem[]>([]);
+    const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
+    const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
+    
+    // ✅ Pagination & Search Context State
+    const [isLoading, setIsLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [lastQueries, setLastQueries] = useState<ApiQuery[]>([]);
+    const [lastSearchMode, setLastSearchMode] = useState<SearchMode>('normal');
+  
+    // UI & App-level State
+    const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
+    const [showShortcuts, setShowShortcuts] = useState(false);
+    
+    // Refs for focusing and scrolling
+    const inputPanelRef = useRef<HTMLDivElement>(null);
+    const resultsRef = useRef<HTMLDivElement>(null);
   const [broadcastMessages, setBroadcastMessages] = useState<ResultItem[]>([]);
   const [activeUsers, setActiveUsers] = useState(0);
-  
-  const inputPanelRef = useRef<HTMLDivElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
   // State to hold the title for the FramesPanel, captured on click
   const [currentVideoTitle, setCurrentVideoTitle] = useState('');
   // Session and WebSocket hooks
@@ -54,7 +79,71 @@ const App: React.FC = () => {
   videoTitle: '',
   isLoading: false,
 });
+const executeSearch = useCallback(async (queries: ApiQuery[], mode: SearchMode, page: number) => {
+  setIsLoading(true);
+  try {
+    const newResults = await searchByText(queries, mode, page, PAGE_SIZE);
 
+    setResults(newResults);
+    setHasNextPage(newResults.length === PAGE_SIZE); // If we got a full page, there might be more.
+
+    // Group results (logic is unchanged)
+    const grouped = newResults.reduce((acc, item) => {
+      const group = acc.find(g => g.videoId === item.videoId);
+      if (group) group.items.push(item);
+      else acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
+      return acc;
+    }, [] as GroupedResult[]);
+    setGroupedResults(grouped);
+
+    // Scroll to top of results view
+    resultsRef.current?.scrollTo(0, 0);
+
+  } catch (error) {
+    console.error("Search failed:", error);
+    alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    setHasNextPage(false); // Reset on error
+  } finally {
+    setIsLoading(false);
+  }
+}, []); // Empty dependency array as it uses state setters and constants
+const handleInitiateSearch = useCallback((queries: ApiQuery[], mode: SearchMode) => {
+  // A new search always starts at page 1
+  setCurrentPage(1); 
+  
+  // Save the context of this search so we can paginate it later
+  setLastQueries(queries);
+  setLastSearchMode(mode);
+  
+  // Execute the search for the first page
+  executeSearch(queries, mode, 1);
+}, [executeSearch]); // Depends on executeSearch
+const handlePageChange = useCallback((newPage: number) => {
+  if (lastQueries.length > 0) {
+    setCurrentPage(newPage);
+    executeSearch(lastQueries, lastSearchMode, newPage);
+  }
+}, [lastQueries, lastSearchMode, executeSearch]); // Depends on saved context and executeSearch
+
+// A handler for when a single query is searched from within QueryItem
+const handleSingleItemSearch = (newResults: ResultItem[]) => {
+  setResults(newResults);
+   // A single item search should not affect the main pagination context
+  setHasNextPage(false); 
+  setCurrentPage(1);
+
+  const grouped = newResults.reduce((acc, item) => {
+      const group = acc.find(g => g.videoId === item.videoId);
+      if (group) {
+        group.items.push(item);
+      } else {
+        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
+      }
+      return acc;
+    }, [] as GroupedResult[]);
+    setGroupedResults(grouped);
+    resultsRef.current?.scrollTo(0, 0);
+}
   // Keyframe loader hooks
    // --- Updated Keyframe Loader Hook ---
   // The hook now manages the state for the FramesPanel internally.
@@ -265,13 +354,19 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
   // Create panel components
   // Create panel components
  // ✅ 2. PASS THE NEW STATE TO THE INPUTPANEL INSTANCE
-  const { 
+ // ✅ Create the InputPanel instance, passing the new handler and loading state
+ const { 
   panelContent, 
   searchButton, 
   chainSearchButton 
 } = InputPanel({
-  onSearch: handleSearch,
-  isAutoTranslateEnabled: isAutoTranslateEnabled, // Pass the state down
+  onSearch: handleInitiateSearch, // Pass the new search initiator
+  // Note: To make `onSingleSearchResult` work, you'd also need to pass `handleSingleItemSearch`
+  // down through InputPanel -> QueryList -> QueryItem. Let's assume this prop is added.
+  onSingleSearchResult: handleSingleItemSearch,
+  isAutoTranslateEnabled: isAutoTranslateEnabled,
+  // Pass loading state down so InputPanel can disable its buttons
+  isLoading: isLoading, 
 });
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
@@ -287,12 +382,19 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
     <>
     {/* ✅ 3. PASS THE STATE AND SETTER TO THE TOPCONTROLBAR */}
     <TopControlBar
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      onShowShortcuts={() => setShowShortcuts(true)}
-      isAutoTranslateEnabled={isAutoTranslateEnabled}
-      onAutoTranslateChange={setIsAutoTranslateEnabled}
-    />
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onShowShortcuts={() => setShowShortcuts(true)}
+            isAutoTranslateEnabled={isAutoTranslateEnabled}
+            onAutoTranslateChange={setIsAutoTranslateEnabled}
+            
+            // ✅ PASS all pagination props HERE
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            hasNextPage={hasNextPage}
+            isLoading={isLoading}
+            totalResults={results.length}
+          />
       <div ref={resultsRef}>
         <ResultsPanel
           viewMode={viewMode}
@@ -323,6 +425,7 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
     onSimilaritySearch={handleSimilaritySearch}
     currentUser={user.username}
     sendMessage={sendMessage}
+
   />
 ) : null;
 

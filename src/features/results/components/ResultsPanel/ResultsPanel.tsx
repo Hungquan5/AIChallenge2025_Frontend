@@ -4,7 +4,7 @@ import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
-
+import PaginationControls from './PaginationControls';
 interface ResultsPanelProps {
   viewMode: ViewMode;
   results: ResultItem[];
@@ -16,6 +16,7 @@ interface ResultsPanelProps {
   currentUser: string;
   sendMessage: (message: string) => void;
   onItemBroadcast?: (item: ResultItem) => void;
+
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -25,7 +26,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onResultClick,
   onResultRightClick, // ✅ Destructure the new handler.
   onSimilaritySearch, // We will use THIS prop directly.
-  currentUser, sendMessage,onItemBroadcast
+  currentUser, sendMessage,onItemBroadcast,
+
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalData, setModalData] = useState<ResultItem | null>(null);
@@ -146,11 +148,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   useShortcuts({ NEXT_RESULT: focusNextResult, PREV_RESULT: focusPrevResult });
 
   return (
-    <div className="min-h-full" ref={containerRef}>
-      {/* 
-        Loading and Error indicators should be moved to App.tsx, 
-        since it's now managing the state for this global action.
-      */}
+    <div className="min-h-full">
+
 
       {viewMode === 'sortByConfidence' ? (
         <SortedByConfidenceView
@@ -166,14 +165,13 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
         <GroupedByVideoView
           groupedResults={groupedResults}
           onResultClick={onResultClick}
-          onRightClick={handleRightClick}
+          onRightClick={onResultRightClick}
           // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
           currentUser={currentUser}
           sendMessage={sendMessage}
         />
       )}
-
     </div>
   );
 };
