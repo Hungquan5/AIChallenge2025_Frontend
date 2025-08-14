@@ -92,7 +92,6 @@ export const searchBySimilarImage = async (
     }
 
     const data: ResultItem[] = await response.json();
-    console.log('Similarity search results:', { searchMode, resultCount: data.length });
     
     // Process results similar to searchByText function
     return data.map((item, index) => ({

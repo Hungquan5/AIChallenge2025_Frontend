@@ -24,6 +24,8 @@ interface Props {
   sendMessage: (message: string) => void;
   // This prop was correctly added to the interface already.
   onResultDoubleClick: (item: ResultItem) => void;
+  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  
 }
 
 // ✅ FIX 1: Destructure the `onResultDoubleClick` prop from the component's props.
@@ -34,7 +36,10 @@ const GroupedByVideoView: React.FC<Props> = ({
   onSimilaritySearch, 
   currentUser, 
   sendMessage,
-  onResultDoubleClick // <-- Destructure it here
+  onResultDoubleClick, // <-- Destructure it here
+
+  onSubmission
+
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -88,7 +93,7 @@ const GroupedByVideoView: React.FC<Props> = ({
                 onLoad={handleImageLoad}
                 onClick={onResultClick ? () => onResultClick(item) : undefined}
                 onContextMenu={(event) => onRightClick(item, event)}
-                onSubmit={() => fullSubmissionFlow(item)}
+                onSubmit={() => onSubmission(item)}
                 onSending={() => handleSending(item)}
                 onSimilaritySearch={onSimilaritySearch}
                 imageClassName={imageClass}

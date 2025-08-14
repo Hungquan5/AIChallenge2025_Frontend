@@ -22,6 +22,8 @@ interface AppShellProps {
   onBroadcastSimilaritySearch: (imageSrc: string, cardId: string) => void;
   onClearBroadcastFeed: () => void;
   onVqaSubmit: (item: ResultItem, question: string) => void;
+  onBroadcastResultSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  onBroadcastResultDoubleClick: (item: ResultItem) => void; // Add prop
 
 
 }
@@ -40,6 +42,8 @@ const AppShell: React.FC<AppShellProps> = ({
   onBroadcastResultClick,
   onBroadcastRightClick,
   onBroadcastSimilaritySearch,
+  onBroadcastResultSubmission,
+  onBroadcastResultDoubleClick,
   onClearBroadcastFeed,
   onVqaSubmit,
 
@@ -173,7 +177,8 @@ const AppShell: React.FC<AppShellProps> = ({
             onRightClick={onBroadcastRightClick}
             onSimilaritySearch={onBroadcastSimilaritySearch}
             onVqaSubmit={onVqaSubmit}
-
+            onSubmission={onBroadcastResultSubmission}
+            onResultDoubleClick ={onBroadcastResultDoubleClick}
           />
           </div>
         </div>

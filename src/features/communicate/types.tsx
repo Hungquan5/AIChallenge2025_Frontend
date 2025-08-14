@@ -4,26 +4,45 @@ export interface User {
   username: string;
 }
 
-// This is the message format for broadcasting an image.
-// The payload should contain the full data for the item.
+// --- MESSAGE TYPE DEFINITIONS ---
+
+// 1. This is the message format for broadcasting an image.
 export interface BroadcastImageMessage {
   type: 'broadcast_image';
   payload: ResultItem;
 }
 
-// This could be another type of message, for example, for status updates.
+// 2. This is a message type for general status updates.
 export interface StatusMessage {
   type: 'status';
   message: string;
   username?: string;
 }
 
-// WebSocketMessage is now a union of all possible message types.
-// This allows for type-safe handling in your components.
-export type WebSocketMessage = BroadcastImageMessage | StatusMessage;
+// ✅ 3. ADD THE NEW DEFINITION FOR A SUBMISSION RESULT
+// This defines the structure of the data sent when a submission is broadcasted.
+export interface SubmissionResultPayload {
+    submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
+    description: string;
+    username?: string; // The user who made the submission
+}
+
+export interface SubmissionResultMessage {
+    type: 'submission_result';
+    payload: SubmissionResultPayload;
+}
 
 
-// Your other API-related types can remain as they are.
+// ✅ 4. UPDATE THE MAIN WEBSOCKET MESSAGE TYPE
+// WebSocketMessage is now a union of ALL possible message types.
+export type WebSocketMessage = 
+  | BroadcastImageMessage 
+  | StatusMessage 
+  | SubmissionResultMessage; // Add the new message type here
+
+
+// --- Your other API-related types can remain as they are. ---
+
 export interface ApiError {
   detail: string;
 }

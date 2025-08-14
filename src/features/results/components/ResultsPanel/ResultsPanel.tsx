@@ -16,6 +16,8 @@ interface ResultsPanelProps {
   currentUser: string;
   sendMessage: (message: string) => void;
   onItemBroadcast?: (item: ResultItem) => void;
+  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+
 
   onResultDoubleClick: (item: ResultItem) => void; // Add prop
 }
@@ -28,7 +30,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onResultRightClick, // ✅ Destructure the new handler.
   onSimilaritySearch, // We will use THIS prop directly.
   currentUser, sendMessage,onItemBroadcast,
-  onResultDoubleClick
+  onResultDoubleClick,
+  onSubmission
 
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -163,7 +166,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           currentUser={currentUser}
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
-
+          onSubmission={onSubmission} // ✅ Pass it to the view
         />
       ) : (
         <GroupedByVideoView
@@ -175,7 +178,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           currentUser={currentUser}
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
-
+          onSubmission={onSubmission} // ✅ Pass it to the view
         />
       )}
     </div>

@@ -13,6 +13,9 @@ interface BroadcastFeedProps {
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
   onVqaSubmit: (item: ResultItem, question: string) => void;
+  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  onResultDoubleClick: (item: ResultItem) => void; // Add prop
+
 }
 
 export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
@@ -22,6 +25,8 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
   onRightClick,
   onSimilaritySearch,
   onVqaSubmit,
+  onSubmission,
+  onResultDoubleClick
 }) => {
   // ✅ FIX: Manage all VQA inputs in a single state object outside the loop.
   const [vqaQuestions, setVqaQuestions] = useState<{ [key: string]: string }>({});
@@ -81,7 +86,9 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                   onClick={() => onResultClick(msg)}
                   onContextMenu={(event) => onRightClick(msg, event)}
                   onSimilaritySearch={() => onSimilaritySearch(imageUrl, msg.id)}
-                  onSubmit={() => fullSubmissionFlow(msg)}
+                  onSubmit={() => onSubmission(msg)}
+                  onDoubleClick={() => onResultDoubleClick(msg)}
+
                   loaded={true}
                   onLoad={() => {}}
                 />

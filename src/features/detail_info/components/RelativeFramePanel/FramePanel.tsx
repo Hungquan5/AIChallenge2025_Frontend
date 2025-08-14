@@ -21,6 +21,9 @@ interface FramesPanelProps {
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   currentUser: string;
   sendMessage: (message: string) => void;
+  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  onResultDoubleClick: (item: ResultItem) => void; // Add prop
+
 }
 
 const FramesPanel: React.FC<FramesPanelProps> = ({
@@ -34,6 +37,8 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
   onRightClick,
   currentUser,
   sendMessage,
+  onResultDoubleClick,
+  onSubmission
 }) => {
 
   const handleSending = (item: ResultItem) => {
@@ -87,8 +92,10 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                       onClick={() => onFrameClick(frame)}
                       onContextMenu={(event) => onRightClick(frame, event)}
                       onSimilaritySearch={onSimilaritySearch}
-                      onSubmit={() => fullSubmissionFlow(frame)}
+                      onSubmit={() => onSubmission(frame)}
                       onSending={() => { handleSending(frame) }}
+                      onDoubleClick={() => onResultDoubleClick(frame)}
+
                       showConfidence
                       showTimestamp
                       isSelected={isActive} // ✅ Use the isSelected prop to apply the highlight

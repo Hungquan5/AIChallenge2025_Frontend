@@ -56,7 +56,6 @@ export const searchByText = async (
   }
 
   const data: ResultItem[] = await res.json();
-  console.log('Search results:', { mode, page, pageSize, data });
 
   return data.map((item, index) => ({
     ...item,
@@ -87,7 +86,6 @@ export const searchBySingleQuery = async (
     }
   
     const data: ResultItem[] = await res.json();
-    console.log('Single query search results:', { data });
   
     return data.map((item, index) => ({
       ...item,
