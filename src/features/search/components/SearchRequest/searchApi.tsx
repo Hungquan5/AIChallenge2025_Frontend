@@ -16,7 +16,7 @@ export const translateText = async (text: string): Promise<string> => {
     const url = "https://translate.googleapis.com/translate_a/single";
     const params = new URLSearchParams({
       client: 'gtx',
-      sl: 'auto',
+      sl: 'vi',
       tl: 'en',
       dt: 't',
       q: text

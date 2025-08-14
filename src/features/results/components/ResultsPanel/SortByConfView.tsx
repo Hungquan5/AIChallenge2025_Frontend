@@ -18,6 +18,8 @@ interface Props {
   // --- NEW PROPS ---
   currentUser: string; // The name of the current user for broadcasting
   sendMessage: (message: string) => void; // WebSocket send function
+  onResultDoubleClick: (item: ResultItem) => void; // Add prop
+
 }
 
 
@@ -29,6 +31,8 @@ const SortedByConfidenceView: React.FC<Props> = ({
   onSimilaritySearch,
   currentUser, // Destructure new prop
   sendMessage, // Destructure new prop
+  onResultDoubleClick
+
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -84,6 +88,8 @@ const SortedByConfidenceView: React.FC<Props> = ({
           onSubmit={() => fullSubmissionFlow(item)} // Call the submit function with the item
           onSending={() => handleSending(item)}
           imageClassName={imageClass} // Use the imported class for image styling
+          onDoubleClick={() => onResultDoubleClick(item)}
+
         />
       ))}
     </div>

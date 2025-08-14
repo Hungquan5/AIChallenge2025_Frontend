@@ -1,5 +1,5 @@
 // components/ResultCard.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback,useRef,useEffect } from 'react';
 import {
   cardClass,
   imageClass,
@@ -16,6 +16,8 @@ interface Props {
   loaded: boolean;
   onLoad: (id: string) => void;
   onClick?: () => void;
+    // ✅ ADD THIS NEW PROP
+  onDoubleClick?: () => void; 
   onContextMenu?: (event: React.MouseEvent) => void;
   onSimilaritySearch?: (imageSrc: string, cardId: string) => void; // New prop for similarity search
   onSubmit?: () => void; // Optional submit handler
@@ -38,6 +40,8 @@ const ResultCard: React.FC<Props> = ({
   loaded,
   onLoad,
   onClick,
+    // ✅ Destructure the new prop
+  onDoubleClick,
   onContextMenu,
   onSimilaritySearch,
   onSubmit,
@@ -51,6 +55,7 @@ const ResultCard: React.FC<Props> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const clickTimeout = useRef<number | null>(null);
   // Maintain a local state for selection for submition
   const [isSelectedState, setIsSelectedState] = useState(isSelected);
   const handleImageLoad = useCallback(() => {
@@ -77,41 +82,61 @@ const handleSending = useCallback(()=> {
     onClick();
   }
 }, [onSending,onClick])
-const handleClick = useCallback((e: React.MouseEvent) => {
-  if (disabled) {
-    e.preventDefault();
-    return;
-  }
+  // ✅ 2. This is the new, combined click handler logic
+  const handleInteraction = useCallback((e: React.MouseEvent) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
 
-  if ((e.ctrlKey|| e.metaKey)&& e.button===1 ){
-    e.preventDefault();
-    e.stopPropagation();
-    handleSubmit();
-    return;
-  }
-  // Middle click (mouse button 1) triggers submit
-  if (e.button === 1) {
-    e.preventDefault();
-    e.stopPropagation();
-    handleSending(); // <-- Use your defined function
-    return;
-  }
+    // --- Other Mouse Interactions (remain the same) ---
+    // Ctrl + Middle Click for Submit
+    if ((e.ctrlKey || e.metaKey) && e.button === 1) {
+      e.preventDefault(); e.stopPropagation(); handleSubmit(); return;
+    }
+    // Middle Click for Sending
+    if (e.button === 1) {
+      e.preventDefault(); e.stopPropagation(); handleSending(); return;
+    }
+    // Ctrl + Left Click for Similarity Search
+    if ((e.ctrlKey || e.metaKey) && e.button === 0 && onSimilaritySearch) {
+      e.preventDefault(); e.stopPropagation(); onSimilaritySearch(thumbnail, id); return;
+    }
 
-
-  // Ctrl/Cmd + Left Click triggers similarity search
-  if ((e.ctrlKey || e.metaKey) && e.button === 0 && onSimilaritySearch) {
-    e.preventDefault();
-    e.stopPropagation();
-    onSimilaritySearch(thumbnail, id);
-    return;
-  }
-
-  // Regular Left Click
-  if (e.button === 0) {
-    onClick?.();
-  }
-}, [disabled, handleSubmit, onClick, onSimilaritySearch, thumbnail, id]);
-
+    // --- The Core Single/Double Click Logic ---
+    if (e.button === 0) { // Only handle regular left clicks
+      // If a double-click handler exists
+      if (onDoubleClick) {
+        // If a timer is already running, it means this is the second click.
+        if (clickTimeout.current) {
+          // 1. Clear the pending single-click timer
+          clearTimeout(clickTimeout.current);
+          clickTimeout.current = null;
+          
+          // 2. Execute the double-click action immediately
+          onDoubleClick();
+        } else {
+          // This is the first click.
+          // Set a timer to execute the single-click action after a delay.
+          clickTimeout.current = window.setTimeout(() => {
+            onClick?.(); // Execute single-click if timer is not cleared
+            clickTimeout.current = null; // Reset the timer ref
+          }, 250); // A 250ms delay is standard for detecting double-clicks
+        }
+      } else {
+        // If NO double-click handler is provided, just execute the single-click immediately.
+        onClick?.();
+      }
+    }
+  }, [disabled, onClick, onDoubleClick, onSimilaritySearch, handleSubmit, handleSending, thumbnail, id]);
+  // Clean up the timer if the component unmounts
+  useEffect(() => {
+    return () => {
+      if (clickTimeout.current) {
+        clearTimeout(clickTimeout.current);
+      }
+    };
+  }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return;
@@ -176,7 +201,7 @@ const handleClick = useCallback((e: React.MouseEvent) => {
     <div
       className={cardClasses}
       tabIndex={disabled ? -1 : 0}
-      onMouseDown={handleClick}
+      onMouseDown={handleInteraction}
       onContextMenu={handleContextMenu}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
@@ -185,6 +210,7 @@ const handleClick = useCallback((e: React.MouseEvent) => {
       aria-label={onClick ? `View ${title}${onSimilaritySearch ? ', Ctrl+click for similarity search' : ''}` : undefined}
       aria-disabled={disabled}
       data-testid={`result-card-${id}`}
+
     >
       {/* Main image container that fills the entire card */}
       <div className={imageContainerClass}>

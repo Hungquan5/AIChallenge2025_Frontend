@@ -1,95 +1,107 @@
-  // src/features/results/components/GroupedByVideoView.tsx
-  import React, { useState, useCallback, useMemo } from 'react';
-  import type { GroupedResult, ResultItem } from '../../types';
-  import {
-    groupContainerClass,
-    groupTitleClass,
-    groupCountClass,
-    gridClass,
-    noResultsClass,
-    noResultsHintClass,
-    noResultsTitleClass,
-    imageClass
-  } from './styles';
-  import ResultCard from './ResultCard';
-  import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';
+// src/features/results/components/GroupedByVideoView.tsx
 
-  interface Props {
-    groupedResults: GroupedResult[];
-    onResultClick: (item: ResultItem) => void;
-    onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
-    onSimilaritySearch: (imageSrc: string, cardId: string) => void;
-      // --- NEW PROPS ---
-      currentUser: string; // The name of the current user for broadcasting
-      sendMessage: (message: string) => void; // WebSocket send function
-  }
+import React, { useState, useCallback } from 'react';
+import type { GroupedResult, ResultItem } from '../../types';
+import {
+  groupContainerClass,
+  groupTitleClass,
+  groupCountClass,
+  gridClass,
+  noResultsClass,
+  noResultsHintClass,
+  noResultsTitleClass,
+  imageClass
+} from './styles';
+import ResultCard from './ResultCard';
+import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';
 
-  // ✅ FIX 1: Destructure `onSimilaritySearch` from the component's props
-  const GroupedByVideoView: React.FC<Props> = ({ groupedResults, onResultClick, onRightClick, onSimilaritySearch,currentUser,sendMessage }) => {
-    const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+interface Props {
+  groupedResults: GroupedResult[];
+  onResultClick: (item: ResultItem) => void;
+  onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  currentUser: string;
+  sendMessage: (message: string) => void;
+  // This prop was correctly added to the interface already.
+  onResultDoubleClick: (item: ResultItem) => void;
+}
 
-    const handleImageLoad = useCallback((id: string) => {
-      setLoadedImages(prev => new Set([...prev, id]));
-    }, []);
-    
+// ✅ FIX 1: Destructure the `onResultDoubleClick` prop from the component's props.
+const GroupedByVideoView: React.FC<Props> = ({ 
+  groupedResults, 
+  onResultClick, 
+  onRightClick, 
+  onSimilaritySearch, 
+  currentUser, 
+  sendMessage,
+  onResultDoubleClick // <-- Destructure it here
+}) => {
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
-    const handleSending = useCallback((item: ResultItem) => {
-      // 2. Create and send the WebSocket message
-      const message = {
-        type: 'broadcast_image',
-        payload: {
-          id: item.title.split('/').pop() || '', // Extract the last part of the videoId as id`
-          thumbnail: item.thumbnail,
-          videoId: item.videoId,
-          title: item.title,
-          submittedBy: currentUser,
-        },
-      };
-      sendMessage(JSON.stringify(message));
+  const handleImageLoad = useCallback((id: string) => {
+    setLoadedImages(prev => new Set([...prev, id]));
+  }, []);
+  
+  const handleSending = useCallback((item: ResultItem) => {
+    const message = {
+      type: 'broadcast_image',
+      payload: {
+        id: item.id,
+        videoId: item.videoId,
+        thumbnail: item.thumbnail,
+        title: item.title,
+        timestamp: item.timestamp,
+        confidence: item.confidence,
+        submittedBy: currentUser,
+      },
+    };
+    sendMessage(JSON.stringify(message));
+  }, [currentUser, sendMessage]);
 
-    }, [currentUser, sendMessage]);
-    if (groupedResults.length === 0) {
-      return (
-        <div className={noResultsClass}>
-          <p className={noResultsTitleClass}>No results found</p>
-          <p className={noResultsHintClass}>Try adjusting your search terms</p>
-        </div>
-      );
-    }
-
+  if (groupedResults.length === 0) {
     return (
-      <div className={groupContainerClass}>
-        {groupedResults.map(group => (
-          <div key={group.videoId}>
-            <h2 className={groupTitleClass}>
-              {group.videoTitle}
-              <span className={groupCountClass}>({group.items.length})</span>
-            </h2>
-            <div className={gridClass}>
-              {group.items.map(item => (
-                <ResultCard
-                  key={item.id}
-                  id={item.id}
-                  thumbnail={item.thumbnail}
-                  title={item.title}
-                  confidence={item.confidence}
-                  timestamp={item.timestamp}
-                  loaded={loadedImages.has(item.id)}
-                  onLoad={handleImageLoad}
-                  onClick={onResultClick ? () => onResultClick(item) : undefined}
-                  onContextMenu={(event) => onRightClick(item, event)}
-                  onSubmit={() => fullSubmissionFlow(item)} // Call the submit function with the item
-                  onSending={() => handleSending(item)}
-                  // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
-                  onSimilaritySearch={onSimilaritySearch}
-                  imageClassName={imageClass} // Use the imported class for image styling
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+      <div className={noResultsClass}>
+        <p className={noResultsTitleClass}>No results found</p>
+        <p className={noResultsHintClass}>Try adjusting your search terms</p>
       </div>
     );
-  };
+  }
 
-  export default React.memo(GroupedByVideoView);
+  return (
+    <div className={groupContainerClass}>
+      {groupedResults.map(group => (
+        <div key={group.videoId}>
+          <h2 className={groupTitleClass}>
+            {group.videoTitle}
+            <span className={groupCountClass}>({group.items.length})</span>
+          </h2>
+          <div className={gridClass}>
+            {group.items.map(item => (
+              <ResultCard
+                key={item.id}
+                id={item.id}
+                thumbnail={item.thumbnail}
+                title={item.title}
+                confidence={item.confidence}
+                timestamp={item.timestamp}
+                loaded={loadedImages.has(item.id)}
+                onLoad={handleImageLoad}
+                onClick={onResultClick ? () => onResultClick(item) : undefined}
+                onContextMenu={(event) => onRightClick(item, event)}
+                onSubmit={() => fullSubmissionFlow(item)}
+                onSending={() => handleSending(item)}
+                onSimilaritySearch={onSimilaritySearch}
+                imageClassName={imageClass}
+                
+                // ✅ FIX 2: Pass the handler down to the ResultCard's onDoubleClick prop.
+                onDoubleClick={() => onResultDoubleClick(item)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default React.memo(GroupedByVideoView);

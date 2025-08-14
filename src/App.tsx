@@ -10,7 +10,7 @@ import InputPanel from './features/search/components/InputPanel/InputPanel';
 import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
 import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
 import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
-
+import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 // --- Types & API ---
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
 import { searchByText } from './features/search/components/SearchRequest/searchApi'; // The API call now lives here.
@@ -79,6 +79,15 @@ const App: React.FC = () => {
   videoTitle: '',
   isLoading: false,
 });
+const [detailModalItem, setDetailModalItem] = useState<ResultItem | null>(null);
+ // ✅ 2. Create handlers to open and close the new modal
+ const handleOpenDetailModal = useCallback((item: ResultItem) => {
+  setDetailModalItem(item);
+}, []);
+
+const handleCloseDetailModal = useCallback(() => {
+  setDetailModalItem(null);
+}, []);
 const executeSearch = useCallback(async (queries: ApiQuery[], mode: SearchMode, page: number) => {
   setIsLoading(true);
   try {
@@ -248,20 +257,6 @@ const handleSingleItemSearch = (newResults: ResultItem[]) => {
 const handleClearBroadcastFeed = useCallback(() => {
   setBroadcastMessages([]);
 }, []);
-  // Search handlers (unchanged)
-  const handleSearch = (newResults: ResultItem[]) => {
-    setResults(newResults);
-    const grouped = newResults.reduce((acc, item) => {
-      const group = acc.find(g => g.videoId === item.videoId);
-      if (group) {
-        group.items.push(item);
-      } else {
-        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
-      }
-      return acc;
-    }, [] as GroupedResult[]);
-    setGroupedResults(grouped);
-  };
 
   const handleSimilarityResults = (newResults: ResultItem[]) => {
     setResults(newResults);
@@ -319,18 +314,7 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
     setVideoPanelState({ isOpen: false, videoId: null, timestamp: null });
   }, []);
 
-  // ✅ 4. Create the right-click handler to be passed to the carousel
-  // This function receives the entire `frame` object
-  const handleCarouselRightClick = useCallback((item: ResultItem) => {
-    if (item.videoId && item.timestamp) {
-      handleOpenVideoPanel(item.videoId, item.timestamp);
-    }
-  }, [handleOpenVideoPanel]);
 
-
-  const toggleViewMode = () => {
-    setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
-  };
  // ✅ --- NEW: Handler for the 'Escape' key shortcut ---
  const handleCloseModal = useCallback(() => {
   // The VideoPanel is the top-most modal, so check for it first.
@@ -406,6 +390,8 @@ const handleFrameClickInPanel = (frame: ResultItem) => {
           currentUser={user.username}
           sendMessage={sendMessage}
           onItemBroadcast={handleItemBroadcast}
+          onResultDoubleClick={handleOpenDetailModal}
+
         />
       </div>
     </>
@@ -439,6 +425,13 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
   />
 ) : null;
     // Show username prompt if no user
+      // ✅ 4. Conditionally render the new modal
+  const detailModalInstance = detailModalItem ? (
+    <FrameDetailModal 
+      item={detailModalItem} 
+      onClose={handleCloseDetailModal} 
+    />
+  ) : null;
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
   }
@@ -463,6 +456,7 @@ const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && 
         onVqaSubmit={handleVqaSubmit}
 
       />
+      {detailModalInstance}
 
       {/* Shortcuts Modal */}
       {showShortcuts && (

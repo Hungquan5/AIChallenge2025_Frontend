@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
 import { searchButtonClass,containerClass } from './styles';
 import type { ResultItem, Query,SearchMode,ApiQuery } from '../../types';
-import { searchByText } from '../SearchRequest/searchApi';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
 // ✅ This is where the fix is.
