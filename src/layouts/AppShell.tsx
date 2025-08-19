@@ -106,7 +106,7 @@ const AppShell: React.FC<AppShellProps> = ({
           <button
             onClick={toggleBroadcast}
             className={`
-              relative -mb-1 px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
+              relative -mb-1 px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
               text-white rounded-t-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5
               flex items-center gap-2 border-t border-l border-r border-blue-300/30
               ${isBroadcastOpen ? 'shadow-xl -translate-y-0.5' : 'shadow-lg'}

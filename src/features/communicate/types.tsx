@@ -22,9 +22,10 @@ export interface StatusMessage {
 // ✅ 3. ADD THE NEW DEFINITION FOR A SUBMISSION RESULT
 // This defines the structure of the data sent when a submission is broadcasted.
 export interface SubmissionResultPayload {
-    submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
-    description: string;
-    username?: string; // The user who made the submission
+  itemId: string; // ✅ ADD THIS LINE: The unique ID of the submitted item
+  submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
+  description: string;
+  username?: string;
 }
 
 export interface SubmissionResultMessage {

@@ -17,7 +17,14 @@ TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
 
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
-  
+
+    // ✅ ADD THESE NEW SHORTCUTS for focusing feature inputs
+    TOGGLE_OCR: { key: 'j', modifier: 'Ctrl/Cmd' },
+    TOGGLE_ASR: { key: 'k', modifier: 'Ctrl/Cmd' },
+    TOGGLE_OBJ: { key: 'l', modifier: 'Ctrl/Cmd' },
+        // ✅ ADD THESE NEW SHORTCUTS for toggling query mode
+        TOGGLE_TEXT_MODE: { key: 'u', modifier: 'Ctrl/Cmd' },
+        TOGGLE_IMAGE_MODE: { key: 'i', modifier: 'Ctrl/Cmd' },
   // Search mode shortcuts
   SWITCH_TO_NORMAL: { key: '1', modifier: 'Alt' },
   SWITCH_TO_CHAIN: { key: '2', modifier: 'Alt' },

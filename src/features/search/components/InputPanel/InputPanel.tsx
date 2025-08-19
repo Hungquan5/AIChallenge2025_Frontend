@@ -44,22 +44,27 @@ const InputPanel = ({
   const handleSearch = async (searchMode: SearchMode = 'normal') => {
     setLoading(true);
 
-    // 1. Translation logic (remains the same)
+    // 1. Translation logic (NOW FIXED)
     const translationPromises = queries.map(async (q) => {
-        // ... (no changes in this block)
-        if (q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
-            try {
-              const translated = await translateText(q.origin.trim());
-              return { ...q, text: translated, lang: 'eng' as const };
-            } catch (error) {
-              console.error(`Translation failed:`, error);
-              return q;
-            }
+      // ✅ FIX: Only translate on search IF auto-translate is enabled.
+      if (isAutoTranslateEnabled && q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
+          try {
+            const translated = await translateText(q.origin.trim());
+            // Update the query with the translation for this search
+            return { ...q, text: translated, lang: 'eng' as const };
+          } catch (error) {
+            console.error(`Translation failed:`, error);
+            // If translation fails, search with the original text
+            return q;
           }
-          return q;
-    });
-    const translatedQueries = await Promise.all(translationPromises);
-    setQueries(translatedQueries);
+      }
+      // If auto-translate is off, or the query doesn't need translation, return it as is.
+      return q;
+  });
+  const translatedQueries = await Promise.all(translationPromises);
+  
+  // This is an important step: update the UI to show the text that was just translated and used for the search.
+  setQueries(translatedQueries);
 
     // 2. Prepare API queries (remains the same)
     const apiQueriesPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {

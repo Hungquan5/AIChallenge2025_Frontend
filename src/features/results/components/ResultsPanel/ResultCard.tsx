@@ -1,5 +1,6 @@
 // components/ResultCard.tsx
 import React, { useState, useCallback,useRef,useEffect } from 'react';
+import { Share2, Search, Send } from 'lucide-react'; // Add Send icon
 import {
   cardClass,
   imageClass,
@@ -28,7 +29,9 @@ interface Props {
   showTimestamp?: boolean;
   isSelected?: boolean;
   disabled?: boolean;
+
 }
+
 
 const ResultCard: React.FC<Props> = ({
   imageClassName, 
@@ -52,12 +55,15 @@ const ResultCard: React.FC<Props> = ({
   showTimestamp = false,
   isSelected = false,
   disabled = false,
+
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const clickTimeout = useRef<number | null>(null);
   // Maintain a local state for selection for submition
   const [isSelectedState, setIsSelectedState] = useState(isSelected);
+
+
   const handleImageLoad = useCallback(() => {
     onLoad(id);
   }, [id, onLoad]);
@@ -267,11 +273,22 @@ const handleSending = useCallback(()=> {
 
 // Enhanced memo comparison for better performance
 export default React.memo(ResultCard, (prevProps, nextProps) => {
+  // ✅ ADD the new props to this array
   const keysToCompare: (keyof Props)[] = [
     'id', 'thumbnail', 'title', 'confidence', 'timestamp', 
     'loaded', 'priority', 'alt', 'showConfidence', 'showTimestamp', 
-    'isSelected', 'disabled'
+    'isSelected', 'disabled',
+
   ];
   
+  // Also compare that the functions haven't changed, which is good practice
+  if (
+    prevProps.onClick !== nextProps.onClick ||
+    prevProps.onSubmit !== nextProps.onSubmit ||
+    prevProps.onDoubleClick !== nextProps.onDoubleClick
+  ) {
+    return false; // Functions are different, so re-render
+  }
+
   return keysToCompare.every(key => prevProps[key] === nextProps[key]);
 });

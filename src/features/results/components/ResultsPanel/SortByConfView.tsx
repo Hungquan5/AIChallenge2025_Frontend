@@ -20,6 +20,7 @@ interface Props {
   sendMessage: (message: string) => void; // WebSocket send function
   onResultDoubleClick: (item: ResultItem) => void; // Add prop
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+
 }
 
 
@@ -32,7 +33,8 @@ const SortedByConfidenceView: React.FC<Props> = ({
   currentUser, // Destructure new prop
   sendMessage, // Destructure new prop
   onResultDoubleClick,
-  onSubmission
+  onSubmission,
+
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 

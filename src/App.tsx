@@ -17,6 +17,8 @@ import type { ResultItem, GroupedResult, ViewMode } from './features/results/typ
 import { searchByText } from './features/search/components/SearchRequest/searchApi'; // The API call now lives here.
 import type { ApiQuery, SearchMode } from './features/search/types';
 import type { WebSocketMessage } from './features/communicate/types';
+import type { SubmissionResultPayload } from './features/communicate/types';
+import type { SubmissionResultMessage } from './features/communicate/types';
 // --- Hooks & Utilities ---
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
@@ -81,6 +83,7 @@ const App: React.FC = () => {
     isLoading: false,
   });
   const [detailModalItem, setDetailModalItem] = useState<ResultItem | null>(null);
+
   // ✅ 2. Create handlers to open and close the new modal
   const handleOpenDetailModal = useCallback((item: ResultItem) => {
     setDetailModalItem(item);
@@ -92,7 +95,7 @@ const App: React.FC = () => {
 
   // ✅ 1. ADD NEW STATE FOR THE SUBMISSION RESULT NOTIFICATION
   const [submissionResult, setSubmissionResult] = useState<{
-    key: number; // Use a key to re-trigger the component & its animations
+    itemId: string;
     submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
     description: string;
     username?: string;
@@ -206,7 +209,11 @@ const App: React.FC = () => {
       // ✅ 2. HANDLE THE NEW BROADCAST MESSAGE FOR SUBMISSIONS
       case 'submission_result':
         if (message.payload) {
-          setSubmissionResult({ ...message.payload, key: Date.now() });
+          // Show the pop-up notification for everyone
+          setSubmissionResult({ ...message.payload, });
+
+          // UPDATE THE GLOBAL STATUS MAP FOR EVERYONE
+
         }
         break;
 
@@ -218,26 +225,30 @@ const App: React.FC = () => {
   // ✅ 3. CREATE A HANDLER TO PROCESS THE SUBMISSION
   const handleSubmission = async (item: ResultItem) => {
     try {
-      const result = await fullSubmissionFlow(item);
+      const result = await fullSubmissionFlow(item); // result contains 'submission' and 'description'
+      
+      // Prepare the message payload, now including the itemId
+      const submissionPayload: SubmissionResultPayload = {
+        itemId: item.thumbnail, // Include the ID of the item being submitted
+        submission: result.submission,
+        description: result.description,
+        username: user?.username,
+      };
 
       // Broadcast the result to all users via WebSocket
-      const message = {
+      const message: SubmissionResultMessage = {
         type: 'submission_result',
-        payload: {
-          ...result, // Contains 'submission' and 'description'
-          username: user?.username, // Add the user who submitted
-        },
+        payload: submissionPayload,
       };
       sendMessage(JSON.stringify(message));
 
     } catch (error) {
-      // If the submission fails, show an error panel only to the current user
       const description = error instanceof Error ? error.message : 'An unknown error occurred.';
       setSubmissionResult({
-        key: Date.now(),
+        itemId: item.id,
         submission: 'ERROR',
         description: description,
-        username: user?.username
+        username: user?.username,
       });
     }
   };
@@ -434,7 +445,7 @@ const App: React.FC = () => {
           currentUser={user.username}
           sendMessage={sendMessage}
           onItemBroadcast={handleItemBroadcast}
-          onResultDoubleClick={handleOpenDetailModal}
+           onResultDoubleClick={handleOpenDetailModal}
           onSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
 
         />
@@ -508,7 +519,7 @@ const App: React.FC = () => {
       {/* ✅ 5. RENDER THE SUBMISSION PANEL WHEN THERE'S A RESULT */}
       {submissionResult && (
         <SubmissionStatusPanel
-          key={submissionResult.key}
+          key={submissionResult.itemId}
           result={submissionResult}
           onClose={() => setSubmissionResult(null)}
         />

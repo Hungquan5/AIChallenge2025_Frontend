@@ -25,7 +25,7 @@ interface Props {
   // This prop was correctly added to the interface already.
   onResultDoubleClick: (item: ResultItem) => void;
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
-  
+
 }
 
 // ✅ FIX 1: Destructure the `onResultDoubleClick` prop from the component's props.
@@ -38,7 +38,8 @@ const GroupedByVideoView: React.FC<Props> = ({
   sendMessage,
   onResultDoubleClick, // <-- Destructure it here
 
-  onSubmission
+  onSubmission,
+
 
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());

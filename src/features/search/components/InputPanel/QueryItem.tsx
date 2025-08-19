@@ -9,6 +9,8 @@ import {
   Trash2, Globe, Languages, Loader2, Search, Plus, X 
 } from 'lucide-react';
 
+type FocusField = 'ocr' | 'asr' | 'obj';
+type Mode = 'text' | 'image'; 
 
 import {
   actionButtonClass,
@@ -330,6 +332,10 @@ interface QueryItemProps {
   onNext?: () => void;
   onPrev?: () => void;
   inputRef?: RefObject<HTMLTextAreaElement>;
+  focusRequest: { index: number; field: FocusField } | null;
+  onFocusRequestConsumed: () => void;
+  modeChangeRequest: { index: number; mode: Mode } | null;
+  onModeChangeRequestConsumed: () => void;
 }
 
 const QueryItem: React.FC<QueryItemProps> = ({
@@ -343,7 +349,11 @@ const QueryItem: React.FC<QueryItemProps> = ({
   onNext,
   onPrev,
   inputRef,
-  onSingleSearchResult
+  onSingleSearchResult,
+  focusRequest,
+  onFocusRequestConsumed,
+  modeChangeRequest,
+  onModeChangeRequestConsumed
 }) => {
   const [queryMode, setQueryMode] = useState<'text' | 'image'>(query.imageFile ? 'image' : 'text');
   const [showOCR, setShowOCR] = useState(!!query.ocr);
@@ -352,12 +362,55 @@ const QueryItem: React.FC<QueryItemProps> = ({
   const [isItemSearching, setIsItemSearching] = useState(false); // For item-specific loading
   
   const localTextareaRef = useRef<HTMLTextAreaElement>(null);
+    // ✅ 3. CREATE REFS for the feature input fields
+    const ocrInputRef = useRef<HTMLInputElement>(null);
+    const asrInputRef = useRef<HTMLInputElement>(null);
+    const objInputRef = useRef<HTMLInputElement>(null);
+  
   const textareaRef = inputRef || localTextareaRef;
+ // ✅ 4. ADD A useEffect to handle the focus request from the parent
+ useEffect(() => {
+  // Check if the request is for *this specific* item
+  if (focusRequest && focusRequest.index === index) {
+    const { field } = focusRequest;
 
+    // Use a switch to handle which input to show and focus
+    switch (field) {
+      case 'ocr':
+        setShowOCR(true);
+        // We must wait for the component to re-render with the input visible.
+        // A setTimeout with a 0ms delay defers this to the next event cycle.
+        setTimeout(() => ocrInputRef.current?.focus(), 0);
+        break;
+      case 'asr':
+        setShowASR(true);
+        setTimeout(() => asrInputRef.current?.focus(), 0);
+        break;
+      case 'obj':
+        setShowOBJ(true);
+        setTimeout(() => objInputRef.current?.focus(), 0);
+        break;
+    }
+
+    // Important: Tell the parent the request has been handled to prevent re-triggering.
+    onFocusRequestConsumed();
+  }
+}, [focusRequest, index, onFocusRequestConsumed]); // This effect runs only when a new request comes 
   useEffect(() => {
     // Sync queryMode if the imageFile is added/removed from parent
     setQueryMode(query.imageFile ? 'image' : 'text');
   }, [query.imageFile]);
+// ✅ 4. Add a NEW useEffect to handle the mode change request
+useEffect(() => {
+  // Check if the request is for *this specific* item
+  if (modeChangeRequest && modeChangeRequest.index === index) {
+    // Directly command the internal state to change
+    setQueryMode(modeChangeRequest.mode);
+    
+    // Important: Tell the parent the request has been handled
+    onModeChangeRequestConsumed();
+  }
+}, [modeChangeRequest, index, onModeChangeRequestConsumed]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | null } }) => {
     const file = e.target.files?.[0];
@@ -468,10 +521,10 @@ const QueryItem: React.FC<QueryItemProps> = ({
       {/* --- Feature Toggles & Inputs --- */}
       <div className="space-y-4">
          <EnhancedFeatureToggles showOCR={showOCR} showASR={showASR} showOBJ={showOBJ} onToggle={handleFeatureToggle} query={query} />
-        {showOCR && <input type="text" value={query.ocr} onChange={(e) => onUpdate(index, { ocr: e.target.value })} placeholder="OCR input..." className={`${featureInputClass} ${ocrInputClass}`} />}
-        {showASR && <input type="text" value={query.asr} onChange={(e) => onUpdate(index, { asr: e.target.value })} placeholder="ASR input..." className={`${featureInputClass} ${asrInputClass}`} />}
-        {showOBJ && <input type="text" value={query.obj?.[0] || ''} onChange={(e) => onUpdate(index, { obj: [e.target.value] })} placeholder="ex: person=8 bicycle<=2" className={`${featureInputClass} ${objInputClass}`} />}
-      </div>
+        {showOCR && <input ref={ocrInputRef} type="text" value={query.ocr} onChange={(e) => onUpdate(index, { ocr: e.target.value })} placeholder="OCR input..." className={`${featureInputClass} ${ocrInputClass}`} />}
+        {showASR && <input ref={asrInputRef} type="text" value={query.asr} onChange={(e) => onUpdate(index, { asr: e.target.value })} placeholder="ASR input..." className={`${featureInputClass} ${asrInputClass}`} />}
+        {showOBJ && <input ref={objInputRef} type="text" value={query.obj?.[0] || ''} onChange={(e) => onUpdate(index, { obj: [e.target.value] })} placeholder="ex: person=8 bicycle<=2" className={`${featureInputClass} ${objInputClass}`} />}
+        </div>
 
       {/* --- Bottom Controls --- */}
       <div className={bottomControlsClass}>

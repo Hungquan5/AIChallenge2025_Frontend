@@ -15,6 +15,10 @@ interface QueryListProps {
   isAutoTranslateEnabled: boolean; // ✅ 1. ACCEPT THE PROP
 }
 
+type FocusField = 'ocr' | 'asr' | 'obj';
+type Mode = 'text' | 'image'; // ✅ 1. Add a type for clarity
+
+
 const QueryList: React.FC<QueryListProps> = ({ 
   queries, 
   onQueriesChange, 
@@ -33,7 +37,9 @@ const QueryList: React.FC<QueryListProps> = ({
   };
   const translationAbortControllerRef = useRef<AbortController | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  
+  const [focusRequest, setFocusRequest] = useState<{ index: number; field: FocusField } | null>(null);
+  const [modeChangeRequest, setModeChangeRequest] = useState<{ index: number; mode: Mode } | null>(null);
+
   // ✅ 2. Refactor the auto-translate effect to be cancellable
   useEffect(() => {
     if (!isAutoTranslateEnabled) {
@@ -140,8 +146,42 @@ const QueryList: React.FC<QueryListProps> = ({
       } else {
         updateQuery(focusedIndex, { lang: newLang });
       }
-    }
-  })  
+    },
+      // ✅ ADD THE NEW HANDLERS HERE
+      TOGGLE_OCR: () => {
+        if (focusedIndex !== null) {
+          setFocusRequest({ index: focusedIndex, field: 'ocr' });
+        }
+      },
+      TOGGLE_ASR: () => {
+        if (focusedIndex !== null) {
+          setFocusRequest({ index: focusedIndex, field: 'asr' });
+        }
+      },
+      TOGGLE_OBJ: () => {
+        if (focusedIndex !== null) {
+          setFocusRequest({ index: focusedIndex, field: 'obj' });
+        }
+      },
+       // ✅ ADD THE NEW HANDLERS for text/image mode
+    // ✅ 3. MODIFY the TOGGLE_TEXT_MODE and TOGGLE_IMAGE_MODE handlers
+    TOGGLE_TEXT_MODE: () => {
+      if (focusedIndex !== null) {
+        // This part is good, it clears the image data
+        updateQuery(focusedIndex, { imageFile: null });
+        // Now, also send a command to ensure the UI updates
+        setModeChangeRequest({ index: focusedIndex, mode: 'text' });
+      }
+    },
+    TOGGLE_IMAGE_MODE: () => {
+      if (focusedIndex !== null) {
+        // This part clears the text data
+        updateQuery(focusedIndex, { text: '', origin: '', lang: 'ori' });
+        // Now, send the command to switch the UI to image mode
+        setModeChangeRequest({ index: focusedIndex, mode: 'image' });
+      }
+    },
+  }); 
   const removeQuery = (index: number) => {
     if (queries.length <= 1) return;
 
@@ -185,7 +225,11 @@ const QueryList: React.FC<QueryListProps> = ({
             onNext={() => handleNext(index)}
             onPrev={() => handlePrev(index)}
             inputRef={index === 0 ? firstInputRef : undefined}
-          />
+            focusRequest={focusRequest}
+            onFocusRequestConsumed={() => setFocusRequest(null)}
+            // ✅ 4. Pass the new props down to the QueryItem
+            modeChangeRequest={modeChangeRequest}
+            onModeChangeRequestConsumed={() => setModeChangeRequest(null)}          />
         ))}
       </div>
     </div>

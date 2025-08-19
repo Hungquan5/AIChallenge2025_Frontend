@@ -31,7 +31,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onSimilaritySearch, // We will use THIS prop directly.
   currentUser, sendMessage,onItemBroadcast,
   onResultDoubleClick,
-  onSubmission
+  onSubmission,
 
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,6 +167,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
           onSubmission={onSubmission} // ✅ Pass it to the view
+
         />
       ) : (
         <GroupedByVideoView
@@ -179,6 +180,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
           onSubmission={onSubmission} // ✅ Pass it to the view
+
         />
       )}
     </div>
