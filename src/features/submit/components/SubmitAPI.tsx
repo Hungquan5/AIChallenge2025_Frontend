@@ -1,4 +1,14 @@
 import type { ResultItem } from "../../search/types";
+import frameRates from '../../../assets/video_fps.json'; // 1. Import the JSON file
+
+// Define a type for the frame rates data for better type checking
+type FrameRates = {
+  [key: string]: number;
+};
+
+// Cast the imported JSON data to our defined type
+const videoFrameRates: FrameRates = frameRates;
+
 const loginToDres = async (username: string = 'quannh', password: string='123456') => {
   const response = await fetch('http://192.168.28.151:5000/api/v2/login', {
     method: 'POST',
@@ -15,6 +25,7 @@ const loginToDres = async (username: string = 'quannh', password: string='123456
   const data = await response.json();
   return data.sessionId;
 };
+
 const getEvaluationId = async (sessionId: string) => {
   const response = await fetch(`http://192.168.28.151:5000/api/v2/client/evaluation/list?session=${sessionId}`, {
     method: 'GET',
@@ -34,21 +45,24 @@ const getEvaluationId = async (sessionId: string) => {
   return activeEval.id;
 };
 
-
 const submitToDres = async (
   result: ResultItem,
   sessionId: string,
   evaluationId: string
 ) => {
   try {
+    // 2. Look up the frame rate, with a fallback to a default value
+    const frameRate = videoFrameRates[result.videoId] || 25.0;
+
     const body = {
       answerSets: [
         {
           answers: [
             {
               mediaItemName: result.videoId,
-              start: parseInt(result.timestamp) / 25 * 1000,
-              end: parseInt(result.timestamp) / 25 * 1000
+              // 3. Use the dynamic frameRate in the calculation
+              start: parseInt(result.timestamp) / frameRate * 1000,
+              end: parseInt(result.timestamp) / frameRate * 1000
             },
           ],
         },
@@ -62,7 +76,6 @@ const submitToDres = async (
     });
 
     if (!response.ok) {
-      // Try to parse error message from DRES if available
       const errorData = await response.json().catch(() => null);
       const errorMessage = errorData?.description || `DRES submission failed: ${response.statusText}`;
       throw new Error(errorMessage);
@@ -70,17 +83,17 @@ const submitToDres = async (
 
     const data = await response.json();
     console.log('DRES submission success:', data);
-    return data; // ✅ RETURN THE SUBMISSION RESULT
+    return data;
   } catch (error) {
     console.error('DRES submission error:', error);
-    // Re-throw the error so the calling function can catch it
     throw error;
   }
 };
+
 const fullSubmissionFlow = async (result: ResultItem) => {
   const sessionId = "uneVJA5BbMLneeYbeARgO4t4JBBNy7wq";
   const evaluationId = await getEvaluationId(sessionId);
-  // ✅ RETURN THE RESULT FROM THE FLOW
-  return await submitToDres(result, sessionId, evaluationId); 
+  return await submitToDres(result, sessionId, evaluationId);
 };
-export { fullSubmissionFlow };   
+
+export { fullSubmissionFlow };

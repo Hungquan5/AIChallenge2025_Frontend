@@ -1,7 +1,7 @@
 // AppShell.tsx
 import React,{ useState } from 'react';
 import type { ResultItem } from '../features/search/types';
-import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2} from 'lucide-react';
+import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2,FileText} from 'lucide-react';
 import { BroadcastFeed } from '../features/communicate/components/Communicate/BroadcastFeed';
 interface AppShellProps {
   leftPanel: React.ReactNode;
@@ -24,6 +24,7 @@ interface AppShellProps {
   onVqaSubmit: (item: ResultItem, question: string) => void;
   onBroadcastResultSubmission: (item: ResultItem) => void; // ✅ Add the new prop
   onBroadcastResultDoubleClick: (item: ResultItem) => void; // Add prop
+  onExportBroadcastFeed: () => void;
 
 
 }
@@ -46,6 +47,7 @@ const AppShell: React.FC<AppShellProps> = ({
   onBroadcastResultDoubleClick,
   onClearBroadcastFeed,
   onVqaSubmit,
+  onExportBroadcastFeed, // Destructure the new prop
 
 }) => {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
@@ -90,23 +92,40 @@ const AppShell: React.FC<AppShellProps> = ({
         </div>
       </div>
 
-      {/* Broadcast Feed Panel - Bottom Slide Up */}
-      <div className="relative z-30">
-        {/* Toggle Button */}
-        <div className="flex justify-center">
-        {broadcastMessages.length > 0 && (
-              <button
-                onClick={onClearBroadcastFeed}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs text-red-600 hover:bg-red-100/50 rounded-md transition-colors duration-200"
-                title="Clear all submissions from the feed"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+       {/* Broadcast Feed Panel - Bottom Slide Up */}
+       <div className="relative z-30">
+        
+        {/* ✅ FIX: This container now has a higher z-index to stay on top */}
+        <div className="relative flex justify-center items-end pointer-events-none">
+          {/* Action Buttons on the left */}
+          <div className="absolute left-4 bottom-1 flex items-center pointer-events-auto">
+            {broadcastMessages.length > 0 && (
+              <>
+                <button
+                  onClick={onClearBroadcastFeed}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-red-600 bg-white/60 hover:bg-red-100/80 rounded-md transition-colors duration-200 backdrop-blur-sm border border-slate-200"
+                  title="Clear all submissions from the feed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear
+                </button>
+                <button
+                  onClick={onExportBroadcastFeed}
+                  className="flex items-center gap-1.5 ml-2 px-2 py-1 text-xs text-green-700 bg-white/60 hover:bg-green-100/80 rounded-md transition-colors duration-200 backdrop-blur-sm border border-slate-200"
+                  title="Export feed as a .txt file"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Export
+                </button>
+              </>
             )}
+          </div>
+
           <button
             onClick={toggleBroadcast}
             className={`
-              relative -mb-1 px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
+              pointer-events-auto /* Make sure this button is always clickable */
+              relative px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
               text-white rounded-t-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5
               flex items-center gap-2 border-t border-l border-r border-blue-300/30
               ${isBroadcastOpen ? 'shadow-xl -translate-y-0.5' : 'shadow-lg'}

@@ -1,11 +1,9 @@
-// src/features/SearchRequest/searchApi.ts
-
 import type { ResultItem, SearchMode, ApiQuery } from '../../types';
 
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
 
-// Helper function to adjust thumbnail URLs
+// Helper function to create the full thumbnail URL from a constructed path
 const adjustThumbnail = (thumbnail: string): string => {
   const datasetIndex = thumbnail.indexOf('/dataset/');
   return datasetIndex !== -1
@@ -30,7 +28,7 @@ export const translateText = async (text: string): Promise<string> => {
     const result = await response.json();
     return result[0].map((item: [string]) => item[0]).join('');
   };
-// ✅ MODIFIED: Added page and pageSize parameters
+// ✅ MODIFIED: This function now constructs `title` and `thumbnail`
 export const searchByText = async (
   queries: ApiQuery[],
   mode: SearchMode = 'normal',
@@ -39,7 +37,6 @@ export const searchByText = async (
 ): Promise<ResultItem[]> => {
   const endpoint = mode === 'chain' ? '/embeddings/chain_search' : '/embeddings/search';
   
-  // ✅ Construct URL with pagination query parameters
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('page', page.toString());
   url.searchParams.append('page_size', pageSize.toString());
@@ -55,16 +52,26 @@ export const searchByText = async (
     throw new Error(`Failed to search: ${errorData ? JSON.stringify(errorData) : res.statusText}`);
   }
 
-  const data: ResultItem[] = await res.json();
+  // The backend now returns a partial result, we need to shape it
+  const partialData = await res.json();
 
-  return data.map((item, index) => ({
-    ...item,
-    // The 'id' should be unique across all pages for a given search
-    id: `${page}-${index}`, 
-    thumbnail: adjustThumbnail(item.thumbnail),
-  }));
+  // Map over the partial data to create full ResultItem objects
+  return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
+    // Construct the thumbnail path based on the provided logic
+    const thumbnailPath = `/dataset/full/batch1/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+    
+    return {
+      videoId: item.videoId,
+      timestamp: item.timestamp,
+      confidence: item.confidence,
+      // Create the missing properties
+      id: `${page}-${index}`, // The 'id' should be unique across all pages for a given search
+      title: `${item.videoId} - ${item.timestamp}`, // Create title from videoId and timestamp
+      thumbnail: adjustThumbnail(thumbnailPath), // Create and adjust the thumbnail URL
+    };
+  });
 };
-
+// ✅ MODIFIED: This function also constructs `title` and `thumbnail`
 export const searchBySingleQuery = async (
     query: ApiQuery
   ): Promise<ResultItem[]> => {
@@ -85,11 +92,21 @@ export const searchBySingleQuery = async (
       );
     }
   
-    const data: ResultItem[] = await res.json();
+    const partialData = await res.json();
   
-    return data.map((item, index) => ({
-      ...item,
-      id: String(index),
-      thumbnail: adjustThumbnail(item.thumbnail),
-    }));
+    // Map over the partial data to create full ResultItem objects
+    return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
+        // Construct the thumbnail path based on the provided logic
+        const thumbnailPath = `/dataset/full/batch1/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+        
+        return {
+            videoId: item.videoId,
+            timestamp: item.timestamp,
+            confidence: item.confidence,
+            // Create the missing properties
+            id: String(index),
+            title: `${item.videoId} - ${item.timestamp}`, // Create title from videoId and timestamp
+            thumbnail: adjustThumbnail(thumbnailPath), // Create and adjust the thumbnail URL
+        };
+    });
   };

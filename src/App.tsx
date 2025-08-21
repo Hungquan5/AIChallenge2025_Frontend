@@ -30,11 +30,14 @@ import { performSimilaritySearch } from './features/search/components/Similarity
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { X } from 'lucide-react';
-
+import { mockResults,mockGroupedResults } from './utils/mockData';
 
 
 const PAGE_SIZE = 100; // Define your page size, matching the backend default
 const App: React.FC = () => {
+
+
+  
   // ✅ 1. Add state to manage the video modal
   const [videoPanelState, setVideoPanelState] = useState<{
     isOpen: boolean;
@@ -46,8 +49,8 @@ const App: React.FC = () => {
     timestamp: null,
   });
   // Search Results & View State
-  const [results, setResults] = useState<ResultItem[]>([]);
-  const [groupedResults, setGroupedResults] = useState<GroupedResult[]>([]);
+  const [results, setResults] = useState<ResultItem[]>(mockResults);
+  const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
 
   // ✅ Pagination & Search Context State
@@ -196,12 +199,16 @@ const App: React.FC = () => {
     switch (message.type) {
       case 'broadcast_image':
         if (message.payload) {
-          // ✅ FIX: Do NOT overwrite the original timestamp.
-          // Instead, create a new 'receivedAt' property for display.
           const newMessage: ResultItem = {
-            ...(message.payload as ResultItem), // Spread the original, untouched payload
+            ...(message.payload as ResultItem),
           };
-          setBroadcastMessages(prevMessages => [newMessage, ...prevMessages.slice(0, 19)]);
+          // ✅ FIX: Prevent adding duplicate messages
+          setBroadcastMessages(prevMessages => {
+            if (prevMessages.some(msg => msg.id === newMessage.id)) {
+              return prevMessages; // Item already exists, do not update state
+            }
+            return [newMessage, ...prevMessages.slice(0, 19)];
+          });
         }
         break;
 
@@ -221,7 +228,37 @@ const App: React.FC = () => {
         console.log('Unknown message type:', message.type);
     }
   }, []); // Add dependencies if needed, but it seems ok here.
+// ✅ 1. CREATE THE NEW EXPORT HANDLER HERE
+const handleExportBroadcast = useCallback(() => {
+  if (broadcastMessages.length === 0) {
+    alert("There's nothing in the live feed to export.");
+    return;
+  }
 
+  // Format the content: each line is "videoId, timestamp"
+  const fileContent = broadcastMessages
+    .map(msg => `${msg.videoId}, ${msg.timestamp}`)
+    .join('\n');
+
+  // Create a Blob to hold the text data
+  const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+
+  // Create a temporary link element to trigger the download
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+
+  // Create a dynamic filename with the current date
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  link.download = `live_feed_export_${timestamp}.txt`;
+
+  // Programmatically click the link to start the download
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Clean up the object URL
+  URL.revokeObjectURL(link.href);
+}, [broadcastMessages]); // Dependency on broadcastMessages is crucial
   // ✅ 3. CREATE A HANDLER TO PROCESS THE SUBMISSION
   const handleSubmission = async (item: ResultItem) => {
     try {
@@ -257,34 +294,39 @@ const App: React.FC = () => {
     onMessage: handleWebSocketMessage,
   });
 
-  // Enhanced broadcast handler with better UX
-  const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
-    if (!user?.username) {
-      console.warn('Cannot broadcast: No username available');
-      return;
+// Enhanced broadcast handler with better UX
+const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
+  if (!user?.username) {
+    console.warn('Cannot broadcast: No username available');
+    return;
+  }
+
+  // Prepare enhanced message with metadata
+  const enhancedItem = {
+    ...itemToBroadcast,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    username: user.username,
+    broadcasted: true
+  };
+
+  // ✅ FIX: Prevent adding duplicate messages
+  setBroadcastMessages(prevMessages => {
+    if (prevMessages.some(msg => msg.id === enhancedItem.id)) {
+      return prevMessages; // Item already exists, do not update state
     }
+    return [enhancedItem, ...prevMessages.slice(0, 19)];
+  });
 
-    // Prepare enhanced message with metadata
-    const enhancedItem = {
-      ...itemToBroadcast,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      username: user.username,
-      broadcasted: true
-    };
+  // Send to other users via WebSocket
+  const message = {
+    type: 'broadcast_image',
+    payload: itemToBroadcast,
+    username: user.username,
+    timestamp: Date.now()
+  };
 
-    // Add to local broadcast feed immediately for instant feedback
-    setBroadcastMessages(prevMessages => [enhancedItem, ...prevMessages.slice(0, 19)]);
-
-    // Send to other users via WebSocket
-    const message = {
-      type: 'broadcast_image',
-      payload: itemToBroadcast,
-      username: user.username,
-      timestamp: Date.now()
-    };
-
-    sendMessage(JSON.stringify(message));
-  }, [user?.username, sendMessage]);
+  sendMessage(JSON.stringify(message));
+}, [user?.username, sendMessage]);
 
   // Enhanced broadcast message removal handler
   const handleRemoveBroadcastMessage = useCallback((messageId: string, index: number) => {
@@ -513,6 +555,7 @@ const App: React.FC = () => {
         onBroadcastResultDoubleClick={handleOpenDetailModal}
         onBroadcastResultSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
         onVqaSubmit={handleVqaSubmit}
+        onExportBroadcastFeed={handleExportBroadcast} 
 
       />
       {detailModalInstance}

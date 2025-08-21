@@ -47,20 +47,17 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
  * @param imageSrc - The image URL to search for similar images
  * @param searchMode - The search mode ('normal' or 'chain')
  * @returns Promise<ResultItem[]> - Array of similar images
- */
-export const searchBySimilarImage = async (
+ */export const searchBySimilarImage = async (
   imageSrc: string,
   searchMode: SearchMode = 'normal'
 ): Promise<ResultItem[]> => {
   try {
     console.log(`Starting similarity search for image: ${imageSrc}`);
     
-    // Convert image URL to base64
     const imageBase64 = await imageUrlToBase64(imageSrc);
     
-    // Create API query for image similarity search
     const apiQuery: ApiQuery = {
-      text: '', // Empty text for image-only search
+      text: '',
       image: imageBase64,
       asr: '',
       ocr: '',
@@ -69,7 +66,6 @@ export const searchBySimilarImage = async (
       lang: 'ori'
     };
 
-    // Determine endpoint based on search mode
     const endpoint = searchMode === 'chain' 
       ? '/embeddings/chain_search' 
       : '/embeddings/search';
@@ -79,7 +75,7 @@ export const searchBySimilarImage = async (
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([apiQuery]), // Send as array like in handleSearch
+      body: JSON.stringify([apiQuery]),
     });
 
     if (!response.ok) {
@@ -91,21 +87,30 @@ export const searchBySimilarImage = async (
       );
     }
 
-    const data: ResultItem[] = await response.json();
+    // ✅ FIX: Treat the response as partial data, just like in searchByText
+    const partialData = await response.json();
     
-    // Process results similar to searchByText function
-    return data.map((item, index) => ({
-      ...item,
-      id: String(index),
-      thumbnail: adjustThumbnail(item.thumbnail),
-    }));
+    // ✅ FIX: Map over the partial data and construct the full ResultItem
+    return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
+      // Construct the thumbnail path
+      const thumbnailPath = `/dataset/full/batch1/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+      
+      return {
+        videoId: item.videoId,
+        timestamp: item.timestamp,
+        confidence: item.confidence,
+        // Create the missing properties
+        id: String(index), // A simple index can be used for the id
+        title: `${item.videoId} - ${item.timestamp}`, // Create title
+        thumbnail: adjustThumbnail(thumbnailPath), // Create and adjust the thumbnail URL
+      };
+    });
 
   } catch (error) {
     console.error('Similarity search error:', error);
     throw error;
   }
 };
-
 /**
  * Perform similarity search and handle UI feedback
  * @param imageSrc - The image URL to search for similar images
