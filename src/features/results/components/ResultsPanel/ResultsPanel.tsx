@@ -17,7 +17,8 @@ interface ResultsPanelProps {
   sendMessage: (message: string) => void;
   onItemBroadcast?: (item: ResultItem) => void;
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
-
+  submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
+  optimisticSubmissions: Set<string>; // Add new prop
 
   onResultDoubleClick: (item: ResultItem) => void; // Add prop
 }
@@ -32,7 +33,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   currentUser, sendMessage,onItemBroadcast,
   onResultDoubleClick,
   onSubmission,
-
+  submissionStatuses, // --- Destructure the new prop ---
+  optimisticSubmissions,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalData, setModalData] = useState<ResultItem | null>(null);
@@ -167,7 +169,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
           onSubmission={onSubmission} // ✅ Pass it to the view
-
+          submissionStatuses={submissionStatuses} // --- Pass it down ---
+          optimisticSubmissions={optimisticSubmissions}
         />
       ) : (
         <GroupedByVideoView
@@ -180,7 +183,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick} // Pass it down
           onSubmission={onSubmission} // ✅ Pass it to the view
-
+          submissionStatuses={submissionStatuses} // --- Pass it down ---
+          optimisticSubmissions={optimisticSubmissions}
         />
       )}
     </div>

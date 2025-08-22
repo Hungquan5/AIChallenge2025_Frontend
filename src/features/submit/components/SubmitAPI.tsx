@@ -52,7 +52,7 @@ const submitToDres = async (
 ) => {
   try {
     // 2. Look up the frame rate, with a fallback to a default value
-    const frameRate = videoFrameRates[result.videoId] || 25.0;
+    const frameRate = videoFrameRates[`${result.videoId}.mp4`] || 25.0;
 
     const body = {
       answerSets: [
@@ -91,7 +91,7 @@ const submitToDres = async (
 };
 
 const fullSubmissionFlow = async (result: ResultItem) => {
-  const sessionId = "uneVJA5BbMLneeYbeARgO4t4JBBNy7wq";
+  const sessionId = "HdysKp02FJfESBoxwLZGdnbz6ub3gKdp";
   const evaluationId = await getEvaluationId(sessionId);
   return await submitToDres(result, sessionId, evaluationId);
 };

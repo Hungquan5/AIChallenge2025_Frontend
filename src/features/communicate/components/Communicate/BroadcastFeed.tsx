@@ -26,7 +26,8 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
   onSimilaritySearch,
   onVqaSubmit,
   onSubmission,
-  onResultDoubleClick
+  onResultDoubleClick,
+
 }) => {
   // ✅ FIX: Manage all VQA inputs in a single state object outside the loop.
   const [vqaQuestions, setVqaQuestions] = useState<{ [key: string]: string }>({});
@@ -51,7 +52,7 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 p-1 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {messages.map((msg, index) => {
           const imageUrl = msg.thumbnail.startsWith('http') ? msg.thumbnail : getImageUrl(msg.videoId, msg.thumbnail);
-          
+
           // ✅ FIX: Handle state change for the specific message input.
           const handleVqaInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             const { value } = e.target;

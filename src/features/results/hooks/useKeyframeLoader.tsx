@@ -24,7 +24,7 @@ export const useKeyframeLoader = () => {
     videoId: kf.video_id,
     title: `${kf.video_id}/${kf.frame_index}`,
     thumbnail: kf.filename,
-    confidence: 1.0, 
+    confidence: 1.0,
     timestamp: kf.frame_index.toString(),
   }), []);
 
@@ -38,13 +38,11 @@ export const useKeyframeLoader = () => {
       const endpoint = direction === 'next'
         ? `http://localhost:9991/keyframes/batch-next`
         : `http://localhost:9991/keyframes/batch-prev`;
-        
       // We use our large batch size here to get all frames in one go.
       const response = await fetch(`${endpoint}?video_id=${videoId}&frame_index=${startIndex}&batch_size=${FETCH_ALL_BATCH_SIZE}`);
-      
       if (!response.ok) {
         // A 404 is not a critical error; it just means there are no more frames.
-        if (response.status === 404) return []; 
+        if (response.status === 404) return [];
         throw new Error(`HTTP error ${response.status}`);
       }
 
@@ -67,7 +65,6 @@ export const useKeyframeLoader = () => {
     setCarouselFrames([]); // Clear previous results
 
     const clickedFrameIndex = parseInt(item.timestamp, 10);
-    
     // The original frame that was clicked. We'll add this to ensure it's included.
     const currentFrame: ResultItem = { ...item, id: `${item.videoId}_${clickedFrameIndex}` };
 
@@ -79,7 +76,6 @@ export const useKeyframeLoader = () => {
 
     // 1. Combine all the frames: previous, the clicked one, and next.
     const combinedFrames = [...prevFrames, currentFrame, ...nextFrames];
-    
     // 2. Remove duplicates. The clicked frame might be returned by the API calls.
     // Using a Map is an efficient way to ensure uniqueness based on the 'id'.
     const uniqueFrames = Array.from(new Map(combinedFrames.map(f => [f.id, f])).values());
@@ -102,6 +98,34 @@ export const useKeyframeLoader = () => {
     setActiveFrameId(newId);
   }, []);
 
+  const loadNextFrames = useCallback(async () => {
+    if (isLoading || !currentVideoId || !carouselFrames || carouselFrames.length === 0) return;
+
+    setIsLoading(true);
+    const lastFrame = carouselFrames[carouselFrames.length - 1];
+    const nextFrames = await fetchFramesBatch(currentVideoId, parseInt(lastFrame.timestamp, 10), 'next');
+
+    if (nextFrames.length > 0) {
+      // Append the new frames to the end of the existing list
+      setCarouselFrames(currentFrames => [...(currentFrames || []), ...nextFrames]);
+    }
+    setIsLoading(false);
+  }, [isLoading, currentVideoId, carouselFrames, fetchFramesBatch]);
+
+  const loadPreviousFrames = useCallback(async () => {
+    if (isLoading || !currentVideoId || !carouselFrames || carouselFrames.length === 0) return;
+
+    setIsLoading(true);
+    const firstFrame = carouselFrames[0];
+    const prevFrames = await fetchFramesBatch(currentVideoId, parseInt(firstFrame.timestamp, 10), 'prev');
+
+    if (prevFrames.length > 0) {
+      // ✅ FIX: Prepend the new frames to the beginning of the existing list
+      setCarouselFrames(currentFrames => [...prevFrames, ...(currentFrames || [])]);
+    }
+    setIsLoading(false);
+  }, [isLoading, currentVideoId, carouselFrames, fetchFramesBatch]);
+
   return {
     carouselFrames,
     activeFrameId,
@@ -111,5 +135,7 @@ export const useKeyframeLoader = () => {
     handleCarouselClose,
     handleFrameChange,
     setActiveFrameId,
+    loadNextFrames,
+    loadPreviousFrames,
   };
 };

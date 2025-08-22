@@ -25,6 +25,8 @@ interface Props {
   // This prop was correctly added to the interface already.
   onResultDoubleClick: (item: ResultItem) => void;
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
+  optimisticSubmissions: Set<string>; // Add new prop
 
 }
 
@@ -37,9 +39,9 @@ const GroupedByVideoView: React.FC<Props> = ({
   currentUser, 
   sendMessage,
   onResultDoubleClick, // <-- Destructure it here
-
+submissionStatuses,
   onSubmission,
-
+optimisticSubmissions,
 
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());

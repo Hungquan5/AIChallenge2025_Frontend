@@ -33,13 +33,23 @@ export interface SubmissionResultMessage {
     payload: SubmissionResultPayload;
 }
 
+// 1. Define the payload for the new message
+export interface SubmissionStatusUpdatePayload {
+  [key: string]: 'PENDING' | 'WRONG'; // A dictionary where key is the image thumbnail URL
+}
 
-// ✅ 4. UPDATE THE MAIN WEBSOCKET MESSAGE TYPE
-// WebSocketMessage is now a union of ALL possible message types.
+// 2. Define the full message structure
+export interface SubmissionStatusUpdateMessage {
+  type: 'submission_status_update';
+  payload: SubmissionStatusUpdatePayload;
+}
+
+// 3. Add the new type to your main WebSocketMessage union type
 export type WebSocketMessage = 
   | BroadcastImageMessage 
   | StatusMessage 
-  | SubmissionResultMessage; // Add the new message type here
+  | SubmissionResultMessage
+  | SubmissionStatusUpdateMessage; // Add this new type
 
 
 // --- Your other API-related types can remain as they are. ---

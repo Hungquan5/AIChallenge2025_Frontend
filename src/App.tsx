@@ -52,7 +52,12 @@ const App: React.FC = () => {
   const [results, setResults] = useState<ResultItem[]>(mockResults);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
+  // --- NEW: State to hold the submission statuses from the backend ---
 
+  // ✅ --- NEW STATE for Optimistic UI ---
+  // We use a Set for efficient add/delete/has checks of unique thumbnail URLs.
+  const [optimisticSubmissions, setOptimisticSubmissions] = useState<Set<string>>(new Set());
+  const [submissionStatuses, setSubmissionStatuses] = useState<{ [key: string]: string }>({});
   // ✅ Pagination & Search Context State
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -223,6 +228,12 @@ const App: React.FC = () => {
 
         }
         break;
+// --- NEW: Handle the submission status update ---
+case 'submission_status_update':
+  if (message.payload) {
+    setSubmissionStatuses(message.payload);
+  }
+  break;
 
       default:
         console.log('Unknown message type:', message.type);
@@ -261,18 +272,20 @@ const handleExportBroadcast = useCallback(() => {
 }, [broadcastMessages]); // Dependency on broadcastMessages is crucial
   // ✅ 3. CREATE A HANDLER TO PROCESS THE SUBMISSION
   const handleSubmission = async (item: ResultItem) => {
+    // 1. Optimistic Update: Immediately disable the card on the current user's screen.
+    setOptimisticSubmissions(prev => new Set(prev).add(item.thumbnail));
+
     try {
-      const result = await fullSubmissionFlow(item); // result contains 'submission' and 'description'
+      const result = await fullSubmissionFlow(item);
       
-      // Prepare the message payload, now including the itemId
       const submissionPayload: SubmissionResultPayload = {
-        itemId: item.thumbnail, // Include the ID of the item being submitted
+        itemId: item.thumbnail, // Use the unique thumbnail as the ID
         submission: result.submission,
         description: result.description,
         username: user?.username,
       };
 
-      // Broadcast the result to all users via WebSocket
+      // 2. Broadcast the result to the backend for all users.
       const message: SubmissionResultMessage = {
         type: 'submission_result',
         payload: submissionPayload,
@@ -280,12 +293,22 @@ const handleExportBroadcast = useCallback(() => {
       sendMessage(JSON.stringify(message));
 
     } catch (error) {
+      // Handle API errors if necessary (e.g., show a toast notification)
       const description = error instanceof Error ? error.message : 'An unknown error occurred.';
       setSubmissionResult({
         itemId: item.id,
         submission: 'ERROR',
         description: description,
         username: user?.username,
+      });
+    } finally {
+      // 3. Cleanup: Remove the item from our optimistic set.
+      // Why? The backend will soon send a `submission_status_update` which becomes
+      // the single source of truth. Our optimistic state was temporary.
+      setOptimisticSubmissions(prev => {
+        const next = new Set(prev);
+        next.delete(item.thumbnail);
+        return next;
       });
     }
   };
@@ -489,7 +512,8 @@ const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
           onItemBroadcast={handleItemBroadcast}
            onResultDoubleClick={handleOpenDetailModal}
           onSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
-
+          submissionStatuses={submissionStatuses} // Pass the statuses down
+          optimisticSubmissions={optimisticSubmissions} // Pass the new optimistic state
         />
       </div>
     </>

@@ -20,6 +20,8 @@ interface Props {
   sendMessage: (message: string) => void; // WebSocket send function
   onResultDoubleClick: (item: ResultItem) => void; // Add prop
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
+  optimisticSubmissions: Set<string>; // Add new prop
 
 }
 
@@ -34,7 +36,8 @@ const SortedByConfidenceView: React.FC<Props> = ({
   sendMessage, // Destructure new prop
   onResultDoubleClick,
   onSubmission,
-
+  submissionStatuses, // --- Destructure the new prop ---
+  optimisticSubmissions,
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -70,11 +73,14 @@ const SortedByConfidenceView: React.FC<Props> = ({
       </div>
     );
   }
-
   return (
     <div className={gridClass}>
-      {sorted.map(item => (
-        <ResultCard
+      {sorted.map(item => {
+        // ✅ Combined check for disabled status
+        const isDisabledByServer = !!submissionStatuses[item.thumbnail];
+        const isDisabledOptimistically = optimisticSubmissions.has(item.thumbnail);
+        return (
+          <ResultCard
           key={item.id}
           id={item.id}
           thumbnail={item.thumbnail}
@@ -91,11 +97,12 @@ const SortedByConfidenceView: React.FC<Props> = ({
           onSending={() => handleSending(item)}
           imageClassName={imageClass} // Use the imported class for image styling
           onDoubleClick={() => onResultDoubleClick(item)}
-
+          disabled={isDisabledByServer || isDisabledOptimistically} // Use the combined result
         />
-      ))}
-    </div>
-  );
+      );
+    })}
+  </div>
+);
 };
 
 export default React.memo(SortedByConfidenceView);
