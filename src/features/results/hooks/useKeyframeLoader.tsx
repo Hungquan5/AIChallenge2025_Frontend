@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { ResultItem } from '../types';
 
 // Backend Keyframe structure
@@ -8,16 +8,26 @@ interface Keyframe {
   filename: string;
 }
 
-// A very large number to act as "infinity" for fetching all frames.
-// This is the main assumption: no video will have more than 10,000 keyframes
-// in one direction from the clicked point. Adjust if necessary.
-const FETCH_ALL_BATCH_SIZE = 10;
+// Reduced batch size for better UX - smaller chunks load faster
+const FETCH_ALL_BATCH_SIZE = 15;
 
 export const useKeyframeLoader = () => {
   const [carouselFrames, setCarouselFrames] = useState<ResultItem[] | null>(null);
   const [activeFrameId, setActiveFrameId] = useState<string | number | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Split loading states for better UX feedback
+  const [isFetchingNext, setIsFetchingNext] = useState(false);
+  const [isFetchingPrev, setIsFetchingPrev] = useState(false);
+  
+  // Track if more frames exist
+  const [hasMoreNext, setHasMoreNext] = useState(true);
+  const [hasMorePrev, setHasMorePrev] = useState(true);
+  
+  // Debounce mechanism to prevent rapid API calls
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastRequestTimeRef = useRef<{ [key: string]: number }>({});
 
   const createFrameItem = useCallback((kf: Keyframe): ResultItem => ({
     id: `${kf.video_id}_${kf.frame_index}`,
@@ -28,70 +38,111 @@ export const useKeyframeLoader = () => {
     timestamp: kf.frame_index.toString(),
   }), []);
 
-  // This function is now reused to fetch a large batch of frames.
   const fetchFramesBatch = useCallback(async (
     videoId: string,
     startIndex: number,
     direction: 'next' | 'prev'
   ): Promise<ResultItem[]> => {
+    // Debounce mechanism - prevent calls within 500ms of each other for same direction
+    const requestKey = `${videoId}-${direction}`;
+    const now = Date.now();
+    const lastRequest = lastRequestTimeRef.current[requestKey] || 0;
+    
+    if (now - lastRequest < 500) {
+      console.log(`Debouncing ${direction} request for ${videoId}`);
+      return [];
+    }
+    
+    lastRequestTimeRef.current[requestKey] = now;
+
     try {
       const endpoint = direction === 'next'
         ? `http://localhost:9991/keyframes/batch-next`
         : `http://localhost:9991/keyframes/batch-prev`;
-      // We use our large batch size here to get all frames in one go.
-      const response = await fetch(`${endpoint}?video_id=${videoId}&frame_index=${startIndex}&batch_size=${FETCH_ALL_BATCH_SIZE}`);
+      
+      const response = await fetch(
+        `${endpoint}?video_id=${videoId}&frame_index=${startIndex}&batch_size=${FETCH_ALL_BATCH_SIZE}`
+      );
+      
       if (!response.ok) {
-        // A 404 is not a critical error; it just means there are no more frames.
-        if (response.status === 404) return [];
+        if (response.status === 404) {
+          console.log(`No more ${direction} frames for ${videoId}`);
+          return [];
+        }
         throw new Error(`HTTP error ${response.status}`);
       }
 
       const keyframes: Keyframe[] = await response.json();
+      console.log(`Fetched ${keyframes.length} ${direction} frames for ${videoId}`);
       return keyframes.map(createFrameItem);
     } catch (err) {
       console.error(`Error loading ${direction} batch for video ${videoId}:`, err);
-      return []; // Return empty on error
+      return [];
     }
   }, [createFrameItem]);
 
   /**
-   * This function now triggers two parallel API calls to get all frames
-   * surrounding the clicked item.
+   * Initial load when clicking a result item
    */
   const handleResultClick = useCallback(async (item: ResultItem) => {
     setIsLoading(true);
     setCurrentVideoId(item.videoId);
     setActiveFrameId(item.timestamp);
     setCarouselFrames([]); // Clear previous results
+    
+    // Reset pagination state
+    setHasMoreNext(true);
+    setHasMorePrev(true);
+    setIsFetchingNext(false);
+    setIsFetchingPrev(false);
 
     const clickedFrameIndex = parseInt(item.timestamp, 10);
-    // The original frame that was clicked. We'll add this to ensure it's included.
     const currentFrame: ResultItem = { ...item, id: `${item.videoId}_${clickedFrameIndex}` };
 
-    // Use Promise.all to run both fetches at the same time for better performance.
-    const [prevFrames, nextFrames] = await Promise.all([
-      fetchFramesBatch(item.videoId, clickedFrameIndex, 'prev'),
-      fetchFramesBatch(item.videoId, clickedFrameIndex, 'next')
-    ]);
+    try {
+      // Load initial batches in parallel
+      const [prevFrames, nextFrames] = await Promise.all([
+        fetchFramesBatch(item.videoId, clickedFrameIndex, 'prev'),
+        fetchFramesBatch(item.videoId, clickedFrameIndex, 'next')
+      ]);
 
-    // 1. Combine all the frames: previous, the clicked one, and next.
-    const combinedFrames = [...prevFrames, currentFrame, ...nextFrames];
-    // 2. Remove duplicates. The clicked frame might be returned by the API calls.
-    // Using a Map is an efficient way to ensure uniqueness based on the 'id'.
-    const uniqueFrames = Array.from(new Map(combinedFrames.map(f => [f.id, f])).values());
+      // Combine and deduplicate frames
+      const combinedFrames = [...prevFrames, currentFrame, ...nextFrames];
+      const uniqueFrames = Array.from(
+        new Map(combinedFrames.map(f => [f.id, f])).values()
+      );
 
-    // 3. Sort the final array by frame index (timestamp) to ensure correct order.
-    uniqueFrames.sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
+      // Sort by frame index
+      uniqueFrames.sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
 
-    setCarouselFrames(uniqueFrames);
-    setIsLoading(false);
+      // Update state based on what we received
+      setHasMoreNext(nextFrames.length >= FETCH_ALL_BATCH_SIZE);
+      setHasMorePrev(prevFrames.length >= FETCH_ALL_BATCH_SIZE);
+
+      setCarouselFrames(uniqueFrames);
+    } catch (error) {
+      console.error('Error in initial frame load:', error);
+      setCarouselFrames([currentFrame]); // At least show the clicked frame
+      setHasMoreNext(false);
+      setHasMorePrev(false);
+    } finally {
+      setIsLoading(false);
+    }
   }, [fetchFramesBatch]);
 
-  // Simplified close handler
   const handleCarouselClose = useCallback(() => {
+    // Clear debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
     setCarouselFrames(null);
     setActiveFrameId(null);
     setCurrentVideoId(null);
+    setHasMoreNext(true);
+    setHasMorePrev(true);
+    setIsFetchingNext(false);
+    setIsFetchingPrev(false);
   }, []);
 
   const handleFrameChange = useCallback((newId: string | number) => {
@@ -99,38 +150,106 @@ export const useKeyframeLoader = () => {
   }, []);
 
   const loadNextFrames = useCallback(async () => {
-    if (isLoading || !currentVideoId || !carouselFrames || carouselFrames.length === 0) return;
-
-    setIsLoading(true);
-    const lastFrame = carouselFrames[carouselFrames.length - 1];
-    const nextFrames = await fetchFramesBatch(currentVideoId, parseInt(lastFrame.timestamp, 10), 'next');
-
-    if (nextFrames.length > 0) {
-      // Append the new frames to the end of the existing list
-      setCarouselFrames(currentFrames => [...(currentFrames || []), ...nextFrames]);
+    // Comprehensive guard clauses
+    if (
+      isFetchingNext || 
+      !hasMoreNext || 
+      !currentVideoId || 
+      !carouselFrames || 
+      carouselFrames.length === 0 ||
+      isLoading
+    ) {
+      return;
     }
-    setIsLoading(false);
-  }, [isLoading, currentVideoId, carouselFrames, fetchFramesBatch]);
+
+    setIsFetchingNext(true);
+    
+    try {
+      const lastFrame = carouselFrames[carouselFrames.length - 1];
+      const nextFrames = await fetchFramesBatch(
+        currentVideoId, 
+        parseInt(lastFrame.timestamp, 10), 
+        'next'
+      );
+
+      if (nextFrames.length > 0) {
+        setCarouselFrames(currentFrames => {
+          if (!currentFrames) return currentFrames;
+          
+          // Deduplicate based on frame ID
+          const existingIds = new Set(currentFrames.map(f => f.id));
+          const newFrames = nextFrames.filter(f => !existingIds.has(f.id));
+          
+          return [...currentFrames, ...newFrames];
+        });
+      }
+      
+      // Update hasMoreNext based on batch size
+      setHasMoreNext(nextFrames.length >= FETCH_ALL_BATCH_SIZE);
+      
+    } catch (error) {
+      console.error('Error loading next frames:', error);
+      setHasMoreNext(false);
+    } finally {
+      setIsFetchingNext(false);
+    }
+  }, [isFetchingNext, hasMoreNext, currentVideoId, carouselFrames, isLoading, fetchFramesBatch]);
 
   const loadPreviousFrames = useCallback(async () => {
-    if (isLoading || !currentVideoId || !carouselFrames || carouselFrames.length === 0) return;
-
-    setIsLoading(true);
-    const firstFrame = carouselFrames[0];
-    const prevFrames = await fetchFramesBatch(currentVideoId, parseInt(firstFrame.timestamp, 10), 'prev');
-
-    if (prevFrames.length > 0) {
-      // ✅ FIX: Prepend the new frames to the beginning of the existing list
-      setCarouselFrames(currentFrames => [...prevFrames, ...(currentFrames || [])]);
+    // Comprehensive guard clauses
+    if (
+      isFetchingPrev || 
+      !hasMorePrev || 
+      !currentVideoId || 
+      !carouselFrames || 
+      carouselFrames.length === 0 ||
+      isLoading
+    ) {
+      return;
     }
-    setIsLoading(false);
-  }, [isLoading, currentVideoId, carouselFrames, fetchFramesBatch]);
+
+    setIsFetchingPrev(true);
+    
+    try {
+      const firstFrame = carouselFrames[0];
+      const prevFrames = await fetchFramesBatch(
+        currentVideoId, 
+        parseInt(firstFrame.timestamp, 10), 
+        'prev'
+      );
+
+      if (prevFrames.length > 0) {
+        setCarouselFrames(currentFrames => {
+          if (!currentFrames) return currentFrames;
+          
+          // Deduplicate based on frame ID
+          const existingIds = new Set(currentFrames.map(f => f.id));
+          const newFrames = prevFrames.filter(f => !existingIds.has(f.id));
+          
+          return [...newFrames, ...currentFrames];
+        });
+      }
+      
+      // Update hasMorePrev based on batch size
+      setHasMorePrev(prevFrames.length >= FETCH_ALL_BATCH_SIZE);
+      
+    } catch (error) {
+      console.error('Error loading previous frames:', error);
+      setHasMorePrev(false);
+    } finally {
+      setIsFetchingPrev(false);
+    }
+  }, [isFetchingPrev, hasMorePrev, currentVideoId, carouselFrames, isLoading, fetchFramesBatch]);
 
   return {
     carouselFrames,
     activeFrameId,
     currentVideoId,
     isLoading,
+    isFetchingNext,
+    isFetchingPrev,
+    hasMoreNext,
+    hasMorePrev,
     handleResultClick,
     handleCarouselClose,
     handleFrameChange,

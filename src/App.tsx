@@ -177,13 +177,20 @@ const App: React.FC = () => {
   // Keyframe loader hooks
   // --- Updated Keyframe Loader Hook ---
   // The hook now manages the state for the FramesPanel internally.
-  const {
-    carouselFrames,    // This is now the array of all frames for the panel.
-    isLoading: isLoadingFrames, // Renamed to avoid conflict.
-    activeFrameId, // ✅ We will use this to highlight the frame
-    handleResultClick: loadFramesForPanel, // Renamed for clarity.
-    handleCarouselClose: closeFramesPanel, // Renamed for clarity.
-  } = useKeyframeLoader();
+// In App.tsx - CORRECTED
+
+const {
+  carouselFrames,
+  isLoading: isLoadingFrames,
+  activeFrameId,
+  handleResultClick: loadFramesForPanel,
+  handleCarouselClose: closeFramesPanel,
+  // ✅ ADD THESE TWO FUNCTIONS
+  loadNextFrames,
+  hasMoreNext,
+  hasMorePrev,
+  loadPreviousFrames,
+} = useKeyframeLoader();
   const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
     if (!question.trim()) {
       console.warn('VQA question is empty.');
@@ -527,6 +534,12 @@ const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
       isLoading={isLoadingFrames}
       activeFrameId={activeFrameId} // Pass the active ID for highlighting
 
+      // ✅ PASS THE FUNCTIONS AS PROPS
+      loadNextFrames={loadNextFrames}
+      // ✅ 2. PASS THE NEW PROPS DOWN
+      hasMoreNext={hasMoreNext}
+      hasMorePrev={hasMorePrev}
+      loadPreviousFrames={loadPreviousFrames}
       onClose={closeFramesPanel}
       onFrameClick={handleFrameClickInPanel}
       onRightClick={handleFrameRightClickInPanel}
@@ -535,7 +548,7 @@ const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
       sendMessage={sendMessage}
       onResultDoubleClick={handleOpenDetailModal}
       onSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
-    />
+      isFetchingNext={false} isFetchingPrev={false}    />
   ) : null;
 
   // ✅ 5. Create the modal instance to pass to the AppShell
