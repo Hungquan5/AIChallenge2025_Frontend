@@ -58,6 +58,11 @@ const App: React.FC = () => {
   // We use a Set for efficient add/delete/has checks of unique thumbnail URLs.
   const [optimisticSubmissions, setOptimisticSubmissions] = useState<Set<string>>(new Set());
   const [submissionStatuses, setSubmissionStatuses] = useState<{ [key: string]: string }>({});
+
+  // ✅ 1. ADD NEW STATE TO HOLD VQA QUESTIONS AT THE TOP LEVEL
+  const [vqaQuestions, setVqaQuestions] = useState<{ [key: string]: string }>({});
+    // ✅ 1. ADD NEW STATE FOR TRACK MODE
+    const [isTrackModeActive, setIsTrackModeActive] = useState(false);
   // ✅ Pagination & Search Context State
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -100,7 +105,31 @@ const App: React.FC = () => {
   const handleCloseDetailModal = useCallback(() => {
     setDetailModalItem(null);
   }, []);
+    // ✅ 2. CREATE A HANDLER TO TOGGLE TRACK MODE
+    const handleToggleTrackMode = useCallback(() => {
+      setIsTrackModeActive(prev => !prev);
+    }, []);
+// ✅ 2. CREATE A HANDLER TO UPDATE THE VQA STATE
+const handleVqaQuestionChange = useCallback((itemId: string, question: string) => {
+  setVqaQuestions(prev => ({
+    ...prev,
+    [itemId]: question,
+  }));
+}, []);
 
+const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
+  if (!question.trim()) {
+    console.warn('VQA question is empty.');
+    return;
+  }
+  console.log('Submitting VQA:', {
+    videoId: item.videoId,
+    frameId: item.timestamp,
+    question: question.trim(),
+  });
+  // After submission, we can clear the input field from the central state
+  handleVqaQuestionChange(item.id, '');
+}, [handleVqaQuestionChange]); // Add dependency
   // ✅ 1. ADD NEW STATE FOR THE SUBMISSION RESULT NOTIFICATION
   const [submissionResult, setSubmissionResult] = useState<{
     itemId: string;
@@ -191,18 +220,7 @@ const {
   hasMorePrev,
   loadPreviousFrames,
 } = useKeyframeLoader();
-  const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
-    if (!question.trim()) {
-      console.warn('VQA question is empty.');
-      return;
-    }
-    // In a real implementation, you would send this data to your backend API.
-    console.log('Submitting VQA:', {
-      videoId: item.videoId,
-      frameId: item.timestamp, // The original, correct frame ID
-      question: question.trim(),
-    });
-  }, []);
+  
 
   // Enhanced WebSocket message handler
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -246,37 +264,71 @@ case 'submission_status_update':
         console.log('Unknown message type:', message.type);
     }
   }, []); // Add dependencies if needed, but it seems ok here.
-// ✅ 1. CREATE THE NEW EXPORT HANDLER HERE
-const handleExportBroadcast = useCallback(() => {
-  if (broadcastMessages.length === 0) {
-    alert("There's nothing in the live feed to export.");
-    return;
-  }
 
-  // Format the content: each line is "videoId, timestamp"
-  const fileContent = broadcastMessages
-    .map(msg => `${msg.videoId}, ${msg.timestamp}`)
-    .join('\n');
 
-  // Create a Blob to hold the text data
-  const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+  // ✅ 3. UPDATE THE EXPORT HANDLER WITH CONDITIONAL LOGIC
+  const handleExportBroadcast = useCallback(() => {
+    if (broadcastMessages.length === 0) {
+      alert("There's nothing in the live feed to export.");
+      return;
+    }
 
-  // Create a temporary link element to trigger the download
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
+    let fileContent = '';
 
-  // Create a dynamic filename with the current date
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  link.download = `live_feed_export_${timestamp}.txt`;
+    if (isTrackModeActive) {
+      // --- TRACK MODE EXPORT LOGIC ---
+      // 1. Group all messages by their videoId
+      const groupedByVideo = broadcastMessages.reduce((acc, msg) => {
+        const key = msg.videoId || 'unknown';
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(msg);
+        return acc;
+      }, {} as Record<string, ResultItem[]>);
 
-  // Programmatically click the link to start the download
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+      // 2. Process each group into a single CSV line
+      fileContent = Object.entries(groupedByVideo)
+        .map(([videoId, items]) => {
+          // 3. Sort the frames by timestamp (e.g., "00:01:23.456")
+          const sortedFrameIds = items
+            .map(item => item.timestamp)
+            .sort((a, b) => (a ?? '').localeCompare(b ?? ''));
+          
+          // 4. Create the final line: videoId,frameId1,frameId2,...
+          return [videoId, ...sortedFrameIds].join(',');
+        })
+        .join('\n');
+    } else {
+      // --- ORIGINAL EXPORT LOGIC ---
+      fileContent = broadcastMessages
+        .map(msg => {
+          const videoId = msg.videoId || '';
+          const frameId = msg.timestamp || '';
+          const question = vqaQuestions[msg.id];
 
-  // Clean up the object URL
-  URL.revokeObjectURL(link.href);
-}, [broadcastMessages]); // Dependency on broadcastMessages is crucial
+          if (question && question.trim()) {
+            const escapedQuestion = question.replace(/"/g, '""');
+            return `${videoId},${frameId},"${escapedQuestion}"`;
+          } else {
+            return `${videoId},${frameId}`;
+          }
+        })
+        .join('\n');
+    }
+
+    // --- COMMON DOWNLOAD LOGIC ---
+    const blob = new Blob([fileContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = `live_feed_export_${timestamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }, [broadcastMessages, vqaQuestions, isTrackModeActive]); // Add new state to dependency array
+
   // ✅ 3. CREATE A HANDLER TO PROCESS THE SUBMISSION
   const handleSubmission = async (item: ResultItem) => {
     // 1. Optimistic Update: Immediately disable the card on the current user's screen.
@@ -576,7 +628,7 @@ const handleExportBroadcast = useCallback(() => {
 
   return (
     <>
-      <AppShell
+           <AppShell
         leftPanel={leftPanel}
         rightPanel={rightPanel}
         searchButton={searchButton}
@@ -592,9 +644,14 @@ const handleExportBroadcast = useCallback(() => {
         onBroadcastSimilaritySearch={handleSimilaritySearch}
         onClearBroadcastFeed={handleClearBroadcastFeed}
         onBroadcastResultDoubleClick={handleOpenDetailModal}
-        onBroadcastResultSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
+        onBroadcastResultSubmission={handleSubmission}
         onVqaSubmit={handleVqaSubmit}
         onExportBroadcastFeed={handleExportBroadcast} 
+        isTrackModeActive={isTrackModeActive}
+        onToggleTrackMode={handleToggleTrackMode}
+        // ✅ 4. PASS THE NEW STATE AND HANDLER TO AppShell
+        vqaQuestions={vqaQuestions}
+        onVqaQuestionChange={handleVqaQuestionChange}
 
       />
       {detailModalInstance}

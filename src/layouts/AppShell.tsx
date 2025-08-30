@@ -1,7 +1,7 @@
 // AppShell.tsx
 import React,{ useState } from 'react';
 import type { ResultItem } from '../features/search/types';
-import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2,FileText} from 'lucide-react';
+import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2,FileText,GitMerge} from 'lucide-react';
 import { BroadcastFeed } from '../features/communicate/components/Communicate/BroadcastFeed';
 interface AppShellProps {
   leftPanel: React.ReactNode;
@@ -25,8 +25,12 @@ interface AppShellProps {
   onBroadcastResultSubmission: (item: ResultItem) => void; // ✅ Add the new prop
   onBroadcastResultDoubleClick: (item: ResultItem) => void; // Add prop
   onExportBroadcastFeed: () => void;
-
-
+  // ✅ 1. ADD THE NEW PROPS FOR VQA STATE
+  vqaQuestions: { [key: string]: string };
+  onVqaQuestionChange: (itemId: string, question: string) => void;
+  // ✅ 2. ADD THE NEW PROPS FOR TRACK MODE
+  isTrackModeActive: boolean;
+  onToggleTrackMode: () => void;
 }
 
 const AppShell: React.FC<AppShellProps> = ({ 
@@ -48,7 +52,13 @@ const AppShell: React.FC<AppShellProps> = ({
   onClearBroadcastFeed,
   onVqaSubmit,
   onExportBroadcastFeed, // Destructure the new prop
-
+  
+  // ✅ 2. DESTRUCTURE THE NEW PROPS
+  vqaQuestions,
+  onVqaQuestionChange,
+  // ✅ 3. DESTRUCTURE THE NEW PROPS
+  isTrackModeActive,
+  onToggleTrackMode,
 }) => {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
@@ -116,6 +126,21 @@ const AppShell: React.FC<AppShellProps> = ({
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Export
+                </button>
+                <button
+                  onClick={onToggleTrackMode}
+                  className={`
+                    flex items-center gap-1.5 ml-2 px-2 py-1 text-xs rounded-md transition-colors duration-200
+                    backdrop-blur-sm border border-slate-200
+                    ${isTrackModeActive
+                      ? 'bg-blue-100/80 text-blue-800 hover:bg-blue-200/80'
+                      : 'bg-white/60 text-slate-700 hover:bg-slate-100/80'
+                    }
+                  `}
+                  title="Toggle Track Mode (groups frames by video)"
+                >
+                  <GitMerge className="w-3.5 h-3.5" />
+                  Track Mode: {isTrackModeActive ? 'ON' : 'OFF'}
                 </button>
               </>
             )}
@@ -189,16 +214,20 @@ const AppShell: React.FC<AppShellProps> = ({
 
             {/* Broadcast Feed Content */}
             <BroadcastFeed 
-            messages={broadcastMessages} 
-            onRemoveMessage={onRemoveBroadcastMessage}
-            // ✅ 3. Pass the handlers down to BroadcastFeed
-            onResultClick={onBroadcastResultClick}
-            onRightClick={onBroadcastRightClick}
-            onSimilaritySearch={onBroadcastSimilaritySearch}
-            onVqaSubmit={onVqaSubmit}
-            onSubmission={onBroadcastResultSubmission}
-            onResultDoubleClick ={onBroadcastResultDoubleClick}
-          />
+              messages={broadcastMessages} 
+              onRemoveMessage={onRemoveBroadcastMessage}
+              onResultClick={onBroadcastResultClick}
+              onRightClick={onBroadcastRightClick}
+              onSimilaritySearch={onBroadcastSimilaritySearch}
+              onVqaSubmit={onVqaSubmit}
+              onSubmission={onBroadcastResultSubmission}
+              onResultDoubleClick ={onBroadcastResultDoubleClick}
+              // ✅ 3. PASS THE PROPS DOWN TO BroadcastFeed
+              vqaQuestions={vqaQuestions}
+              onVqaQuestionChange={onVqaQuestionChange}
+                            // ✅ 5. PASS TRACK MODE STATE DOWN TO THE FEED
+                            isTrackModeActive={isTrackModeActive}
+            />
           </div>
         </div>
       </div>
