@@ -324,38 +324,38 @@ const handleExportBroadcast = useCallback(() => {
     onMessage: handleWebSocketMessage,
   });
 
-// Enhanced broadcast handler with better UX
-const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
+ //  CORRECTED BROADCAST HANDLER
+ const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
   if (!user?.username) {
-    console.warn('Cannot broadcast: No username available');
+    console.warn('Cannot broadcast: No username is set.');
     return;
   }
 
-  // Prepare enhanced message with metadata
-  const enhancedItem = {
+  // 1. Prepare the payload according to your example format.
+  // The payload should be the item itself, with the 'submittedBy' field added.
+  const payloadWithSenderInfo = {
     ...itemToBroadcast,
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    username: user.username,
-    broadcasted: true
+    submittedBy: user.username, // Add the current user's name
   };
 
-  // ✅ FIX: Prevent adding duplicate messages
-  setBroadcastMessages(prevMessages => {
-    if (prevMessages.some(msg => msg.id === enhancedItem.id)) {
-      return prevMessages; // Item already exists, do not update state
-    }
-    return [enhancedItem, ...prevMessages.slice(0, 19)];
-  });
-
-  // Send to other users via WebSocket
+  // 2. Construct the final message object with 'type' and 'payload'.
   const message = {
     type: 'broadcast_image',
-    payload: itemToBroadcast,
-    username: user.username,
-    timestamp: Date.now()
+    payload: payloadWithSenderInfo,
   };
 
+  // 3. Send the correctly formatted message over the WebSocket.
   sendMessage(JSON.stringify(message));
+
+  // 4. (Optional but recommended) Also update the local state optimistically
+  //    with the same data structure so the UI reflects what was sent.
+  setBroadcastMessages(prevMessages => {
+    if (prevMessages.some(msg => msg.id === message.payload.id)) {
+      return prevMessages; // Avoid adding duplicates
+    }
+    return [message.payload, ...prevMessages.slice(0, 19)];
+  });
+
 }, [user?.username, sendMessage]);
 
   // Enhanced broadcast message removal handler
@@ -558,6 +558,8 @@ const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
       videoId={videoPanelState.videoId}
       timestamp={videoPanelState.timestamp}
       onClose={handleCloseVideoPanel}
+      onBroadcast={handleItemBroadcast} // Pass the broadcast handler
+      currentUser={user.username} // <-- PASS THE USERNAME AS A PROP HERE
     />
   ) : null;
   // Show username prompt if no user

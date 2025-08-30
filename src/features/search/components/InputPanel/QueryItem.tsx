@@ -362,6 +362,15 @@ const QueryItem: React.FC<QueryItemProps> = ({
   const [isItemSearching, setIsItemSearching] = useState(false); // For item-specific loading
   
   const localTextareaRef = useRef<HTMLTextAreaElement>(null);
+  // tvh
+  const [localText, setLocalText] = useState(
+    query.lang === 'eng' ? query.text : query.origin
+  );
+
+  useEffect(() => {
+    setLocalText(query.lang === 'eng' ? query.text : query.origin);
+  }, [query.lang, query.text, query.origin]);
+  //end tvh
     // ✅ 3. CREATE REFS for the feature input fields
     const ocrInputRef = useRef<HTMLInputElement>(null);
     const asrInputRef = useRef<HTMLInputElement>(null);
@@ -465,23 +474,37 @@ useEffect(() => {
 
 
   // ✅ MODIFY THIS FUNCTION
+  // const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  //   const value = e.target.value;
+    
+  //   // Check if we are currently in English mode
+  //   if (query.lang === 'eng') {
+  //     // If the user clears the text area, revert the state to 'ori'
+  //     if (value === '') {
+  //       onUpdate(index, { text: '', lang: 'ori' });
+  //     } else {
+  //       // Otherwise, just update the English text
+  //       onUpdate(index, { text: value });
+  //     }
+  //   } else {
+  //     // If in original mode, update the origin text and clear any old translation
+  //     onUpdate(index, { origin: value, text: '' });
+  //   }
+  // };
+  // tvh
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
-    
-    // Check if we are currently in English mode
+    setLocalText(value); // cập nhật ngay để nhập không bị delay
+
+    // chỉ sync với parent khi cần (debounce hoặc trực tiếp, tùy bạn)
     if (query.lang === 'eng') {
-      // If the user clears the text area, revert the state to 'ori'
-      if (value === '') {
-        onUpdate(index, { text: '', lang: 'ori' });
-      } else {
-        // Otherwise, just update the English text
-        onUpdate(index, { text: value });
-      }
+      onUpdate(index, { text: value });
     } else {
-      // If in original mode, update the origin text and clear any old translation
       onUpdate(index, { origin: value, text: '' });
     }
   };
+  //end tvh
+
   return (
     <div className={`${queryItemContainerClass} ${isItemSearching ? 'opacity-75 pointer-events-none' : ''}`}>
       {/* #1: Loading State Overlay */}
@@ -503,9 +526,19 @@ useEffect(() => {
       {/* --- Query Content --- */}
       <div className="space-y-4">
         {queryMode === 'text' ? (
+          // <textarea
+          //   ref={textareaRef}
+          //   value={query.lang === 'eng' ? query.text : query.origin}
+          //   onChange={handleChange}
+          //   onKeyDown={handleKeyDown}
+          //   placeholder="Enter your query..."
+          //   className={inputClass}
+          //   rows={4}
+          //   onFocus={onFocus}
+          // />
           <textarea
             ref={textareaRef}
-            value={query.lang === 'eng' ? query.text : query.origin}
+            value={localText}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder="Enter your query..."
