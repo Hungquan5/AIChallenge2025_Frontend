@@ -27,6 +27,7 @@ interface Props {
   onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
   submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
   optimisticSubmissions: Set<string>; // Add new prop
+  onDislike: (item: ResultItem) => void; // ✅ Add the new prop
 
 }
 
@@ -42,7 +43,7 @@ const GroupedByVideoView: React.FC<Props> = ({
 submissionStatuses,
   onSubmission,
 optimisticSubmissions,
-
+onDislike
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -100,7 +101,8 @@ optimisticSubmissions,
                 onSending={() => handleSending(item)}
                 onSimilaritySearch={onSimilaritySearch}
                 imageClassName={imageClass}
-                
+                onDislike={() => onDislike(item)} // ✅ Pass it to the card
+
                 // ✅ FIX 2: Pass the handler down to the ResultCard's onDoubleClick prop.
                 onDoubleClick={() => onResultDoubleClick(item)}
               />

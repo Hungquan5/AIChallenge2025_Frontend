@@ -93,7 +93,7 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
     // ✅ FIX: Map over the partial data and construct the full ResultItem
     return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
       // Construct the thumbnail path
-      const thumbnailPath = `/dataset/full/batch1/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+      const thumbnailPath = `/dataset/full/merge/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
       
       return {
         videoId: item.videoId,

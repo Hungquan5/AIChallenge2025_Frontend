@@ -4,6 +4,7 @@ import { searchButtonClass,containerClass } from './styles';
 import type { ResultItem, Query,SearchMode,ApiQuery } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
+import type { User } from '../../../communicate/types';
 // ✅ This is where the fix is.
 interface InputPanelProps {
   onSearch: (queries: ApiQuery[], mode: SearchMode) => void;
@@ -12,15 +13,17 @@ interface InputPanelProps {
   
   // ✅ ADD THIS LINE: Declare that this component expects this prop.
   onSingleSearchResult: (results: ResultItem[]) => void;
+  user: User | null; // ✅ FIX: Allow user to be null
 }
-
 import { Search, Zap, Loader2 } from 'lucide-react'; 
 import { translateText } from '../SearchRequest/searchApi';
 const InputPanel = ({ 
   onSearch, 
   isAutoTranslateEnabled, 
   isLoading, 
-  onSingleSearchResult 
+  onSingleSearchResult ,
+  user // ✅ ADDED
+
 }: InputPanelProps) => {// ✅ 2. DESTRUCTURE THE PROP
   const [queries, setQueries] = useState<Query[]>([
     // The initial query no longer has a 'mode' field
@@ -252,6 +255,7 @@ useShortcuts({
           // Now that InputPanel accepts this prop, it can correctly pass it down to QueryList.
           onSingleSearchResult={onSingleSearchResult} 
           isAutoTranslateEnabled={isAutoTranslateEnabled}
+          user={user} // ✅ ADDED: Pass user to QueryList
         />
       </div>
     ),

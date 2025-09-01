@@ -317,7 +317,7 @@ const QueryStatusIndicator = ({ query, mode }: { query: Query; mode: 'text' | 'i
     </div>
   );
 };
-
+import type { User } from '../../../communicate/types';
 // --- MAIN QUERY ITEM PROPS & COMPONENT ---
 
 interface QueryItemProps {
@@ -336,6 +336,8 @@ interface QueryItemProps {
   onFocusRequestConsumed: () => void;
   modeChangeRequest: { index: number; mode: Mode } | null;
   onModeChangeRequestConsumed: () => void;
+  user: User | null; // ✅ FIX: Allow user to be null
+
 }
 
 const QueryItem: React.FC<QueryItemProps> = ({
@@ -353,7 +355,9 @@ const QueryItem: React.FC<QueryItemProps> = ({
   focusRequest,
   onFocusRequestConsumed,
   modeChangeRequest,
-  onModeChangeRequestConsumed
+  onModeChangeRequestConsumed,
+  user, // ✅ ADDED
+
 }) => {
   const [queryMode, setQueryMode] = useState<'text' | 'image'>(query.imageFile ? 'image' : 'text');
   const [showOCR, setShowOCR] = useState(!!query.ocr);
@@ -445,7 +449,7 @@ useEffect(() => {
     setIsItemSearching(true);
     const { asr, ocr, origin, obj, lang, imageFile, text } = query;
     let finalApiQuery;
-
+    
     if (imageFile) {
         const image = await fileToBase64(imageFile);
         finalApiQuery = { asr, ocr, origin, obj, lang, text: '', image };
@@ -454,7 +458,8 @@ useEffect(() => {
     }
 
     try {
-        const results = await searchBySingleQuery(finalApiQuery);
+        // ✅ MODIFIED: Pass the username to the API call
+        const results = await searchBySingleQuery(finalApiQuery, user.username);
         onSingleSearchResult(results);
     } catch (error) {
         console.error('Single item search failed:', error);

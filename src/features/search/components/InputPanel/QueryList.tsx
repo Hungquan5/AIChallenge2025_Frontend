@@ -5,7 +5,7 @@ import QueryItem from './QueryItem';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { translateText } from '../SearchRequest/searchApi';
 import type { ResultItem } from '../../types';
-
+import type { User } from '../../../communicate/types';
 interface QueryListProps {
   queries: Query[];
   onQueriesChange: (queries: Query[]) => void;
@@ -13,6 +13,8 @@ interface QueryListProps {
   firstInputRef?: RefObject<HTMLTextAreaElement>;
   onSingleSearchResult: (results: ResultItem[]) => void;
   isAutoTranslateEnabled: boolean; // ✅ 1. ACCEPT THE PROP
+  user: User | null; // ✅ FIX: Allow user to be null
+
 }
 
 type FocusField = 'ocr' | 'asr' | 'obj';
@@ -26,6 +28,8 @@ const QueryList: React.FC<QueryListProps> = ({
   firstInputRef, 
   onSingleSearchResult,
   isAutoTranslateEnabled, // ✅ 2. DESTRUCTURE THE PROP
+  user // ✅ ADDED
+
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<number | null>(null); // For debouncing API calls
@@ -227,6 +231,8 @@ const QueryList: React.FC<QueryListProps> = ({
             inputRef={index === 0 ? firstInputRef : undefined}
             focusRequest={focusRequest}
             onFocusRequestConsumed={() => setFocusRequest(null)}
+            user={user} // ✅ ADDED: Pass user to each QueryItem
+
             // ✅ 4. Pass the new props down to the QueryItem
             modeChangeRequest={modeChangeRequest}
             onModeChangeRequestConsumed={() => setModeChangeRequest(null)}          />

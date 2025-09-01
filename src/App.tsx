@@ -19,6 +19,7 @@ import type { ApiQuery, SearchMode } from './features/search/types';
 import type { WebSocketMessage } from './features/communicate/types';
 import type { SubmissionResultPayload } from './features/communicate/types';
 import type { SubmissionResultMessage } from './features/communicate/types';
+import { dislikeCluster } from './features/dislike/dislikeApi';
 // --- Hooks & Utilities ---
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
@@ -35,9 +36,6 @@ import { mockResults,mockGroupedResults } from './utils/mockData';
 
 const PAGE_SIZE = 100; // Define your page size, matching the backend default
 const App: React.FC = () => {
-
-
-  
   // ✅ 1. Add state to manage the video modal
   const [videoPanelState, setVideoPanelState] = useState<{
     isOpen: boolean;
@@ -138,11 +136,11 @@ const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
     username?: string;
   } | null>(null);
 
-  const executeSearch = useCallback(async (queries: ApiQuery[], mode: SearchMode, page: number) => {
+  const executeSearch = useCallback(async (queries: ApiQuery[],mode: SearchMode, page: number) => {
+    if (!user) return; // Early exit if user is somehow null
     setIsLoading(true);
     try {
-      const newResults = await searchByText(queries, mode, page, PAGE_SIZE);
-
+      const newResults = await searchByText(queries, user?.username, mode, page, PAGE_SIZE);
       setResults(newResults);
       setHasNextPage(newResults.length === PAGE_SIZE); // If we got a full page, there might be more.
 
@@ -165,24 +163,21 @@ const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Empty dependency array as it uses state setters and constants
+  }, [user]); // ✅ Add user to the dependency array
   const handleInitiateSearch = useCallback((queries: ApiQuery[], mode: SearchMode) => {
-    // A new search always starts at page 1
+    if (!user?.username) return; // ✅ ADDED: Guard against missing user
     setCurrentPage(1);
-
-    // Save the context of this search so we can paginate it later
     setLastQueries(queries);
     setLastSearchMode(mode);
-
-    // Execute the search for the first page
+    // ✅ MODIFIED: Pass the username to executeSearch
     executeSearch(queries, mode, 1);
-  }, [executeSearch]); // Depends on executeSearch
+  }, [executeSearch, user]); // ✅ ADDED: user to dependency array
   const handlePageChange = useCallback((newPage: number) => {
     if (lastQueries.length > 0) {
-      setCurrentPage(newPage);
-      executeSearch(lastQueries, lastSearchMode, newPage);
+        setCurrentPage(newPage);
+        executeSearch(lastQueries, lastSearchMode, newPage);
     }
-  }, [lastQueries, lastSearchMode, executeSearch]); // Depends on saved context and executeSearch
+}, [lastQueries, lastSearchMode, executeSearch]);
 
   // A handler for when a single query is searched from within QueryItem
   const handleSingleItemSearch = (newResults: ResultItem[]) => {
@@ -207,6 +202,23 @@ const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
   // --- Updated Keyframe Loader Hook ---
   // The hook now manages the state for the FramesPanel internally.
 // In App.tsx - CORRECTED
+// ✅ CREATE A HANDLER TO PROCESS THE DISLIKE ACTION
+const handleDislike = async (item: ResultItem) => {
+  if (!user) {
+    console.warn('Cannot dislike: User is not logged in.');
+    return;
+  }
+  console.log(`User ${user.username} disliked cluster for item:`, item.id);
+  try {
+    const response = await dislikeCluster(item, user.username);
+    console.log('Dislike successful:', response.message);
+    // Optionally, you can provide user feedback here, like a toast notification.
+    // You might also want to trigger a search refresh to hide disliked items.
+  } catch (error) {
+    console.error('Failed to dislike cluster:', error);
+    // Handle the error, e.g., show an error message to the user.
+  }
+};
 
 const {
   carouselFrames,
@@ -220,7 +232,7 @@ const {
   hasMorePrev,
   loadPreviousFrames,
 } = useKeyframeLoader();
-  
+
 
   // Enhanced WebSocket message handler
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -294,7 +306,7 @@ case 'submission_status_update':
           const sortedFrameIds = items
             .map(item => item.timestamp)
             .sort((a, b) => (a ?? '').localeCompare(b ?? ''));
-          
+
           // 4. Create the final line: videoId,frameId1,frameId2,...
           return [videoId, ...sortedFrameIds].join(',');
         })
@@ -336,7 +348,7 @@ case 'submission_status_update':
 
     try {
       const result = await fullSubmissionFlow(item);
-      
+
       const submissionPayload: SubmissionResultPayload = {
         itemId: item.thumbnail, // Use the unique thumbnail as the ID
         submission: result.submission,
@@ -518,47 +530,51 @@ case 'submission_status_update':
   // Create panel components
   // ✅ 2. PASS THE NEW STATE TO THE INPUTPANEL INSTANCE
   // ✅ Create the InputPanel instance, passing the new handler and loading state
-  const {
-    panelContent,
-    searchButton,
-    chainSearchButton
-  } = InputPanel({
-    onSearch: handleInitiateSearch, // Pass the new search initiator
-    // Note: To make `onSingleSearchResult` work, you'd also need to pass `handleSingleItemSearch`
-    // down through InputPanel -> QueryList -> QueryItem. Let's assume this prop is added.
+  // Create panel components
+      // This acts as a "type guard". After this block, TypeScript knows `user` is not null.
+
+  const {panelContent, searchButton, chainSearchButton} = InputPanel({
+    onSearch: handleInitiateSearch,
     onSingleSearchResult: handleSingleItemSearch,
     isAutoTranslateEnabled: isAutoTranslateEnabled,
-    // Pass loading state down so InputPanel can disable its buttons
     isLoading: isLoading,
+    user: user, // ✅ ADDED: Pass the user object down
   });
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
       {panelContent}
     </div>
   );
-  // Show username prompt if no user
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
-  }
+}
 
   const rightPanel = (
-    <>
-      {/* ✅ 3. PASS THE STATE AND SETTER TO THE TOPCONTROLBAR */}
-      <TopControlBar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onShowShortcuts={() => setShowShortcuts(true)}
-        isAutoTranslateEnabled={isAutoTranslateEnabled}
-        onAutoTranslateChange={setIsAutoTranslateEnabled}
+    // 1. This container establishes the positioning context and fills the available height.
+    <div className="relative h-full">
+      {/* 2. The control bar is positioned absolutely at the top of the parent. */}
+      <div className="absolute top-0 left-0 right-0 z-10">
+        <TopControlBar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onShowShortcuts={() => setShowShortcuts(true)}
+          isAutoTranslateEnabled={isAutoTranslateEnabled}
+          onAutoTranslateChange={setIsAutoTranslateEnabled}
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          hasNextPage={hasNextPage}
+          isLoading={isLoading}
+          totalResults={results.length}
+        />
+      </div>
 
-        // ✅ PASS all pagination props HERE
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-        hasNextPage={hasNextPage}
-        isLoading={isLoading}
-        totalResults={results.length}
-      />
-      <div ref={resultsRef}>
+      {/*
+        3. This is the scrollable container for the results.
+        - h-full and overflow-y-auto make it a scrollable area.
+        - pt-16 provides padding at the top so results aren't hidden under the control bar.
+          (16 is a Tailwind unit for 4rem or 64px. Adjust if your bar's height is different).
+      */}
+      <div ref={resultsRef} className="h-full overflow-y-auto pt-16">
         <ResultsPanel
           viewMode={viewMode}
           results={results}
@@ -569,14 +585,16 @@ case 'submission_status_update':
           currentUser={user.username}
           sendMessage={sendMessage}
           onItemBroadcast={handleItemBroadcast}
-           onResultDoubleClick={handleOpenDetailModal}
-          onSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
-          submissionStatuses={submissionStatuses} // Pass the statuses down
-          optimisticSubmissions={optimisticSubmissions} // Pass the new optimistic state
+          onResultDoubleClick={handleOpenDetailModal}
+          onSubmission={handleSubmission}
+          submissionStatuses={submissionStatuses}
+          optimisticSubmissions={optimisticSubmissions}
+          onResultDislike={handleDislike} // ✅ Pass the handler down
         />
       </div>
-    </>
+    </div>
   );
+
 
   // ✅ 4. Update the carousel overlay to pass the new handler
   const framesPanelInstance = carouselFrames !== null ? (
@@ -646,7 +664,7 @@ case 'submission_status_update':
         onBroadcastResultDoubleClick={handleOpenDetailModal}
         onBroadcastResultSubmission={handleSubmission}
         onVqaSubmit={handleVqaSubmit}
-        onExportBroadcastFeed={handleExportBroadcast} 
+        onExportBroadcastFeed={handleExportBroadcast}
         isTrackModeActive={isTrackModeActive}
         onToggleTrackMode={handleToggleTrackMode}
         // ✅ 4. PASS THE NEW STATE AND HANDLER TO AppShell

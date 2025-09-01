@@ -29,6 +29,7 @@ interface Props {
   showTimestamp?: boolean;
   isSelected?: boolean;
   disabled?: boolean;
+  onDislike?: () => void; // ✅ ADD THIS NEW PROP
 
 }
 
@@ -55,7 +56,7 @@ const ResultCard: React.FC<Props> = ({
   showTimestamp = false,
   isSelected = false,
   disabled = false,
-
+onDislike,
 }) => {
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -94,7 +95,13 @@ const handleSending = useCallback(()=> {
       e.preventDefault();
       return;
     }
-
+    // ✅ NEW: Ctrl + Right Click for Dislike
+    if ((e.ctrlKey || e.metaKey) && onDislike) {
+      e.preventDefault();
+      e.stopPropagation();
+      onDislike();
+      return;
+    }
     // --- Other Mouse Interactions (remain the same) ---
     // Ctrl + Middle Click for Submit
     if ((e.ctrlKey || e.metaKey) && e.button === 1) {
@@ -160,13 +167,26 @@ const handleSending = useCallback(()=> {
     }
   }, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
 
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (disabled) {
       e.preventDefault();
       return;
     }
+  
+    // --- This 'if' block is the key ---
+    // It checks for the Ctrl key press FIRST.
+    if ((e.ctrlKey || e.metaKey) && onDislike) {
+      e.preventDefault();
+      e.stopPropagation();
+      onDislike();
+      return; // <-- THIS IS THE SOLUTION
+    }
+  
+    // This line is only reached if the 'if' condition above is FALSE.
     onContextMenu?.(e);
-  }, [onContextMenu, disabled]);
+    
+  }, [onContextMenu, onDislike, disabled]);
 
   const cardClasses = `
     ${cardClass} 
@@ -178,7 +198,7 @@ const handleSending = useCallback(()=> {
     ${isSelected ? 'ring-2 ring-blue-500 ring-opacity-60' : ''} 
     ${disabled ? 'opacity-50 cursor-not-allowed' : onClick ? 'cursor-pointer' : ''}
     transition-all duration-300 ease-out
-    ${isHovered && !disabled ? 'transform scale-[1.02] shadow-2xl' : 'shadow-lg'}
+    ${isHovered && !disabled ? 'transform scale-[1.02] shadow-2xl' : 'x-lg'}
   `.trim();
 
   const imageElement = imageError ? (

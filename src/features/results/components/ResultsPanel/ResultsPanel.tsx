@@ -21,6 +21,7 @@ interface ResultsPanelProps {
   optimisticSubmissions: Set<string>; // Add new prop
 
   onResultDoubleClick: (item: ResultItem) => void; // Add prop
+  onResultDislike: (item: ResultItem) => void; // ✅ Add the new pr
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -35,6 +36,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onSubmission,
   submissionStatuses, // --- Destructure the new prop ---
   optimisticSubmissions,
+  onResultDislike
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalData, setModalData] = useState<ResultItem | null>(null);
@@ -102,10 +104,6 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
 
   };
 
-
-
-
-
   const focusPrevResult = () => {
 
 
@@ -171,6 +169,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           onSubmission={onSubmission} // ✅ Pass it to the view
           submissionStatuses={submissionStatuses} // --- Pass it down ---
           optimisticSubmissions={optimisticSubmissions}
+          onDislike={onResultDislike} // ✅ Pass it down
+
         />
       ) : (
         <GroupedByVideoView
@@ -185,6 +185,8 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           onSubmission={onSubmission} // ✅ Pass it to the view
           submissionStatuses={submissionStatuses} // --- Pass it down ---
           optimisticSubmissions={optimisticSubmissions}
+          onDislike={onResultDislike} // ✅ Pass it down
+
         />
       )}
     </div>
