@@ -83,12 +83,13 @@ const AppShell: React.FC<AppShellProps> = ({
           </div>
         </aside>
 
-        {/* Right-side Container */}
+        {/* Right-side Container - REMOVED SCROLLING */}
         <div className="relative flex-1 overflow-hidden">
-          {/* Right Panel Content */}
-          <main className="h-full overflow-hidden bg-white/30 backdrop-blur-sm">
-            <div className="h-full overflow-y-auto text-slate-900 scrollbar-thin scrollbar-thumb-slate-300/50 scrollbar-track-transparent">
-              <div className="min-h-full bg-gradient-to-br from-white/40 to-transparent">
+          {/* Right Panel Content - NO MORE SCROLLING HERE */}
+          <main className="h-full bg-white/30 backdrop-blur-sm">
+            {/* ✅ REMOVED overflow-y-auto and scrollbar classes */}
+            <div className="h-full text-slate-900">
+              <div className="h-full bg-gradient-to-br from-white/40 to-transparent">
                 {rightPanel}
               </div>
             </div>
@@ -96,7 +97,7 @@ const AppShell: React.FC<AppShellProps> = ({
           
           {/* Carousel Overlay */}
           {carouselOverlay}
-                    {/* ✅ RENDER THE VIDEO MODAL HERE */}
+          {/* ✅ RENDER THE VIDEO MODAL HERE */}
           {/* It will overlay the main content and carousel */}
           {videoModal}
         </div>

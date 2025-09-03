@@ -90,59 +90,75 @@ const handleSending = useCallback(()=> {
   }
 }, [onSending,onClick])
   // ✅ 2. This is the new, combined click handler logic
+  // ✅ SOLUTION: All mouse click logic is now centralized in this single handler.
   const handleInteraction = useCallback((e: React.MouseEvent) => {
     if (disabled) {
       e.preventDefault();
       return;
     }
-    // ✅ NEW: Ctrl + Right Click for Dislike
-    if ((e.ctrlKey || e.metaKey) && onDislike) {
-      e.preventDefault();
-      e.stopPropagation();
-      onDislike();
-      return;
-    }
-    // --- Other Mouse Interactions (remain the same) ---
-    // Ctrl + Middle Click for Submit
-    if ((e.ctrlKey || e.metaKey) && e.button === 1) {
-      e.preventDefault(); e.stopPropagation(); handleSubmit(); return;
-    }
-    // Middle Click for Sending
-    if (e.button === 1) {
-      e.preventDefault(); e.stopPropagation(); handleSending(); return;
-    }
-    // Ctrl + Left Click for Similarity Search
-    if ((e.ctrlKey || e.metaKey) && e.button === 0 && onSimilaritySearch) {
-      e.preventDefault(); e.stopPropagation(); onSimilaritySearch(thumbnail, id); return;
-    }
 
-    // --- The Core Single/Double Click Logic ---
-    if (e.button === 0) { // Only handle regular left clicks
-      // If a double-click handler exists
-      if (onDoubleClick) {
-        // If a timer is already running, it means this is the second click.
-        if (clickTimeout.current) {
-          // 1. Clear the pending single-click timer
-          clearTimeout(clickTimeout.current);
-          clickTimeout.current = null;
-          
-          // 2. Execute the double-click action immediately
-          onDoubleClick();
-        } else {
-          // This is the first click.
-          // Set a timer to execute the single-click action after a delay.
-          clickTimeout.current = window.setTimeout(() => {
-            onClick?.(); // Execute single-click if timer is not cleared
-            clickTimeout.current = null; // Reset the timer ref
-          }, 250); // A 250ms delay is standard for detecting double-clicks
-        }
-      } else {
-        // If NO double-click handler is provided, just execute the single-click immediately.
-        onClick?.();
+    // --- Modifier + Click Logic ---
+    const isCtrlPressed = e.ctrlKey || e.metaKey;
+
+    if (isCtrlPressed) {
+      e.preventDefault();
+      e.stopPropagation(); // Prevent default browser actions for Ctrl+clicks
+
+      switch (e.button) {
+        case 0: // Ctrl + Left Click for Similarity Search
+          onSimilaritySearch?.(thumbnail, id);
+          return;
+        case 1: // Ctrl + Middle Click for Submit
+          onSubmit?.();
+          return;
+        case 2: // Ctrl + Right Click for Dislike
+          onDislike?.();
+          return;
+        default:
+          return;
       }
     }
-  }, [disabled, onClick, onDoubleClick, onSimilaritySearch, handleSubmit, handleSending, thumbnail, id]);
-  // Clean up the timer if the component unmounts
+
+    // --- Standard Click Logic (No Modifiers) ---
+    switch (e.button) {
+      case 0: // Standard Left Click (handles single vs. double click)
+        if (onDoubleClick) {
+          if (clickTimeout.current) {
+            clearTimeout(clickTimeout.current);
+            clickTimeout.current = null;
+            onDoubleClick();
+          } else {
+            clickTimeout.current = window.setTimeout(() => {
+              onClick?.();
+              clickTimeout.current = null;
+            }, 250);
+          }
+        } else {
+          onClick?.(); // No double-click handler, so just single-click
+        }
+        return;
+
+      case 1: // Standard Middle Click for Sending
+        e.preventDefault(); // Prevent default middle-click behavior (e.g., auto-scroll)
+        onSending?.();
+        return;
+      
+      case 2: // Standard Right Click
+        // Let the default context menu behavior happen,
+        // which will be handled by the onContextMenu prop passed to the div.
+        return;
+    }
+  }, [
+    disabled, 
+    onClick, 
+    onDoubleClick, 
+    onSimilaritySearch, 
+    onSubmit, 
+    onSending, 
+    onDislike,
+    thumbnail, 
+    id
+  ]);
   useEffect(() => {
     return () => {
       if (clickTimeout.current) {
@@ -167,26 +183,18 @@ const handleSending = useCallback(()=> {
     }
   }, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
 
-
+  
+  // The handleContextMenu is now only for the default right-click menu, if provided.
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (disabled) {
       e.preventDefault();
       return;
     }
-  
-    // --- This 'if' block is the key ---
-    // It checks for the Ctrl key press FIRST.
-    if ((e.ctrlKey || e.metaKey) && onDislike) {
-      e.preventDefault();
-      e.stopPropagation();
-      onDislike();
-      return; // <-- THIS IS THE SOLUTION
-    }
-  
-    // This line is only reached if the 'if' condition above is FALSE.
+    // This will now only be called for a standard right-click,
+    // as the Ctrl+Right-Click is already handled in onMouseDown.
     onContextMenu?.(e);
-    
-  }, [onContextMenu, onDislike, disabled]);
+  }, [onContextMenu, disabled]);
+
 
   const cardClasses = `
     ${cardClass} 

@@ -1,10 +1,12 @@
+// src/utils/shortcuts.ts
+
 import { useEffect } from 'react';
 
 // Định nghĩa các phím tắt
 export const SHORTCUTS = {
   // Search shortcuts
-TRIGGER_SEARCH: { key: 'Enter', modifier: 'none' },
-TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
+  TRIGGER_SEARCH: { key: 'Enter', modifier: 'none' },
+  TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   NEW_QUERY: { key: 'Enter', modifier: 'Ctrl/Cmd' },
   NEXT_CELL: { key: 'Tab', modifier: 'none' },
   PREV_CELL: { key: 'Tab', modifier: 'Shift' },
@@ -13,18 +15,20 @@ TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   ADD_QUERY: { key: 'n', modifier: 'Alt' },
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
   TRANSLATE_QUERY: { key: 'q', modifier: 'Alt' },
-  TOGGLE_AUTO_TRANSLATE: { key: 'q', modifier: 'Alt+Shift' }, // ✅ ADD THIS LINE
+  TOGGLE_AUTO_TRANSLATE: { key: 'q', modifier: 'Alt+Shift' },
 
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
 
-    // ✅ ADD THESE NEW SHORTCUTS for focusing feature inputs
-    TOGGLE_OCR: { key: 'j', modifier: 'Ctrl/Cmd' },
-    TOGGLE_ASR: { key: 'k', modifier: 'Ctrl/Cmd' },
-    TOGGLE_OBJ: { key: 'l', modifier: 'Ctrl/Cmd' },
-        // ✅ ADD THESE NEW SHORTCUTS for toggling query mode
-        TOGGLE_TEXT_MODE: { key: 'u', modifier: 'Ctrl/Cmd' },
-        TOGGLE_IMAGE_MODE: { key: 'i', modifier: 'Ctrl/Cmd' },
+  // Feature input shortcuts
+  TOGGLE_OCR: { key: 'j', modifier: 'Ctrl/Cmd' },
+  TOGGLE_ASR: { key: 'k', modifier: 'Ctrl/Cmd' },
+  TOGGLE_OBJ: { key: 'l', modifier: 'Ctrl/Cmd' },
+
+  // Query mode shortcuts
+  TOGGLE_TEXT_MODE: { key: 'u', modifier: 'Ctrl/Cmd' },
+  TOGGLE_IMAGE_MODE: { key: 'i', modifier: 'Ctrl/Cmd' },
+
   // Search mode shortcuts
   SWITCH_TO_NORMAL: { key: '1', modifier: 'Alt' },
   SWITCH_TO_CHAIN: { key: '2', modifier: 'Alt' },
@@ -34,15 +38,15 @@ TRIGGER_CHAIN_SEARCH: { key: 'Enter', modifier: 'Shift' },
   NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, 
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
-  // ✅ ADD THIS NEW SHORTCUT
+
   // Modal and Panel shortcuts
   CLOSE_MODAL: { key: 'Escape', modifier: 'none' },
+  TOGGLE_DISLIKE_PANEL: { key: 'd', modifier: 'Ctrl/Cmd' }, // ✅ ADD THIS LINE
 } as const;
 
 type ShortcutKey = keyof typeof SHORTCUTS;
 
-// Helper function để kiểm tra phím tắt
-// ✅ REPLACE the existing isShortcut with this updated version
+// Helper function to check for shortcuts
 export const isShortcut = (event: KeyboardEvent | React.KeyboardEvent, shortcut: typeof SHORTCUTS[ShortcutKey]): boolean => {
   if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) {
     return false;
@@ -71,8 +75,7 @@ export const isShortcut = (event: KeyboardEvent | React.KeyboardEvent, shortcut:
   return true;
 };
 
-
-// Hook để đăng ký phím tắt (no changes needed here)
+// Hook to register shortcuts
 export const useShortcuts = (handlers: {
   [K in ShortcutKey]?: () => void;
 }): void => {

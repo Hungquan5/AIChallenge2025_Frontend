@@ -59,3 +59,48 @@ export const dislikeCluster = async (item: ResultItem, userId: string): Promise<
     throw error;
   }
 };
+
+
+export const undislikeCluster = async (item: ResultItem, userId: string): Promise<any> => {
+  const { videoId, timestamp } = item;
+  const frameIndex = parseInt(timestamp, 10);
+
+  if (!videoId || isNaN(frameIndex)) {
+    throw new Error('Invalid video_id or frame_index for un-disliking cluster.');
+  }
+
+  const queryParams = new URLSearchParams({
+    video_id: videoId,
+    frame_index: frameIndex.toString(),
+    user_id: userId,
+  });
+
+  // Note the different endpoint name
+  const url = `${API_BASE_URL}/keyframes/un_dislike_cluster?${queryParams.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      let errorData;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        errorData = await response.json();
+        throw new Error(errorData.detail || `Failed with status: ${response.status}`);
+      } else {
+        errorData = await response.text();
+        throw new Error(`Server returned a non-JSON response: ${errorData}`);
+      }
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in undislikeCluster API call:', error);
+    throw error;
+  }
+};

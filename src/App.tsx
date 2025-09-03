@@ -12,6 +12,7 @@ import FramesPanel from './features/detail_info/components/RelativeFramePanel/Fr
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 import { fullSubmissionFlow } from './features/submit/components/SubmitAPI';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
+import DislikePanel from './features/dislike/components/DislikePanel';
 // --- Types & API ---
 import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
 import { searchByText } from './features/search/components/SearchRequest/searchApi'; // The API call now lives here.
@@ -19,7 +20,7 @@ import type { ApiQuery, SearchMode } from './features/search/types';
 import type { WebSocketMessage } from './features/communicate/types';
 import type { SubmissionResultPayload } from './features/communicate/types';
 import type { SubmissionResultMessage } from './features/communicate/types';
-import { dislikeCluster } from './features/dislike/dislikeApi';
+import { dislikeCluster,undislikeCluster } from './features/dislike/dislikeApi';
 // --- Hooks & Utilities ---
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
@@ -46,6 +47,11 @@ const App: React.FC = () => {
     videoId: null,
     timestamp: null,
   });
+
+
+    // ✅ 1. ADD STATE FOR THE DISLIKE PANEL
+    const [dislikedItems, setDislikedItems] = useState<ResultItem[]>([]);
+    const [isDislikePanelOpen, setIsDislikePanelOpen] = useState(false);
   // Search Results & View State
   const [results, setResults] = useState<ResultItem[]>(mockResults);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
@@ -178,6 +184,36 @@ const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
         executeSearch(lastQueries, lastSearchMode, newPage);
     }
 }, [lastQueries, lastSearchMode, executeSearch]);
+  // ✅ 2. ADD HANDLERS FOR DISLIKE FUNCTIONALITY
+  const handleToggleDislikePanel = useCallback(() => {
+    setIsDislikePanelOpen(prev => !prev);
+  }, []);
+
+  const handleUndislike = useCallback(async (itemToRemove: ResultItem) => {
+    if (!user) return;
+    try {
+      await undislikeCluster(itemToRemove, user.username);
+      setDislikedItems(prev => prev.filter(item => item.id !== itemToRemove.id));
+    } catch (error) {
+      console.error('Failed to un-dislike item:', error);
+      alert(`Could not remove dislike: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [user]);
+
+  const handleClearDislikes = useCallback(async () => {
+    if (!user || dislikedItems.length === 0) return;
+    try {
+      // Call the API for all items in parallel
+      await Promise.all(
+        dislikedItems.map(item => undislikeCluster(item, user.username))
+      );
+      // Clear the state once all API calls succeed
+      setDislikedItems([]);
+    } catch (error) {
+      console.error('Failed to clear all dislikes:', error);
+      alert(`Could not clear dislikes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [user, dislikedItems]);
 
   // A handler for when a single query is searched from within QueryItem
   const handleSingleItemSearch = (newResults: ResultItem[]) => {
@@ -202,23 +238,37 @@ const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
   // --- Updated Keyframe Loader Hook ---
   // The hook now manages the state for the FramesPanel internally.
 // In App.tsx - CORRECTED
-// ✅ CREATE A HANDLER TO PROCESS THE DISLIKE ACTION
-const handleDislike = async (item: ResultItem) => {
-  if (!user) {
-    console.warn('Cannot dislike: User is not logged in.');
-    return;
-  }
-  console.log(`User ${user.username} disliked cluster for item:`, item.id);
-  try {
-    const response = await dislikeCluster(item, user.username);
-    console.log('Dislike successful:', response.message);
-    // Optionally, you can provide user feedback here, like a toast notification.
-    // You might also want to trigger a search refresh to hide disliked items.
-  } catch (error) {
-    console.error('Failed to dislike cluster:', error);
-    // Handle the error, e.g., show an error message to the user.
-  }
-};
+
+  // ✅ 3. MODIFY THE EXISTING `handleDislike` HANDLER
+  const handleDislike = async (item: ResultItem) => {
+    if (!user) {
+      console.warn('Cannot dislike: User is not logged in.');
+      return;
+    }
+    // Prevent adding duplicates to the panel UI
+    if (dislikedItems.some(d => d.id === item.id)) {
+      console.log('Item is already in the dislike panel.');
+      return;
+    }
+
+    try {
+      // This is the original API call logic
+      const response = await dislikeCluster(item, user.username);
+      console.log('Dislike successful:', response.message);
+      
+      // Now, also add the item to our local state for the panel
+      setDislikedItems(prev => [item, ...prev]);
+
+      // Open the panel automatically if it's closed
+      if (!isDislikePanelOpen) {
+        setIsDislikePanelOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to dislike cluster:', error);
+      alert(`Dislike failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
 
 const {
   carouselFrames,
@@ -473,8 +523,17 @@ case 'submission_status_update':
     });
   };
 
-  // ✅ NEW: Handler to be passed to ResultsPanel for right-clicks.
+
+  // ✅ FIX: The handler for standard right-clicks now ignores the event if Ctrl is pressed.
   const handleResultRightClick = (item: ResultItem, event: React.MouseEvent) => {
+    // If the Ctrl key is pressed, we know the onMouseDown handler already
+    // processed this as a 'dislike' action. So, we do nothing here.
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault(); // Still prevent the default menu
+      return; // Exit early
+    }
+
+    // --- This is the original logic, which now only runs for a standard right-click ---
     event.preventDefault(); // Prevent the default browser context menu.
     if (item.videoId && item.timestamp) {
       handleOpenVideoPanel(item.videoId, item.timestamp);
@@ -524,6 +583,8 @@ case 'submission_status_update':
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
     TOGGLE_AUTO_TRANSLATE: () => setIsAutoTranslateEnabled(prev => !prev),
     CLOSE_MODAL: handleCloseModal, // Add the new handler here
+    TOGGLE_DISLIKE_PANEL: handleToggleDislikePanel, // <-- Add this line
+
   });
 
   // Create panel components
@@ -549,32 +610,61 @@ case 'submission_status_update':
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
 }
 
-  const rightPanel = (
-    // 1. This container establishes the positioning context and fills the available height.
-    <div className="relative h-full">
-      {/* 2. The control bar is positioned absolutely at the top of the parent. */}
-      <div className="absolute top-0 left-0 right-0 z-10">
-        <TopControlBar
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onShowShortcuts={() => setShowShortcuts(true)}
-          isAutoTranslateEnabled={isAutoTranslateEnabled}
-          onAutoTranslateChange={setIsAutoTranslateEnabled}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          hasNextPage={hasNextPage}
-          isLoading={isLoading}
-          totalResults={results.length}
+ 
+ // Updated rightPanel section in App.tsx
+
+const rightPanel = (
+  // 1. Parent container becomes the positioning context for its children.
+  <div className="relative h-full flex flex-col">
+
+    {/* 2. The TopControlBar is fixed at the top - NOT scrollable */}
+    <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
+      <TopControlBar
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onShowShortcuts={() => setShowShortcuts(true)}
+        isAutoTranslateEnabled={isAutoTranslateEnabled}
+        onAutoTranslateChange={setIsAutoTranslateEnabled}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+        hasNextPage={hasNextPage}
+        isLoading={isLoading}
+        totalResults={results.length}
+      />
+    </div>
+
+    {/* 3. Content area below the control bar */}
+    <div className="relative flex-1 overflow-hidden">
+      {/* 4. The DislikePanel is positioned absolutely within the content area */}
+      <div className={`
+        absolute top-0 bottom-0 right-0 z-20
+        transition-transform duration-300 ease-in-out
+        ${isDislikePanelOpen ? 'translate-x-0' : 'translate-x-full'}
+      `}>
+        <DislikePanel
+          isOpen={isDislikePanelOpen}
+          items={dislikedItems}
+          onClose={handleToggleDislikePanel}
+          onClear={handleClearDislikes}
+          onUndislike={handleUndislike}
+          onResultClick={handleMasterResultClick}
+          onSimilaritySearch={handleSimilaritySearch}
         />
       </div>
 
-      {/*
-        3. This is the scrollable container for the results.
-        - h-full and overflow-y-auto make it a scrollable area.
-        - pt-16 provides padding at the top so results aren't hidden under the control bar.
-          (16 is a Tailwind unit for 4rem or 64px. Adjust if your bar's height is different).
-      */}
-      <div ref={resultsRef} className="h-full overflow-y-auto pt-16">
+      {/* 5. This is the scrollable container for the results */}
+      <div
+        ref={resultsRef}
+        className={`
+          h-full overflow-y-auto 
+          p-2
+          transition-all duration-300 ease-in-out
+          ${isDislikePanelOpen ? 'pr-[calc(10vw+8px)]' : 'pr-2'}
+        `}
+        style={{ 
+          scrollbarGutter: 'stable' // Prevents layout shift when scrollbar appears/disappears
+        }}
+      >
         <ResultsPanel
           viewMode={viewMode}
           results={results}
@@ -589,13 +679,12 @@ case 'submission_status_update':
           onSubmission={handleSubmission}
           submissionStatuses={submissionStatuses}
           optimisticSubmissions={optimisticSubmissions}
-          onResultDislike={handleDislike} // ✅ Pass the handler down
+          onResultDislike={handleDislike}
         />
       </div>
     </div>
-  );
-
-
+  </div>
+);
   // ✅ 4. Update the carousel overlay to pass the new handler
   const framesPanelInstance = carouselFrames !== null ? (
     <FramesPanel

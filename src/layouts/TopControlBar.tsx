@@ -5,6 +5,7 @@ import React from 'react';
 import { ListChecks, Library, Keyboard, Languages } from 'lucide-react';
 import type { ViewMode } from '../features/results/types';
 import PaginationControls from '../features/results/components/ResultsPanel/PaginationControls';
+
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
@@ -33,7 +34,8 @@ const TopControlBar: React.FC<Props> = ({
   totalResults,
 }) => {
   return (
-    <div className="flex justify-between items-center bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
+    // ✅ Remove background classes since they're now applied by the parent container
+    <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
         {/* View Mode Toggles */}
         <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-xl">
@@ -91,7 +93,7 @@ const TopControlBar: React.FC<Props> = ({
             hasNextPage={hasNextPage}
           />
         )}
-          </div>
+      </div>
 
       {/* ✅ 4. Add icon to Shortcuts Button */}
       <button
