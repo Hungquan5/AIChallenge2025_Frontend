@@ -42,6 +42,7 @@ export const SHORTCUTS = {
   // Modal and Panel shortcuts
   CLOSE_MODAL: { key: 'Escape', modifier: 'none' },
   TOGGLE_DISLIKE_PANEL: { key: 'd', modifier: 'Ctrl/Cmd' }, // ✅ ADD THIS LINE
+  SHOW_HISTORY: { key: 'a', modifier: 'Ctrl/Cmd' }, // ✅ ADD THIS LINE
 } as const;
 
 type ShortcutKey = keyof typeof SHORTCUTS;

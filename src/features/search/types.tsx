@@ -37,3 +37,10 @@ export interface ApiQuery {
   lang: 'eng' | 'ori';
   image: string; // For the base64 encoded image
 }
+
+
+// ✅ ADD THIS TYPE DEFINITION
+export interface HistoryItem {
+  queries: Query[];
+  dislike_labels: string[];
+}

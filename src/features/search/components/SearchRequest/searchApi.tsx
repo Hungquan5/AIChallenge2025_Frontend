@@ -1,6 +1,6 @@
 // src/features/search/components/SearchRequest/searchApi.ts
 
-import type { ResultItem, SearchMode, ApiQuery } from '../../types';
+import type { ResultItem, SearchMode, ApiQuery,HistoryItem } from '../../types';
 
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
@@ -103,4 +103,30 @@ export const searchBySingleQuery = async (query: ApiQuery, user_id: string): Pro
           thumbnail: adjustThumbnail(thumbnailPath),
       };
   });
+};
+
+
+export const getHistory = async (username: string): Promise<HistoryItem[]> => {
+  try {
+    const endpoint = '/embeddings/history'
+    const url = new URL(`${API_BASE_URL}${endpoint}`);
+    url.searchParams.append('user_id', username); // ✅ ADDED: Append user_id to URL
+    const response = await fetch(url.toString(), { // Assuming your API is proxied to /api
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`History fetch failed with status: ${response.status}`);
+    }
+
+    const data: HistoryItem[] = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to get query history:', error);
+    // Return an empty array or re-throw to be handled by the caller
+    return [];
+  }
 };

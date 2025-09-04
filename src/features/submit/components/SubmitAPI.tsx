@@ -1,5 +1,5 @@
-import type { ResultItem } from "../../search/types";
 import frameRates from '../../../assets/video_fps.json'; // 1. Import the JSON file
+import type { ResultItem } from "../../search/types";
 
 // Define a type for the frame rates data for better type checking
 type FrameRates = {
@@ -91,7 +91,7 @@ const submitToDres = async (
 };
 
 const fullSubmissionFlow = async (result: ResultItem) => {
-  const sessionId = "958a4639-1b2a-453c-897d-e748397cf2d5";
+  const sessionId = "pJtD_wRlmAoGvlEMVNJs0-QwIzCWTvSq";
   const evaluationId = await getEvaluationId(sessionId);
   return await submitToDres(result, sessionId, evaluationId);
 };

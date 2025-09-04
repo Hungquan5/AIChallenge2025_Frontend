@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
 import { searchButtonClass,containerClass } from './styles';
-import type { ResultItem, Query,SearchMode,ApiQuery } from '../../types';
+import type { ResultItem, Query, SearchMode, ApiQuery, HistoryItem } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
 import type { User } from '../../../communicate/types';
+import { Search, Zap, Loader2 } from 'lucide-react'; 
+import { translateText,getHistory } from '../SearchRequest/searchApi';
+import HistoryPanel from '../../../history/components/HistoryPanel';
 // ✅ This is where the fix is.
 interface InputPanelProps {
   onSearch: (queries: ApiQuery[], mode: SearchMode) => void;
@@ -15,8 +18,7 @@ interface InputPanelProps {
   onSingleSearchResult: (results: ResultItem[]) => void;
   user: User | null; // ✅ FIX: Allow user to be null
 }
-import { Search, Zap, Loader2 } from 'lucide-react'; 
-import { translateText } from '../SearchRequest/searchApi';
+
 const InputPanel = ({ 
   onSearch, 
   isAutoTranslateEnabled, 
@@ -35,7 +37,10 @@ const InputPanel = ({
   const chainSearchButtonRef = useRef<HTMLButtonElement>(null);
   const queriesRef = useRef<Query[]>(queries);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+    // ✅ 3. ADD STATE FOR HISTORY PANEL
+    const [historyItems, setHistoryItems] = useState<HistoryItem[] | null>(null);
+    const [isHistoryPanelVisible, setIsHistoryPanelVisible] = useState(false);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   useEffect(() => {
     queriesRef.current = queries;
   }, [queries]);
@@ -43,6 +48,41 @@ const InputPanel = ({
   useEffect(() => {
     setTimeout(focusFirstTextarea, 0);
   }, []);
+// ✅ 4. ADD HANDLERS FOR THE HISTORY FEATURE
+const fetchAndShowHistory = async () => {
+  if (!user || isHistoryLoading) return;
+
+  setIsHistoryLoading(true);
+  try {
+    const histories = await getHistory(user.username);
+    if (histories.length > 0) {
+      setHistoryItems(histories);
+      setIsHistoryPanelVisible(true);
+    } else {
+      alert("No history found.");
+    }
+  } catch (error) {
+    console.error("Failed to show history:", error);
+    alert("Could not load history.");
+  } finally {
+    setIsHistoryLoading(false);
+  }
+};
+const handleHistorySelection = (item: HistoryItem) => {
+  // We need to transform the queries from history slightly, as they won't have a `imageFile` object
+  const queriesFromHistory = item.queries.map(q => ({
+      ...q,
+      imageFile: null, // Ensure imageFile is reset
+  }));
+  setQueries(queriesFromHistory);
+  setIsHistoryPanelVisible(false);
+  setHistoryItems(null);
+};
+
+const handleCloseHistoryPanel = () => {
+  setIsHistoryPanelVisible(false);
+  setHistoryItems(null);
+};
 
   const handleSearch = async (searchMode: SearchMode = 'normal') => {
     setLoading(true);
@@ -163,23 +203,17 @@ const handleTranslateAll = async () => {
     setLoading(false);
   }
 };
+  // ✅ 5. REGISTER THE NEW SHORTCUT
+  useShortcuts({
+    TRIGGER_CHAIN_SEARCH: async () => { await handleSearch('chain'); },
+    TRIGGER_SEARCH: async () => { await handleSearch('normal'); },
+    ADD_QUERY: addNewQuery,
+    REMOVE_QUERY: removeLastQuery,
+    CLEAR_SEARCH: clearAllQueries,
+    FOCUS_SEARCH: focusFirstTextarea,
+    SHOW_HISTORY: fetchAndShowHistory, // <-- ADDED
+  });
 
-  // Register shortcuts
- // Register shortcuts
-useShortcuts({
-  TRIGGER_CHAIN_SEARCH: async () => {
-
-    await handleSearch('chain');
-  },
-  TRIGGER_SEARCH: async () => {
-
-    await handleSearch('normal');
-  },
-  ADD_QUERY: addNewQuery,
-  REMOVE_QUERY: removeLastQuery,
-  CLEAR_SEARCH: clearAllQueries,
-  FOCUS_SEARCH: focusFirstTextarea,
-});
 // ...
   // useEffect(() => {
   //   const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,23 +279,32 @@ useShortcuts({
   );
 
 
-
-  return {
-    panelContent: (
-      <div className={containerClass} ref={containerRef}>
-        <QueryList 
-          queries={queries} 
-          onQueriesChange={setQueries}
-          // Now that InputPanel accepts this prop, it can correctly pass it down to QueryList.
-          onSingleSearchResult={onSingleSearchResult} 
-          isAutoTranslateEnabled={isAutoTranslateEnabled}
-          user={user} // ✅ ADDED: Pass user to QueryList
+ // ✅ 6. UPDATE THE RENDERED OUTPUT
+ return {
+  panelContent: (
+    // Add a relative positioning context for the history panel
+    <div className={`${containerClass} relative`} ref={containerRef}>
+      <QueryList 
+        queries={queries} 
+        onQueriesChange={setQueries}
+        onSingleSearchResult={onSingleSearchResult} 
+        isAutoTranslateEnabled={isAutoTranslateEnabled}
+        user={user}
+      />
+      
+        
+        {/* The History Panel is now controlled by its `isVisible` prop */}
+        <HistoryPanel 
+          isVisible={isHistoryPanelVisible}
+          items={historyItems}
+          onSelect={handleHistorySelection}
+          onClose={handleCloseHistoryPanel}
         />
       </div>
-    ),
-    searchButton: <SearchButton />,
-    chainSearchButton: <ChainSearchButton />
-  };
+  ),
+  searchButton: <SearchButton />,
+  chainSearchButton: <ChainSearchButton />
+};
 };
 
 export default InputPanel;
