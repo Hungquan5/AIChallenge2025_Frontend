@@ -91,7 +91,7 @@ const submitToDres = async (
 };
 
 const fullSubmissionFlow = async (result: ResultItem) => {
-  const sessionId = "pJtD_wRlmAoGvlEMVNJs0-QwIzCWTvSq";
+  const sessionId = "gKUoLj-0Sms2QsGts1g-7LO6NVST6ha8";
   const evaluationId = await getEvaluationId(sessionId);
   return await submitToDres(result, sessionId, evaluationId);
 };

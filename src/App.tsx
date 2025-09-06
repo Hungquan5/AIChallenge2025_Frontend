@@ -1,7 +1,7 @@
-// src/App.tsx
-
-import React, { useCallback, useRef, useState } from 'react';
+// src/App.tsx (Refactored)
+import React, { useRef } from 'react';
 import './App.css';
+
 // --- Core Components & Layouts ---
 import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
@@ -10,773 +10,273 @@ import ResultsPanel from './features/results/components/ResultsPanel/ResultsPane
 import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
 import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
-import { fullSubmissionFlow } from './features/submit/components/SubmitAPI';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
 import DislikePanel from './features/dislike/components/DislikePanel';
-// --- Types & API ---
-import type { ResultItem, GroupedResult, ViewMode } from './features/results/types';
-import { searchByText } from './features/search/components/SearchRequest/searchApi'; // The API call now lives here.
-import type { ApiQuery, SearchMode } from './features/search/types';
-import type { WebSocketMessage } from './features/communicate/types';
-import type { SubmissionResultPayload } from './features/communicate/types';
-import type { SubmissionResultMessage } from './features/communicate/types';
-import { dislikeCluster,undislikeCluster } from './features/dislike/dislikeApi';
-// --- Hooks & Utilities ---
+
+// --- Custom Hooks ---
+import { useAppState } from './hooks/useAppState';
+import { useModalState } from './hooks/useModalState';
+import { useBroadcastState } from './features/communicate/hooks/useBroadcastState';
+import { useSubmissionState } from './features/submit/hooks/useSubmissionState';
+import { useDislikeState } from './features/dislike/hooks/useDislikeState';
+
+// --- Feature Hooks ---
 import { useSession } from './features/communicate/hooks/useSession';
 import { useWebSocket } from './features/communicate/hooks/useWebsocket';
 import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
-import { useShortcuts } from './utils/shortcuts';
-import { performSimilaritySearch } from './features/search/components/SimilaritySearch/SimilaritySearch';
+import { useSearch } from './features/search/hooks/useSearch';
+import { useEventHandlers } from './hooks/useEventHandlers';
+import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketHandlers';
 
 // --- Other Components ---
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
 import ShortcutsHelp from './components/ShortcutsHelp';
+import { useShortcuts } from './utils/shortcuts';
 import { X } from 'lucide-react';
-import { mockResults,mockGroupedResults } from './utils/mockData';
 
-
-const PAGE_SIZE = 100; // Define your page size, matching the backend default
 const App: React.FC = () => {
-  // ✅ 1. Add state to manage the video modal
-  const [videoPanelState, setVideoPanelState] = useState<{
-    isOpen: boolean;
-    videoId: string | null;
-    timestamp: string | null; // The panel needs the frame ID as a timestamp
-  }>({
-    isOpen: false,
-    videoId: null,
-    timestamp: null,
-  });
-
-
-    // ✅ 1. ADD STATE FOR THE DISLIKE PANEL
-    const [dislikedItems, setDislikedItems] = useState<ResultItem[]>([]);
-    const [isDislikePanelOpen, setIsDislikePanelOpen] = useState(false);
-  // Search Results & View State
-  const [results, setResults] = useState<ResultItem[]>(mockResults);
-  const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
-  const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
-  // --- NEW: State to hold the submission statuses from the backend ---
-
-  // ✅ --- NEW STATE for Optimistic UI ---
-  // We use a Set for efficient add/delete/has checks of unique thumbnail URLs.
-  const [optimisticSubmissions, setOptimisticSubmissions] = useState<Set<string>>(new Set());
-  const [submissionStatuses, setSubmissionStatuses] = useState<{ [key: string]: string }>({});
-
-  // ✅ 1. ADD NEW STATE TO HOLD VQA QUESTIONS AT THE TOP LEVEL
-  const [vqaQuestions, setVqaQuestions] = useState<{ [key: string]: string }>({});
-    // ✅ 1. ADD NEW STATE FOR TRACK MODE
-    const [isTrackModeActive, setIsTrackModeActive] = useState(false);
-  // ✅ Pagination & Search Context State
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [lastQueries, setLastQueries] = useState<ApiQuery[]>([]);
-  const [lastSearchMode, setLastSearchMode] = useState<SearchMode>('normal');
-
-  // UI & App-level State
-  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-
-  // Refs for focusing and scrolling
+  // Refs
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [broadcastMessages, setBroadcastMessages] = useState<ResultItem[]>([]);
-  const [activeUsers, setActiveUsers] = useState(0);
-  // State to hold the title for the FramesPanel, captured on click
-  const [currentVideoTitle, setCurrentVideoTitle] = useState('');
-  // Session and WebSocket hooks
+
+  // Core State Hooks
+  const appState = useAppState();
+  const modalState = useModalState();
+  const broadcastState = useBroadcastState();
+  const submissionState = useSubmissionState();
+  const dislikeState = useDislikeState();
+
+  // Session and User
   const { user, createSession, isLoading: isSessionLoading } = useSession();
-  // State for the new FramesPanel
-  const [framesPanelState, setFramesPanelState] = useState<{
-    isOpen: boolean;
-    frames: ResultItem[];
-    videoTitle: string;
-    isLoading: boolean;
-  }>({
-    isOpen: false,
-    frames: [],
-    videoTitle: '',
-    isLoading: false,
+
+  // Keyframe Loader
+  const keyframeLoader = useKeyframeLoader();
+
+  // Search Handlers
+  const searchHandlers = useSearch({
+    appState,
+    user,
+    resultsRef
   });
-  const [detailModalItem, setDetailModalItem] = useState<ResultItem | null>(null);
 
-  // ✅ 2. Create handlers to open and close the new modal
-  const handleOpenDetailModal = useCallback((item: ResultItem) => {
-    setDetailModalItem(item);
-  }, []);
-
-  const handleCloseDetailModal = useCallback(() => {
-    setDetailModalItem(null);
-  }, []);
-    // ✅ 2. CREATE A HANDLER TO TOGGLE TRACK MODE
-    const handleToggleTrackMode = useCallback(() => {
-      setIsTrackModeActive(prev => !prev);
-    }, []);
-// ✅ 2. CREATE A HANDLER TO UPDATE THE VQA STATE
-const handleVqaQuestionChange = useCallback((itemId: string, question: string) => {
-  setVqaQuestions(prev => ({
-    ...prev,
-    [itemId]: question,
-  }));
-}, []);
-
-const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
-  if (!question.trim()) {
-    console.warn('VQA question is empty.');
-    return;
-  }
-  console.log('Submitting VQA:', {
-    videoId: item.videoId,
-    frameId: item.timestamp,
-    question: question.trim(),
+  // WebSocket Handlers
+  const webSocketHandlers = useWebSocketHandlers({
+    broadcastState,
+    submissionState
   });
-  // After submission, we can clear the input field from the central state
-  handleVqaQuestionChange(item.id, '');
-}, [handleVqaQuestionChange]); // Add dependency
-  // ✅ 1. ADD NEW STATE FOR THE SUBMISSION RESULT NOTIFICATION
-  const [submissionResult, setSubmissionResult] = useState<{
-    itemId: string;
-    submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
-    description: string;
-    username?: string;
-  } | null>(null);
 
-  const executeSearch = useCallback(async (queries: ApiQuery[],mode: SearchMode, page: number) => {
-    if (!user) return; // Early exit if user is somehow null
-    setIsLoading(true);
-    try {
-      const newResults = await searchByText(queries, user?.username, mode, page, PAGE_SIZE);
-      setResults(newResults);
-      setHasNextPage(newResults.length === PAGE_SIZE); // If we got a full page, there might be more.
-
-      // Group results (logic is unchanged)
-      const grouped = newResults.reduce((acc, item) => {
-        const group = acc.find(g => g.videoId === item.videoId);
-        if (group) group.items.push(item);
-        else acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
-        return acc;
-      }, [] as GroupedResult[]);
-      setGroupedResults(grouped);
-
-      // Scroll to top of results view
-      resultsRef.current?.scrollTo(0, 0);
-
-    } catch (error) {
-      console.error("Search failed:", error);
-      alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setHasNextPage(false); // Reset on error
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]); // ✅ Add user to the dependency array
-  const handleInitiateSearch = useCallback((queries: ApiQuery[], mode: SearchMode) => {
-    if (!user?.username) return; // ✅ ADDED: Guard against missing user
-    setCurrentPage(1);
-    setLastQueries(queries);
-    setLastSearchMode(mode);
-    // ✅ MODIFIED: Pass the username to executeSearch
-    executeSearch(queries, mode, 1);
-  }, [executeSearch, user]); // ✅ ADDED: user to dependency array
-  const handlePageChange = useCallback((newPage: number) => {
-    if (lastQueries.length > 0) {
-        setCurrentPage(newPage);
-        executeSearch(lastQueries, lastSearchMode, newPage);
-    }
-}, [lastQueries, lastSearchMode, executeSearch]);
-  // ✅ 2. ADD HANDLERS FOR DISLIKE FUNCTIONALITY
-  const handleToggleDislikePanel = useCallback(() => {
-    setIsDislikePanelOpen(prev => !prev);
-  }, []);
-
-  const handleUndislike = useCallback(async (itemToRemove: ResultItem) => {
-    if (!user) return;
-    try {
-      await undislikeCluster(itemToRemove, user.username);
-      setDislikedItems(prev => prev.filter(item => item.id !== itemToRemove.id));
-    } catch (error) {
-      console.error('Failed to un-dislike item:', error);
-      alert(`Could not remove dislike: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, [user]);
-
-  const handleClearDislikes = useCallback(async () => {
-    if (!user || dislikedItems.length === 0) return;
-    try {
-      // Call the API for all items in parallel
-      await Promise.all(
-        dislikedItems.map(item => undislikeCluster(item, user.username))
-      );
-      // Clear the state once all API calls succeed
-      setDislikedItems([]);
-    } catch (error) {
-      console.error('Failed to clear all dislikes:', error);
-      alert(`Could not clear dislikes: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, [user, dislikedItems]);
-
-  // A handler for when a single query is searched from within QueryItem
-  const handleSingleItemSearch = (newResults: ResultItem[]) => {
-    setResults(newResults);
-    // A single item search should not affect the main pagination context
-    setHasNextPage(false);
-    setCurrentPage(1);
-
-    const grouped = newResults.reduce((acc, item) => {
-      const group = acc.find(g => g.videoId === item.videoId);
-      if (group) {
-        group.items.push(item);
-      } else {
-        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
-      }
-      return acc;
-    }, [] as GroupedResult[]);
-    setGroupedResults(grouped);
-    resultsRef.current?.scrollTo(0, 0);
-  }
-  // Keyframe loader hooks
-  // --- Updated Keyframe Loader Hook ---
-  // The hook now manages the state for the FramesPanel internally.
-// In App.tsx - CORRECTED
-
-  // ✅ 3. MODIFY THE EXISTING `handleDislike` HANDLER
-  const handleDislike = async (item: ResultItem) => {
-    if (!user) {
-      console.warn('Cannot dislike: User is not logged in.');
-      return;
-    }
-    // Prevent adding duplicates to the panel UI
-    if (dislikedItems.some(d => d.id === item.id)) {
-      console.log('Item is already in the dislike panel.');
-      return;
-    }
-
-    try {
-      // This is the original API call logic
-      const response = await dislikeCluster(item, user.username);
-      console.log('Dislike successful:', response.message);
-      
-      // Now, also add the item to our local state for the panel
-      setDislikedItems(prev => [item, ...prev]);
-
-      // Open the panel automatically if it's closed
-      if (!isDislikePanelOpen) {
-        setIsDislikePanelOpen(true);
-      }
-    } catch (error) {
-      console.error('Failed to dislike cluster:', error);
-      alert(`Dislike failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
-
-const {
-  carouselFrames,
-  isLoading: isLoadingFrames,
-  activeFrameId,
-  handleResultClick: loadFramesForPanel,
-  handleCarouselClose: closeFramesPanel,
-  // ✅ ADD THESE TWO FUNCTIONS
-  loadNextFrames,
-  hasMoreNext,
-  hasMorePrev,
-  loadPreviousFrames,
-} = useKeyframeLoader();
-
-
-  // Enhanced WebSocket message handler
-  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
-    if (!message) return;
-
-    switch (message.type) {
-      case 'broadcast_image':
-        if (message.payload) {
-          const newMessage: ResultItem = {
-            ...(message.payload as ResultItem),
-          };
-          // ✅ FIX: Prevent adding duplicate messages
-          setBroadcastMessages(prevMessages => {
-            if (prevMessages.some(msg => msg.id === newMessage.id)) {
-              return prevMessages; // Item already exists, do not update state
-            }
-            return [newMessage, ...prevMessages.slice(0, 19)];
-          });
-        }
-        break;
-
-
-      // ✅ 2. HANDLE THE NEW BROADCAST MESSAGE FOR SUBMISSIONS
-      case 'submission_result':
-        if (message.payload) {
-          // Show the pop-up notification for everyone
-          setSubmissionResult({ ...message.payload, });
-
-          // UPDATE THE GLOBAL STATUS MAP FOR EVERYONE
-
-        }
-        break;
-// --- NEW: Handle the submission status update ---
-case 'submission_status_update':
-  if (message.payload) {
-    setSubmissionStatuses(message.payload);
-  }
-  break;
-
-      default:
-        console.log('Unknown message type:', message.type);
-    }
-  }, []); // Add dependencies if needed, but it seems ok here.
-
-
-  // ✅ 3. UPDATE THE EXPORT HANDLER WITH CONDITIONAL LOGIC
-  const handleExportBroadcast = useCallback(() => {
-    if (broadcastMessages.length === 0) {
-      alert("There's nothing in the live feed to export.");
-      return;
-    }
-
-    let fileContent = '';
-
-    if (isTrackModeActive) {
-      // --- TRACK MODE EXPORT LOGIC ---
-      // 1. Group all messages by their videoId
-      const groupedByVideo = broadcastMessages.reduce((acc, msg) => {
-        const key = msg.videoId || 'unknown';
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-        acc[key].push(msg);
-        return acc;
-      }, {} as Record<string, ResultItem[]>);
-
-      // 2. Process each group into a single CSV line
-      fileContent = Object.entries(groupedByVideo)
-        .map(([videoId, items]) => {
-          // 3. Sort the frames by timestamp (e.g., "00:01:23.456")
-          const sortedFrameIds = items
-            .map(item => item.timestamp)
-            .sort((a, b) => (a ?? '').localeCompare(b ?? ''));
-
-          // 4. Create the final line: videoId,frameId1,frameId2,...
-          return [videoId, ...sortedFrameIds].join(',');
-        })
-        .join('\n');
-    } else {
-      // --- ORIGINAL EXPORT LOGIC ---
-      fileContent = broadcastMessages
-        .map(msg => {
-          const videoId = msg.videoId || '';
-          const frameId = msg.timestamp || '';
-          const question = vqaQuestions[msg.id];
-
-          if (question && question.trim()) {
-            const escapedQuestion = question.replace(/"/g, '""');
-            return `${videoId},${frameId},"${escapedQuestion}"`;
-          } else {
-            return `${videoId},${frameId}`;
-          }
-        })
-        .join('\n');
-    }
-
-    // --- COMMON DOWNLOAD LOGIC ---
-    const blob = new Blob([fileContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    link.download = `live_feed_export_${timestamp}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-  }, [broadcastMessages, vqaQuestions, isTrackModeActive]); // Add new state to dependency array
-
-  // ✅ 3. CREATE A HANDLER TO PROCESS THE SUBMISSION
-  const handleSubmission = async (item: ResultItem) => {
-    // 1. Optimistic Update: Immediately disable the card on the current user's screen.
-    setOptimisticSubmissions(prev => new Set(prev).add(item.thumbnail));
-
-    try {
-      const result = await fullSubmissionFlow(item);
-
-      const submissionPayload: SubmissionResultPayload = {
-        itemId: item.thumbnail, // Use the unique thumbnail as the ID
-        submission: result.submission,
-        description: result.description,
-        username: user?.username,
-      };
-
-      // 2. Broadcast the result to the backend for all users.
-      const message: SubmissionResultMessage = {
-        type: 'submission_result',
-        payload: submissionPayload,
-      };
-      sendMessage(JSON.stringify(message));
-
-    } catch (error) {
-      // Handle API errors if necessary (e.g., show a toast notification)
-      const description = error instanceof Error ? error.message : 'An unknown error occurred.';
-      setSubmissionResult({
-        itemId: item.id,
-        submission: 'ERROR',
-        description: description,
-        username: user?.username,
-      });
-    } finally {
-      // 3. Cleanup: Remove the item from our optimistic set.
-      // Why? The backend will soon send a `submission_status_update` which becomes
-      // the single source of truth. Our optimistic state was temporary.
-      setOptimisticSubmissions(prev => {
-        const next = new Set(prev);
-        next.delete(item.thumbnail);
-        return next;
-      });
-    }
-  };
+  // WebSocket Connection
   const { isConnected, sendMessage, reconnect } = useWebSocket({
     username: user?.username || '',
-    onMessage: handleWebSocketMessage,
+    onMessage: webSocketHandlers.handleWebSocketMessage,
   });
 
- //  CORRECTED BROADCAST HANDLER
- const handleItemBroadcast = useCallback((itemToBroadcast: ResultItem) => {
-  if (!user?.username) {
-    console.warn('Cannot broadcast: No username is set.');
-    return;
-  }
-
-  // 1. Prepare the payload according to your example format.
-  // The payload should be the item itself, with the 'submittedBy' field added.
-  const payloadWithSenderInfo = {
-    ...itemToBroadcast,
-    submittedBy: user.username, // Add the current user's name
-  };
-
-  // 2. Construct the final message object with 'type' and 'payload'.
-  const message = {
-    type: 'broadcast_image',
-    payload: payloadWithSenderInfo,
-  };
-
-  // 3. Send the correctly formatted message over the WebSocket.
-  sendMessage(JSON.stringify(message));
-
-  // 4. (Optional but recommended) Also update the local state optimistically
-  //    with the same data structure so the UI reflects what was sent.
-  setBroadcastMessages(prevMessages => {
-    if (prevMessages.some(msg => msg.id === message.payload.id)) {
-      return prevMessages; // Avoid adding duplicates
-    }
-    return [message.payload, ...prevMessages.slice(0, 19)];
+  // Event Handlers
+  const eventHandlers = useEventHandlers({
+    appState,
+    modalState,
+    broadcastState,
+    submissionState,
+    dislikeState,
+    keyframeLoader,
+    searchHandlers,
+    user,
+    sendMessage
   });
 
-}, [user?.username, sendMessage]);
-
-  // Enhanced broadcast message removal handler
-  const handleRemoveBroadcastMessage = useCallback((messageId: string, index: number) => {
-    setBroadcastMessages(prevMessages =>
-      prevMessages.filter((_, i) => i !== index)
-    );
-
-    // Optionally, send removal notification to other users
-    const message = {
-      type: 'remove_broadcast',
-      messageId,
-      username: user?.username,
-      timestamp: Date.now()
-    };
-
-    sendMessage(JSON.stringify(message));
-  }, [user?.username, sendMessage]);
-  const handleBroadcastFeedRightClick = useCallback((item: ResultItem, event: React.MouseEvent) => {
-    // We already have a function to open the video panel from the carousel.
-    // It just needs a videoId and a timestamp.
-    if (item.videoId && item.timestamp) {
-      handleOpenVideoPanel(item.videoId, item.timestamp);
-    }
-  }, []);
-  const handleClearBroadcastFeed = useCallback(() => {
-    setBroadcastMessages([]);
-  }, []);
-
-  const handleSimilarityResults = (newResults: ResultItem[]) => {
-    setResults(newResults);
-    const grouped = newResults.reduce((acc, item) => {
-      const group = acc.find(g => g.videoId === item.videoId);
-      if (group) {
-        group.items.push(item);
-      } else {
-        acc.push({ videoId: item.videoId, videoTitle: item.title, items: [item] });
-      }
-      return acc;
-    }, [] as GroupedResult[]);
-    setGroupedResults(grouped);
-    resultsRef.current?.scrollTo(0, 0);
-  };
-
-  const handleSimilaritySearch = async (imageSrc: string, cardId: string) => {
-    console.log(`Starting similarity search for card: ${cardId} with image: ${imageSrc}`);
-    closeFramesPanel();
-
-    await performSimilaritySearch(imageSrc, cardId, (newResults: ResultItem[]) => {
-      handleSimilarityResults(newResults);
-    });
-  };
-
-
-  // ✅ FIX: The handler for standard right-clicks now ignores the event if Ctrl is pressed.
-  const handleResultRightClick = (item: ResultItem, event: React.MouseEvent) => {
-    // If the Ctrl key is pressed, we know the onMouseDown handler already
-    // processed this as a 'dislike' action. So, we do nothing here.
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault(); // Still prevent the default menu
-      return; // Exit early
-    }
-
-    // --- This is the original logic, which now only runs for a standard right-click ---
-    event.preventDefault(); // Prevent the default browser context menu.
-    if (item.videoId && item.timestamp) {
-      handleOpenVideoPanel(item.videoId, item.timestamp);
-    }
-  };
-  // --- All your existing hooks (useSession, useKeyframeLoader, etc.) ---
-  const handleMasterResultClick = (item: ResultItem) => {
-    // 1. Capture the title of the video that was clicked.
-    setCurrentVideoTitle(item.title);
-    // 2. Trigger the keyframe loader to fetch all frames for that video.
-    loadFramesForPanel(item);
-  };
-  const handleFrameRightClickInPanel = (frame: ResultItem, event: React.MouseEvent) => {
-    event.preventDefault();
-    handleOpenVideoPanel(frame.videoId, frame.timestamp);
-  };
-  // --- NEW: Handlers for interactions inside the FramesPanel ---
-  const handleFrameClickInPanel = (frame: ResultItem) => {
-    handleOpenVideoPanel(frame.videoId, frame.timestamp);
-  };
-  // ✅ 3. Create handlers to open and close the VideoPanel
-  const handleOpenVideoPanel = useCallback((videoId: string, timestamp: string) => {
-    console.log(`Opening VideoPanel for videoId: ${videoId} at timestamp: ${timestamp}`);
-    setVideoPanelState({ isOpen: true, videoId, timestamp });
-  }, []);
-
-  const handleCloseVideoPanel = useCallback(() => {
-    setVideoPanelState({ isOpen: false, videoId: null, timestamp: null });
-  }, []);
-
-
-  // ✅ --- NEW: Handler for the 'Escape' key shortcut ---
-  const handleCloseModal = useCallback(() => {
-    // The VideoPanel is the top-most modal, so check for it first.
-    if (videoPanelState.isOpen) {
-      handleCloseVideoPanel();
-      return; // Exit after closing one layer
-    }
-    // If the video panel isn't open, check if the frames panel is.
-    if (carouselFrames !== null) {
-      closeFramesPanel();
-    }
-  }, [videoPanelState.isOpen, handleCloseVideoPanel, carouselFrames, closeFramesPanel]);
-  // Keyboard shortcuts
+  // Keyboard Shortcuts
   useShortcuts({
-    TOGGLE_VIEW_MODE: () => setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence'),
+    TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
-    TOGGLE_AUTO_TRANSLATE: () => setIsAutoTranslateEnabled(prev => !prev),
-    CLOSE_MODAL: handleCloseModal, // Add the new handler here
-    TOGGLE_DISLIKE_PANEL: handleToggleDislikePanel, // <-- Add this line
-
+    TOGGLE_AUTO_TRANSLATE: appState.toggleAutoTranslate,
+    CLOSE_MODAL: modalState.handleCloseModal,
+    TOGGLE_DISLIKE_PANEL: modalState.handleToggleDislikePanel,
   });
 
-  // Create panel components
-  // Create panel components
-  // ✅ 2. PASS THE NEW STATE TO THE INPUTPANEL INSTANCE
-  // ✅ Create the InputPanel instance, passing the new handler and loading state
-  // Create panel components
-      // This acts as a "type guard". After this block, TypeScript knows `user` is not null.
 
-  const {panelContent, searchButton, chainSearchButton} = InputPanel({
-    onSearch: handleInitiateSearch,
-    onSingleSearchResult: handleSingleItemSearch,
-    isAutoTranslateEnabled: isAutoTranslateEnabled,
-    isLoading: isLoading,
-    user: user, // ✅ ADDED: Pass the user object down
+
+  // Create panel instances
+  const { panelContent, searchButton, chainSearchButton } = InputPanel({
+    onSearch: searchHandlers.handleInitiateSearch,
+    onSingleSearchResult: searchHandlers.handleSingleItemSearch,
+    isAutoTranslateEnabled: appState.isAutoTranslateEnabled,
+    isLoading: appState.isLoading,
+    user: user,
   });
+
   const leftPanel = (
     <div ref={inputPanelRef} tabIndex={-1}>
       {panelContent}
     </div>
   );
-  if (!user) {
-    return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
-}
-
- 
- // Updated rightPanel section in App.tsx
-
-const rightPanel = (
-  // 1. Parent container becomes the positioning context for its children.
-  <div className="relative h-full flex flex-col">
-
-    {/* 2. The TopControlBar is fixed at the top - NOT scrollable */}
-    <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
-      <TopControlBar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onShowShortcuts={() => setShowShortcuts(true)}
-        isAutoTranslateEnabled={isAutoTranslateEnabled}
-        onAutoTranslateChange={setIsAutoTranslateEnabled}
-        currentPage={currentPage}
-        onPageChange={handlePageChange}
-        hasNextPage={hasNextPage}
-        isLoading={isLoading}
-        totalResults={results.length}
-      />
-    </div>
-
-    {/* 3. Content area below the control bar */}
-    <div className="relative flex-1 overflow-hidden">
-      {/* 4. The DislikePanel is positioned absolutely within the content area */}
-      <div className={`
-        absolute top-0 bottom-0 right-0 z-20
-        transition-transform duration-300 ease-in-out
-        ${isDislikePanelOpen ? 'translate-x-0' : 'translate-x-full'}
-      `}>
-        <DislikePanel
-          isOpen={isDislikePanelOpen}
-          items={dislikedItems}
-          onClose={handleToggleDislikePanel}
-          onClear={handleClearDislikes}
-          onUndislike={handleUndislike}
-          onResultClick={handleMasterResultClick}
-          onSimilaritySearch={handleSimilaritySearch}
-        />
-      </div>
-
-      {/* 5. This is the scrollable container for the results */}
-      <div
-        ref={resultsRef}
-        className={`
-          h-full overflow-y-auto 
-          p-2
-          transition-all duration-300 ease-in-out
-          ${isDislikePanelOpen ? 'pr-[calc(10vw+8px)]' : 'pr-2'}
-        `}
-        style={{ 
-          scrollbarGutter: 'stable' // Prevents layout shift when scrollbar appears/disappears
-        }}
-      >
-        <ResultsPanel
-          viewMode={viewMode}
-          results={results}
-          groupedResults={groupedResults}
-          onResultClick={handleMasterResultClick}
-          onSimilaritySearch={handleSimilaritySearch}
-          onResultRightClick={handleResultRightClick}
-          currentUser={user.username}
-          sendMessage={sendMessage}
-          onItemBroadcast={handleItemBroadcast}
-          onResultDoubleClick={handleOpenDetailModal}
-          onSubmission={handleSubmission}
-          submissionStatuses={submissionStatuses}
-          optimisticSubmissions={optimisticSubmissions}
-          onResultDislike={handleDislike}
-        />
-      </div>
-    </div>
-  </div>
-);
-  // ✅ 4. Update the carousel overlay to pass the new handler
-  const framesPanelInstance = carouselFrames !== null ? (
-    <FramesPanel
-      frames={carouselFrames}
-      videoTitle={currentVideoTitle}
-      isLoading={isLoadingFrames}
-      activeFrameId={activeFrameId} // Pass the active ID for highlighting
-
-      // ✅ PASS THE FUNCTIONS AS PROPS
-      loadNextFrames={loadNextFrames}
-      // ✅ 2. PASS THE NEW PROPS DOWN
-      hasMoreNext={hasMoreNext}
-      hasMorePrev={hasMorePrev}
-      loadPreviousFrames={loadPreviousFrames}
-      onClose={closeFramesPanel}
-      onFrameClick={handleFrameClickInPanel}
-      onRightClick={handleFrameRightClickInPanel}
-      onSimilaritySearch={handleSimilaritySearch}
-      currentUser={user.username}
-      sendMessage={sendMessage}
-      onResultDoubleClick={handleOpenDetailModal}
-      onSubmission={handleSubmission} // ✅ 4. PASS THE HANDLER DOWN
-      isFetchingNext={false} isFetchingPrev={false}    />
-  ) : null;
-
-  // ✅ 5. Create the modal instance to pass to the AppShell
-  // ✅ 6. Create the VideoPanel instance to pass to the AppShell
-  const videoPanelInstance = videoPanelState.isOpen && videoPanelState.videoId && videoPanelState.timestamp ? (
-    <VideoPanel
-      videoId={videoPanelState.videoId}
-      timestamp={videoPanelState.timestamp}
-      onClose={handleCloseVideoPanel}
-      onBroadcast={handleItemBroadcast} // Pass the broadcast handler
-      currentUser={user.username} // <-- PASS THE USERNAME AS A PROP HERE
-    />
-  ) : null;
-  // Show username prompt if no user
-  // ✅ 4. Conditionally render the new modal
-  const detailModalInstance = detailModalItem ? (
-    <FrameDetailModal
-      item={detailModalItem}
-      onClose={handleCloseDetailModal}
-    />
-  ) : null;
+  // Early return for authentication
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
   }
+  const rightPanel = (
+    <div className="relative h-full flex flex-col">
+      {/* Top Control Bar */}
+      <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
+        <TopControlBar
+          viewMode={appState.viewMode}
+          onViewModeChange={appState.setViewMode}
+          onShowShortcuts={() => modalState.setShowShortcuts(true)}
+          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+          onAutoTranslateChange={appState.setIsAutoTranslateEnabled}
+          currentPage={appState.currentPage}
+          onPageChange={searchHandlers.handlePageChange}
+          hasNextPage={appState.hasNextPage}
+          isLoading={appState.isLoading}
+          totalResults={appState.results.length}
+        />
+      </div>
+
+      {/* Content area with DislikePanel */}
+      <div className="relative flex-1 overflow-hidden">
+        {/* Dislike Panel */}
+        <div className={`
+          absolute top-0 bottom-0 right-0 z-20
+          transition-transform duration-300 ease-in-out
+          ${modalState.isDislikePanelOpen ? 'translate-x-0' : 'translate-x-full'}
+        `}>
+          <DislikePanel
+            isOpen={modalState.isDislikePanelOpen}
+            items={dislikeState.dislikedItems}
+            onClose={modalState.handleToggleDislikePanel}
+            onClear={() => dislikeState.handleClearDislikes(user)}
+            onUndislike={(item) => dislikeState.handleUndislike(item, user)}
+            onResultClick={eventHandlers.handleMasterResultClick}
+            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+          />
+        </div>
+
+        {/* Results Panel */}
+        <div
+          ref={resultsRef}
+          className={`
+            h-full overflow-y-auto p-2
+            transition-all duration-300 ease-in-out
+            ${modalState.isDislikePanelOpen ? 'pr-[calc(10vw+8px)]' : 'pr-2'}
+          `}
+          style={{ scrollbarGutter: 'stable' }}
+        >
+          <ResultsPanel
+            viewMode={appState.viewMode}
+            results={appState.results}
+            groupedResults={appState.groupedResults}
+            onResultClick={eventHandlers.handleMasterResultClick}
+            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+            onResultRightClick={eventHandlers.handleResultRightClick}
+            currentUser={user.username}
+            sendMessage={sendMessage}
+            onItemBroadcast={eventHandlers.handleItemBroadcast}
+            onResultDoubleClick={modalState.handleOpenDetailModal}
+            onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
+            submissionStatuses={submissionState.submissionStatuses}
+            optimisticSubmissions={submissionState.optimisticSubmissions}
+            onResultDislike={(item) => dislikeState.handleDislike(
+              item, 
+              user, 
+              modalState.isDislikePanelOpen, 
+              modalState.handleToggleDislikePanel
+            )}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Frames Panel Instance
+  const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
+    <FramesPanel
+      frames={keyframeLoader.carouselFrames}
+      videoTitle={appState.currentVideoTitle}
+      isLoading={keyframeLoader.isLoading}
+      activeFrameId={keyframeLoader.activeFrameId}
+      loadNextFrames={keyframeLoader.loadNextFrames}
+      hasMoreNext={keyframeLoader.hasMoreNext}
+      hasMorePrev={keyframeLoader.hasMorePrev}
+      loadPreviousFrames={keyframeLoader.loadPreviousFrames}
+      onClose={keyframeLoader.handleCarouselClose}
+      onFrameClick={eventHandlers.handleFrameClickInPanel}
+      onRightClick={eventHandlers.handleFrameRightClickInPanel}
+      onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+      currentUser={user.username}
+      sendMessage={sendMessage}
+      onResultDoubleClick={modalState.handleOpenDetailModal}
+      onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
+      isFetchingNext={false}
+      isFetchingPrev={false}
+    />
+  ) : null;
+
+  // Video Panel Instance
+  const videoPanelInstance = modalState.videoPanelState.isOpen && 
+    modalState.videoPanelState.videoId && 
+    modalState.videoPanelState.timestamp ? (
+    <VideoPanel
+      videoId={modalState.videoPanelState.videoId}
+      timestamp={modalState.videoPanelState.timestamp}
+      onClose={modalState.handleCloseVideoPanel}
+      onBroadcast={eventHandlers.handleItemBroadcast}
+      currentUser={user.username}
+    />
+  ) : null;
+
+  // Detail Modal Instance
+  const detailModalInstance = modalState.detailModalItem ? (
+    <FrameDetailModal
+      item={modalState.detailModalItem}
+      onClose={modalState.handleCloseDetailModal}
+    />
+  ) : null;
 
   return (
     <>
-           <AppShell
+      <AppShell
         leftPanel={leftPanel}
         rightPanel={rightPanel}
         searchButton={searchButton}
         chainSearchButton={chainSearchButton}
         carouselOverlay={framesPanelInstance}
-        broadcastMessages={broadcastMessages}
+        broadcastMessages={broadcastState.broadcastMessages}
         isConnected={isConnected}
-        activeUsers={activeUsers}
-        onRemoveBroadcastMessage={handleRemoveBroadcastMessage}
+        activeUsers={broadcastState.activeUsers}
+        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage}
         videoModal={videoPanelInstance}
-        onBroadcastResultClick={handleMasterResultClick}
-        onBroadcastRightClick={handleBroadcastFeedRightClick}
-        onBroadcastSimilaritySearch={handleSimilaritySearch}
-        onClearBroadcastFeed={handleClearBroadcastFeed}
-        onBroadcastResultDoubleClick={handleOpenDetailModal}
-        onBroadcastResultSubmission={handleSubmission}
-        onVqaSubmit={handleVqaSubmit}
-        onExportBroadcastFeed={handleExportBroadcast}
-        isTrackModeActive={isTrackModeActive}
-        onToggleTrackMode={handleToggleTrackMode}
-        // ✅ 4. PASS THE NEW STATE AND HANDLER TO AppShell
-        vqaQuestions={vqaQuestions}
-        onVqaQuestionChange={handleVqaQuestionChange}
-
+        onBroadcastResultClick={eventHandlers.handleMasterResultClick}
+        onBroadcastRightClick={eventHandlers.handleBroadcastFeedRightClick}
+        onBroadcastSimilaritySearch={searchHandlers.handleSimilaritySearch}
+        onClearBroadcastFeed={broadcastState.handleClearBroadcastFeed}
+        onBroadcastResultDoubleClick={modalState.handleOpenDetailModal}
+        onBroadcastResultSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
+        onVqaSubmit={broadcastState.handleVqaSubmit}
+        onExportBroadcastFeed={eventHandlers.handleExportBroadcast}
+        isTrackModeActive={broadcastState.isTrackModeActive}
+        onToggleTrackMode={broadcastState.handleToggleTrackMode}
+        vqaQuestions={broadcastState.vqaQuestions}
+        onVqaQuestionChange={broadcastState.handleVqaQuestionChange}
       />
+
+      {/* Modals */}
       {detailModalInstance}
-      {/* ✅ 5. RENDER THE SUBMISSION PANEL WHEN THERE'S A RESULT */}
-      {submissionResult && (
+
+      {/* Submission Status Panel */}
+      {submissionState.submissionResult && (
         <SubmissionStatusPanel
-          key={submissionResult.itemId}
-          result={submissionResult}
-          onClose={() => setSubmissionResult(null)}
+          key={submissionState.submissionResult.itemId}
+          result={submissionState.submissionResult}
+          onClose={() => submissionState.setSubmissionResult(null)}
         />
       )}
+
       {/* Shortcuts Modal */}
-      {showShortcuts && (
+      {modalState.showShortcuts && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="relative bg-white rounded-lg shadow-xl">
             <button
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 p-2"
-              onClick={() => setShowShortcuts(false)}
+              onClick={() => modalState.setShowShortcuts(false)}
             >
               <X className="h-5 w-5" />
             </button>
