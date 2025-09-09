@@ -75,12 +75,6 @@ const AppShell: React.FC<AppShellProps> = ({
           <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {leftPanel}
           </div>
-          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-white/98 via-white/95 to-transparent backdrop-blur-sm border-t border-slate-200/40">
-            <div className="flex gap-2">
-              {searchButton}
-              {chainSearchButton}
-            </div>
-          </div>
         </aside>
 
         {/* Right-side Container - REMOVED SCROLLING */}

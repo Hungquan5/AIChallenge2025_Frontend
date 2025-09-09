@@ -16,6 +16,7 @@ export const SHORTCUTS = {
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
   TRANSLATE_QUERY: { key: 'q', modifier: 'Alt' },
   TOGGLE_AUTO_TRANSLATE: { key: 'q', modifier: 'Alt+Shift' },
+  SEARCH_FOCUSED_ITEM: { key: 'Enter', modifier: 'Alt' }, // ✅ ADD THIS LINE
 
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
@@ -29,12 +30,8 @@ export const SHORTCUTS = {
   TOGGLE_TEXT_MODE: { key: 'u', modifier: 'Ctrl/Cmd' },
   TOGGLE_IMAGE_MODE: { key: 'i', modifier: 'Ctrl/Cmd' },
 
-  // Search mode shortcuts
-  SWITCH_TO_NORMAL: { key: '1', modifier: 'Alt' },
-  SWITCH_TO_CHAIN: { key: '2', modifier: 'Alt' },
-  
   // Navigation shortcuts
-  FOCUS_SEARCH: { key: 'f', modifier: 'Alt' },
+  FOCUS_SEARCH: { key: 'u', modifier: 'Ctrl/Cmd' },
   NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, 
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
