@@ -1,8 +1,8 @@
 // src/utils/shortcuts.ts
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 
-// Định nghĩa các phím tắt
+// Define the shortcuts object without page numbers
 export const SHORTCUTS = {
   // Search shortcuts
   TRIGGER_SEARCH: { key: 'Enter', modifier: 'none' },
@@ -16,7 +16,7 @@ export const SHORTCUTS = {
   REMOVE_QUERY: { key: 'd', modifier: 'Alt' },
   TRANSLATE_QUERY: { key: 'q', modifier: 'Alt' },
   TOGGLE_AUTO_TRANSLATE: { key: 'q', modifier: 'Alt+Shift' },
-  SEARCH_FOCUSED_ITEM: { key: 'Enter', modifier: 'Alt' }, // ✅ ADD THIS LINE
+  SEARCH_FOCUSED_ITEM: { key: 'Enter', modifier: 'Alt' },
 
   // View mode shortcuts
   TOGGLE_VIEW_MODE: { key: 'v', modifier: 'Alt' },
@@ -31,63 +31,83 @@ export const SHORTCUTS = {
   TOGGLE_IMAGE_MODE: { key: 'i', modifier: 'Ctrl/Cmd' },
 
   // Navigation shortcuts
-  FOCUS_SEARCH: { key: 'u', modifier: 'Ctrl/Cmd' },
-  NAVIGATE_SEARCH: {key: 'l', modifier: 'Alt'}, 
+  FOCUS_SEARCH: { key: 's', modifier: 'Alt' }, // Changed to avoid conflict
+  NAVIGATE_SEARCH: { key: 'l', modifier: 'Alt' },
   NEXT_RESULT: { key: 'ArrowDown', modifier: 'Alt' },
   PREV_RESULT: { key: 'ArrowUp', modifier: 'Alt' },
 
   // Modal and Panel shortcuts
   CLOSE_MODAL: { key: 'Escape', modifier: 'none' },
-  TOGGLE_DISLIKE_PANEL: { key: 'd', modifier: 'Ctrl/Cmd' }, // ✅ ADD THIS LINE
-  SHOW_HISTORY: { key: 'e', modifier: 'Ctrl/Cmd' }, // ✅ ADD THIS LINE
+  TOGGLE_DISLIKE_PANEL: { key: 'd', modifier: 'Ctrl/Cmd' },
+  SHOW_HISTORY: { key: 'e', modifier: 'Ctrl/Cmd' },
 } as const;
 
+// Keep TypeScript happy with a clear type definition
 type ShortcutKey = keyof typeof SHORTCUTS;
 
-// Helper function to check for shortcuts
+// Define the type for our handlers, including a new dynamic handler
+type ShortcutHandlers = {
+  [K in ShortcutKey]?: () => void;
+} & {
+  GO_TO_PAGE?: (page: number) => void; // A new, dynamic handler for pagination
+};
+
+// Helper function to check for static shortcuts remains the same
 export const isShortcut = (event: KeyboardEvent | React.KeyboardEvent, shortcut: typeof SHORTCUTS[ShortcutKey]): boolean => {
   if (event.key.toLowerCase() !== shortcut.key.toLowerCase()) {
     return false;
   }
-
   const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-
   const modifiersPressed = {
     'Ctrl/Cmd': isCtrlOrCmd,
     'Alt': event.altKey,
     'Shift': event.shiftKey,
   };
-
   const requiredModifiers = shortcut.modifier.split('+').filter(m => m !== 'none');
   const allModifierKeys = ['Ctrl/Cmd', 'Alt', 'Shift'];
-
   for (const modKey of allModifierKeys) {
     const isRequired = requiredModifiers.includes(modKey);
     const isPressed = modifiersPressed[modKey as keyof typeof modifiersPressed];
-
     if (isRequired !== isPressed) {
-      return false; // Modifier state does not match
+      return false;
     }
   }
-  
   return true;
 };
 
-// Hook to register shortcuts
-export const useShortcuts = (handlers: {
-  [K in ShortcutKey]?: () => void;
-}): void => {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      (Object.entries(SHORTCUTS) as [ShortcutKey, typeof SHORTCUTS[ShortcutKey]][]).forEach(([action, shortcut]) => {
-        if (isShortcut(event, shortcut) && handlers[action]) {
-          event.preventDefault();
-          handlers[action]?.();
-        }
-      });
-    };
+// The updated, more scalable hook
+export const useShortcuts = (handlers: ShortcutHandlers): void => {
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // --- Dynamic Page Navigation Logic ---
+    // Check for Alt + number key (1-9)
+    const pageNumber = parseInt(event.key, 10);
+    if (
+      !event.altKey &&
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !isNaN(pageNumber) &&
+      pageNumber >= 1 &&
+      pageNumber <= 9
+    ) {
+      if (handlers.GO_TO_PAGE) {
+        event.preventDefault();
+        handlers.GO_TO_PAGE(pageNumber);
+        return; // Exit after handling
+      }
+    }
 
+    // --- Static Shortcut Logic (from the SHORTCUTS object) ---
+    (Object.entries(SHORTCUTS) as [ShortcutKey, typeof SHORTCUTS[ShortcutKey]][]).forEach(([action, shortcut]) => {
+      if (isShortcut(event, shortcut) && handlers[action]) {
+        event.preventDefault();
+        handlers[action]?.();
+      }
+    });
+  }, [handlers]); // Dependency array ensures the handler is stable if handlers object is memoized
+
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlers]);
+  }, [handleKeyDown]);
 };

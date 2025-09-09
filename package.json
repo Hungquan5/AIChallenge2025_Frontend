@@ -21,6 +21,7 @@
     "react-loading-skeleton": "^3.5.0",
     "react-player": "^3.3.1",
     "react-sliding-pane": "^7.3.0",
+    "react-virtualized": "^9.22.6",
     "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^2.1.0",
     "swiper": "^11.2.10",

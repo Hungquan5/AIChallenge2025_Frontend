@@ -1,11 +1,8 @@
-// src/features/search/components/SearchRequest/searchApi.ts
-
 import type { ResultItem, SearchMode, ApiQuery,HistoryItem } from '../../types';
 
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
 
-// Helper function to create the full thumbnail URL from a constructed path
 const adjustThumbnail = (thumbnail: string): string => {
   const datasetIndex = thumbnail.indexOf('/dataset/');
   return datasetIndex !== -1
@@ -31,10 +28,9 @@ export const translateText = async (text: string): Promise<string> => {
     return result[0].map((item: [string]) => item[0]).join('');
 };
 
-// ✅ MODIFIED: This function now accepts a user_id and adds it to the request
 export const searchByText = async (
   queries: ApiQuery[],
-  user_id: string, // ✅ ADDED: user_id parameter
+  user_id: string,
   mode: SearchMode = 'normal',
   page: number = 1,
   pageSize: number = 100
@@ -43,7 +39,7 @@ export const searchByText = async (
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('page', page.toString());
   url.searchParams.append('page_size', pageSize.toString());
-  url.searchParams.append('user_id', user_id); // ✅ ADDED: Append user_id to URL
+  url.searchParams.append('user_id', user_id);
 
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -70,11 +66,20 @@ export const searchByText = async (
   });
 };
 
-// ✅ MODIFIED: This function also accepts a user_id
-export const searchBySingleQuery = async (query: ApiQuery, user_id: string): Promise<ResultItem[]> => {
+/**
+ * ✅ MODIFIED: This function now accepts page and pageSize for pagination
+ */
+export const searchBySingleQuery = async (
+  query: ApiQuery, 
+  user_id: string,
+  page: number = 1,
+  pageSize: number = 100
+): Promise<ResultItem[]> => {
   const endpoint = '/embeddings/stage';
   const url = new URL(`${API_BASE_URL}${endpoint}`);
-  url.searchParams.append('user_id', user_id); // ✅ ADDED: Append user_id to URL
+  url.searchParams.append('user_id', user_id);
+  url.searchParams.append('page', page.toString());
+  url.searchParams.append('page_size', pageSize.toString());
 
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -98,20 +103,19 @@ export const searchBySingleQuery = async (query: ApiQuery, user_id: string): Pro
           videoId: item.videoId,
           timestamp: item.timestamp,
           confidence: item.confidence,
-          id: String(index),
+          id: `${page}-${index}`, // ✅ Use page number for unique ID
           title: `${item.videoId} - ${item.timestamp}`,
           thumbnail: adjustThumbnail(thumbnailPath),
       };
   });
 };
 
-
 export const getHistory = async (username: string): Promise<HistoryItem[]> => {
   try {
     const endpoint = '/embeddings/history'
     const url = new URL(`${API_BASE_URL}${endpoint}`);
-    url.searchParams.append('user_id', username); // ✅ ADDED: Append user_id to URL
-    const response = await fetch(url.toString(), { // Assuming your API is proxied to /api
+    url.searchParams.append('user_id', username);
+    const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -126,7 +130,6 @@ export const getHistory = async (username: string): Promise<HistoryItem[]> => {
     return data;
   } catch (error) {
     console.error('Failed to get query history:', error);
-    // Return an empty array or re-throw to be handled by the caller
     return [];
   }
 };

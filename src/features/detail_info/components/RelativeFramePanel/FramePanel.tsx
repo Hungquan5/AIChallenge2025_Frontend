@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect } from 'react';
 import type { ResultItem } from '../../../search/types';
 import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
 import { getImageUrl } from '../../../../utils/getImageURL';
@@ -49,82 +49,76 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
-  
-  // Track if we're currently loading to prevent multiple simultaneous loads
-  const [isInternalLoading, setIsInternalLoading] = useState(false);
-  
-  // Track the previous frame count to detect when new frames are added
-  const prevFrameCountRef = useRef(frames.length);
-  const lastScrollTopRef = useRef(0);
 
-  // Store scroll position when new frames are added at the top
-  useEffect(() => {
+  const scrollStateRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+    prevFrameCount: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
     const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
+    if (!scrollContainer || !scrollStateRef.current) return;
 
-    const currentFrameCount = frames.length;
-    const prevFrameCount = prevFrameCountRef.current;
+    const { prevFrameCount, scrollHeight: prevScrollHeight, scrollTop: prevScrollTop } = scrollStateRef.current;
 
-    // If frames were added at the beginning (prev frames), maintain scroll position
-    if (currentFrameCount > prevFrameCount) {
-      const framesDifference = currentFrameCount - prevFrameCount;
-      
-      // Estimate the height of added frames (adjust based on your card height)
-      const estimatedCardHeight = 200; // Adjust this value based on your actual card height
-      const addedHeight = framesDifference * estimatedCardHeight;
-      
-      // Only adjust if we added frames at the top
-      if (framesDifference > 0 && lastScrollTopRef.current < 100) {
-        scrollContainer.scrollTop = lastScrollTopRef.current + addedHeight;
-      }
+    if (frames.length > prevFrameCount) {
+      const newScrollHeight = scrollContainer.scrollHeight;
+      const heightDifference = newScrollHeight - prevScrollHeight;
+      scrollContainer.scrollTop = prevScrollTop + heightDifference;
     }
 
-    prevFrameCountRef.current = currentFrameCount;
+    scrollStateRef.current = null;
   }, [frames.length]);
 
-  // Improved intersection observer with better logic
+
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer || isLoading || isInternalLoading) return;
+    if (!scrollContainer || isLoading) return;
 
-    // Initial check: if content doesn't fill viewport, load more
-    const hasVerticalScroll = scrollContainer.scrollHeight > scrollContainer.clientHeight;
-    
-    if (!hasVerticalScroll && hasMoreNext) {
-      setIsInternalLoading(true);
-      loadNextFrames();
-      setTimeout(() => setIsInternalLoading(false), 1000); // Prevent rapid calls
-      return;
-    }
+    const checkAndLoadMore = () => {
+      if (
+        scrollContainer.scrollHeight <= scrollContainer.clientHeight &&
+        hasMoreNext &&
+        !isFetchingNext
+      ) {
+        loadNextFrames();
+      }
+    };
 
-    // Set up intersection observer with better margins
+    checkAndLoadMore();
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && !isInternalLoading) {
+          if (entry.isIntersecting) {
             if (entry.target === topSentinelRef.current && hasMorePrev && !isFetchingPrev) {
-              setIsInternalLoading(true);
-              lastScrollTopRef.current = scrollContainer.scrollTop;
+              scrollStateRef.current = {
+                scrollHeight: scrollContainer.scrollHeight,
+                scrollTop: scrollContainer.scrollTop,
+                prevFrameCount: frames.length,
+              };
               loadPreviousFrames();
-              setTimeout(() => setIsInternalLoading(false), 1000);
-            } else if (entry.target === bottomSentinelRef.current && hasMoreNext && !isFetchingNext) {
-              setIsInternalLoading(true);
+            }
+            else if (entry.target === bottomSentinelRef.current && hasMoreNext && !isFetchingNext) {
               loadNextFrames();
-              setTimeout(() => setIsInternalLoading(false), 1000);
             }
           }
         });
       },
-      { 
-        root: scrollContainer, 
-        // Reduced margin to prevent premature loading
-        rootMargin: '200px 0px',
-        // Higher threshold to ensure sentinel is actually visible
-        threshold: 0.1
+      {
+        root: scrollContainer,
+        // This is the key to loading frames before the user hits the bottom.
+        // The 'rootMargin' effectively extends the viewport. A value of '600px'
+        // means the observer will trigger when the sentinel is still 600px
+        // away from being visible.
+        // If your grid rows are about 250px high, this will trigger the next
+        // load when the user is about two rows away from the end.
+        // Increase this value to load earlier, or decrease it to load later.
+        rootMargin: '600px 0px',
       }
     );
 
-    // Only observe if we have more content to load
     if (topSentinelRef.current && hasMorePrev) {
       observer.observe(topSentinelRef.current);
     }
@@ -134,40 +128,15 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
 
     return () => observer.disconnect();
   }, [
-    frames.length, 
-    isLoading, 
-    isInternalLoading, 
-    hasMoreNext, 
-    hasMorePrev, 
-    loadNextFrames, 
+    frames.length,
+    isLoading,
+    hasMoreNext,
+    hasMorePrev,
+    loadNextFrames,
     loadPreviousFrames,
     isFetchingNext,
-    isFetchingPrev
+    isFetchingPrev,
   ]);
-
-  // Manual scroll handler as backup
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (isInternalLoading || isLoading) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    
-    // Store current scroll position
-    lastScrollTopRef.current = scrollTop;
-    
-    // Load previous frames when near top
-    if (scrollTop < 100 && hasMorePrev && !isFetchingPrev) {
-      setIsInternalLoading(true);
-      loadPreviousFrames();
-      setTimeout(() => setIsInternalLoading(false), 1000);
-    }
-    
-    // Load next frames when near bottom
-    if (scrollTop + clientHeight >= scrollHeight - 100 && hasMoreNext && !isFetchingNext) {
-      setIsInternalLoading(true);
-      loadNextFrames();
-      setTimeout(() => setIsInternalLoading(false), 1000);
-    }
-  }, [isInternalLoading, isLoading, hasMoreNext, hasMorePrev, loadNextFrames, loadPreviousFrames, isFetchingNext, isFetchingPrev]);
 
   const handleSending = (item: ResultItem) => {
     const message = {
@@ -188,17 +157,16 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
             <h2 className="text-xl font-bold text-slate-800 truncate pr-4">
               Frames from: {videoTitle}
             </h2>
-            {/* Loading indicators */}
-            {(isFetchingPrev || isFetchingNext || isInternalLoading) && (
+            {(isFetchingPrev || isFetchingNext) && (
               <div className="flex items-center gap-2 text-sm text-blue-600">
                 <div className="w-4 h-4 border-2 border-blue-600 border-dashed rounded-full animate-spin"></div>
                 <span>Loading frames...</span>
               </div>
             )}
           </div>
-          <button 
-            onClick={onClose} 
-            className={styles.closeButtonClass} 
+          <button
+            onClick={onClose}
+            className={styles.closeButtonClass}
             aria-label="Close frames view"
           >
             ×
@@ -214,28 +182,17 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
           <div
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300"
-            onScroll={handleScroll}
           >
             {frames.length > 0 ? (
               <div className={styles.gridClass}>
-                {/* Top sentinel - only show if there are more previous frames */}
                 {hasMorePrev && (
-                  <div 
-                    ref={topSentinelRef} 
-                    className="w-full h-2 flex items-center justify-center"
-                  >
-                    {isFetchingPrev && (
-                      <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        Loading previous frames...
-                      </div>
-                    )}
-                  </div>
+                  <div
+                    ref={topSentinelRef}
+                    className="w-full h-2 col-span-full"
+                  />
                 )}
-                
-                {/* Frames grid */}
                 {frames.map(frame => {
                   const isActive = frame.timestamp === activeFrameId?.toString();
-
                   return (
                     <ResultCard
                       key={frame.id}
@@ -245,7 +202,7 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                       confidence={frame.confidence}
                       timestamp={frame.timestamp}
                       loaded={true}
-                      onLoad={() => {}}
+                      onLoad={() => { }}
                       onClick={() => onFrameClick(frame)}
                       onContextMenu={(event) => onRightClick(frame, event)}
                       onSimilaritySearch={onSimilaritySearch}
@@ -258,23 +215,13 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                     />
                   );
                 })}
-
-                {/* Bottom sentinel - only show if there are more next frames */}
                 {hasMoreNext && (
-                  <div 
-                    ref={bottomSentinelRef} 
-                    className="w-full h-2 flex items-center justify-center"
-                  >
-                    {isFetchingNext && (
-                      <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        Loading more frames...
-                      </div>
-                    )}
-                  </div>
+                   <div
+                    ref={bottomSentinelRef}
+                    className="w-full h-2 col-span-full"
+                  />
                 )}
-
-                {/* End indicator */}
-                {!hasMoreNext && !hasMorePrev && frames.length > 10 && (
+                {!hasMoreNext && frames.length > 10 && (
                   <div className="col-span-full flex items-center justify-center py-4">
                     <div className="text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
                       All frames loaded ({frames.length} total)
@@ -290,7 +237,7 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
           </div>
         )}
 
-        {/* Footer with frame count info */}
+        {/* Footer */}
         <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
           <span>
             Showing {frames.length} frames
@@ -298,10 +245,10 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
           </span>
           <div className="flex gap-4">
             {hasMorePrev && (
-              <span className="text-blue-600">← More frames available</span>
+              <span className="text-blue-600">Scroll up to load more</span>
             )}
             {hasMoreNext && (
-              <span className="text-blue-600">More frames available →</span>
+              <span className="text-blue-600">Scroll down to load more</span>
             )}
           </div>
         </div>

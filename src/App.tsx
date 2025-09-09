@@ -1,5 +1,5 @@
 // src/App.tsx (Refactored)
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react'; // ✅ Import useMemo
 import './App.css';
 
 // --- Core Components & Layouts ---
@@ -84,14 +84,25 @@ const App: React.FC = () => {
     sendMessage
   });
 
-  // Keyboard Shortcuts
-  useShortcuts({
+  // ✅ Create a memoized object for shortcut handlers
+  const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
     TOGGLE_AUTO_TRANSLATE: appState.toggleAutoTranslate,
     CLOSE_MODAL: modalState.handleCloseModal,
     TOGGLE_DISLIKE_PANEL: modalState.handleToggleDislikePanel,
-  });
+    // ✅ ADD THE DYNAMIC PAGE NAVIGATION HANDLER
+    GO_TO_PAGE: searchHandlers.handlePageChange,
+  }), [
+    appState.toggleViewMode,
+    appState.toggleAutoTranslate,
+    modalState.handleCloseModal,
+    modalState.handleToggleDislikePanel,
+    searchHandlers.handlePageChange,
+  ]);
+  
+  // ✅ Pass the memoized handlers to the hook
+  useShortcuts(shortcutHandlers);
 
 
 

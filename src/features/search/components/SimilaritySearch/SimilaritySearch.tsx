@@ -1,4 +1,3 @@
-// src/components/SearchRequest/similaritySearchApi.ts
 import type { ResultItem, SearchMode, ApiQuery } from '../../types';
 
 const API_BASE_URL = 'http://localhost:5731';
@@ -11,9 +10,6 @@ const adjustThumbnail = (thumbnail: string): string => {
     : thumbnail;
 };
 
-/**
- * Convert an image URL to base64 string
- */
 const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
   try {
     const response = await fetch(imageUrl);
@@ -26,7 +22,6 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
-          // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
           const base64 = reader.result.split(',')[1];
           resolve(base64);
         } else {
@@ -46,13 +41,18 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
  * Perform similarity search using an image URL
  * @param imageSrc - The image URL to search for similar images
  * @param searchMode - The search mode ('normal' or 'chain')
+ * @param page - The page number to retrieve
+ * @param pageSize - The number of results per page
  * @returns Promise<ResultItem[]> - Array of similar images
- */export const searchBySimilarImage = async (
+ */
+export const searchBySimilarImage = async (
   imageSrc: string,
-  searchMode: SearchMode = 'normal'
+  searchMode: SearchMode = 'normal',
+  page: number = 1,
+  pageSize: number = 100
 ): Promise<ResultItem[]> => {
   try {
-    console.log(`Starting similarity search for image: ${imageSrc}`);
+    console.log(`Starting similarity search for image: ${imageSrc}, page: ${page}`);
     
     const imageBase64 = await imageUrlToBase64(imageSrc);
     
@@ -70,9 +70,13 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
       ? '/embeddings/chain_search' 
       : '/embeddings/search';
 
+    const url = new URL(`${API_BASE_URL}${endpoint}`);
+    url.searchParams.append('page', page.toString());
+    url.searchParams.append('page_size', pageSize.toString());
+
     console.log('Sending similarity search request...');
     
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([apiQuery]),
@@ -87,22 +91,18 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
       );
     }
 
-    // ✅ FIX: Treat the response as partial data, just like in searchByText
     const partialData = await response.json();
     
-    // ✅ FIX: Map over the partial data and construct the full ResultItem
     return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
-      // Construct the thumbnail path
       const thumbnailPath = `/dataset/full/merge/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
       
       return {
         videoId: item.videoId,
         timestamp: item.timestamp,
         confidence: item.confidence,
-        // Create the missing properties
-        id: String(index), // A simple index can be used for the id
-        title: `${item.videoId} - ${item.timestamp}`, // Create title
-        thumbnail: adjustThumbnail(thumbnailPath), // Create and adjust the thumbnail URL
+        id: `${page}-${index}`, // ✅ Use page number for unique ID
+        title: `${item.videoId} - ${item.timestamp}`,
+        thumbnail: adjustThumbnail(thumbnailPath),
       };
     });
 
@@ -111,14 +111,10 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
     throw error;
   }
 };
+
 /**
  * Perform similarity search and handle UI feedback
- * @param imageSrc - The image URL to search for similar images
- * @param cardId - The ID of the card that triggered the search (for logging)
- * @param onResults - Callback to handle the search results
- * @param onError - Optional callback to handle errors
- * @param onLoading - Optional callback to handle loading state
- * @param searchMode - The search mode ('normal' or 'chain')
+ * ✅ ADDED: page and pageSize parameters to support pagination
  */
 export const performSimilaritySearch = async (
   imageSrc: string,
@@ -126,18 +122,17 @@ export const performSimilaritySearch = async (
   onResults: (results: ResultItem[]) => void,
   onError?: (error: Error) => void,
   onLoading?: (loading: boolean) => void,
-  searchMode: SearchMode = 'normal'
+  searchMode: SearchMode = 'normal',
+  page: number = 1,
+  pageSize: number = 100
 ): Promise<void> => {
   try {
     console.log(`Performing similarity search for card ${cardId} with image: ${imageSrc}`);
     
-    // Set loading state
     onLoading?.(true);
     
-    // Perform the similarity search
-    const results = await searchBySimilarImage(imageSrc, searchMode);
+    const results = await searchBySimilarImage(imageSrc, searchMode, page, pageSize);
     
-    // Handle results
     onResults(results);
     
     console.log(`Similarity search completed for card ${cardId}. Found ${results.length} similar images.`);
@@ -148,27 +143,17 @@ export const performSimilaritySearch = async (
     if (onError) {
       onError(searchError);
     } else {
-      // Default error handling
       alert(`Similarity search failed: ${searchError.message}`);
     }
   } finally {
-    // Clear loading state
     onLoading?.(false);
   }
 };
 
 /**
- * Hook for handling similarity search in React components
- * Usage example:
- * 
- * const handleSimilaritySearch = useSimilaritySearch(
- *   (results) => setSearchResults(results),
- *   (error) => console.error(error),
- *   (loading) => setIsLoading(loading)
- * );
- * 
- * // In your ResultCard:
- * <ResultCard onSimilaritySearch={handleSimilaritySearch} ... />
+ * Hook for handling similarity search in React components.
+ * Note: This hook is intended to INITIATE a search (i.e., for page 1).
+ * Subsequent page requests should be handled by a dedicated pagination handler.
  */
 export const useSimilaritySearch = (
   onResults: (results: ResultItem[]) => void,
@@ -177,13 +162,15 @@ export const useSimilaritySearch = (
   searchMode: SearchMode = 'normal'
 ) => {
   return (imageSrc: string, cardId: string) => {
+    // This hook always triggers a search for the first page.
     performSimilaritySearch(
       imageSrc,
       cardId,
       onResults,
       onError,
       onLoading,
-      searchMode
+      searchMode,
+      1 // Page 1
     );
   };
 };

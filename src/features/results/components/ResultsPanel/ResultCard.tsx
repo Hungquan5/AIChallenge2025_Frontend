@@ -1,13 +1,7 @@
 // components/ResultCard.tsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Share2, Search, Send } from 'lucide-react';
 
-// It's highly recommended to use a utility for conditional class names
-// for better readability and maintainability.
-// You can install it: `npm install clsx` or `yarn add clsx`
-// import clsx from 'clsx'; 
-
-// --- Style Definitions (assumed to be in './styles') ---
+// --- Style Definitions ---
 import {
   cardClass,
   imageClass,
@@ -39,49 +33,7 @@ interface ResultCardProps {
   imageClassName?: string;
 }
 
-// --- Custom Hook for Click Logic ---
-// Encapsulates the complexity of distinguishing single vs. double clicks.
-const useClickLogic = (
-  onClick?: () => void,
-  onDoubleClick?: () => void,
-  delay = 250
-) => {
-  const clickTimeout = useRef<number | null>(null);
-
-  useEffect(() => {
-    // Cleanup timeout on unmount
-    return () => {
-      if (clickTimeout.current) {
-        clearTimeout(clickTimeout.current);
-      }
-    };
-  }, []);
-
-  const handleClick = useCallback(() => {
-    if (onDoubleClick) {
-      if (clickTimeout.current) {
-        // Double click detected
-        clearTimeout(clickTimeout.current);
-        clickTimeout.current = null;
-        onDoubleClick();
-      } else {
-        // Start timer for a potential double click
-        clickTimeout.current = window.setTimeout(() => {
-          onClick?.();
-          clickTimeout.current = null;
-        }, delay);
-      }
-    } else {
-      // If no onDoubleClick is provided, just execute onClick
-      onClick?.();
-    }
-  }, [onClick, onDoubleClick, delay]);
-
-  return handleClick;
-};
-
-
-// --- The Refactored Component ---
+// ✅ REFACTORED: This component is now cleaner and more robust.
 
 const ResultCard: React.FC<ResultCardProps> = ({
   id,
@@ -109,14 +61,25 @@ const ResultCard: React.FC<ResultCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   
-  const handleSingleOrDoubleClick = useClickLogic(onClick, onDoubleClick);
+  // This ref is used to manage the timer for detecting double-clicks.
+  const clickTimeout = useRef<number | null>(null);
+
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeout.current) {
+        clearTimeout(clickTimeout.current);
+      }
+    };
+  }, []);
 
   // --- Event Handlers ---
 
   const handleImageLoad = useCallback(() => onLoad(id), [id, onLoad]);
   const handleImageError = useCallback(() => setImageError(true), []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  // ✅ CHANGED: All left-click logic is now consolidated here.
+  const handleClick = useCallback((e: React.MouseEvent) => {
     if (disabled) {
       e.preventDefault();
       return;
@@ -124,25 +87,59 @@ const ResultCard: React.FC<ResultCardProps> = ({
 
     const isCtrl = e.ctrlKey || e.metaKey;
 
-    // --- Modifier Key + Click Logic ---
-    if (isCtrl) {
+    // --- Modifier Key Logic (Priority #1) ---
+    // If Ctrl is pressed, perform the similarity search and STOP.
+    if (isCtrl && onSimilaritySearch) {
       e.preventDefault();
-      e.stopPropagation();
-      switch (e.button) {
-        case 0: onSimilaritySearch?.(thumbnail, id); break; // Ctrl + Left Click
-        case 1: onSubmit?.(); break;                       // Ctrl + Middle Click
-        case 2: onDislike?.(); break;                      // Ctrl + Right Click
-      }
-      return; // Stop further processing
+      onSimilaritySearch(thumbnail, id);
+      return; // Prevents the single/double-click logic below from running.
     }
 
-    // --- Standard Click Logic (No Modifiers) ---
-    if (e.button === 1) { // Middle Click
-      e.preventDefault();
-      onSending?.();
+    // --- Standard Single/Double-Click Logic (Priority #2) ---
+    if (onDoubleClick) {
+      if (clickTimeout.current) {
+        // This is a double-click
+        clearTimeout(clickTimeout.current);
+        clickTimeout.current = null;
+        onDoubleClick();
+      } else {
+        // This is the first click, start a timer
+        clickTimeout.current = window.setTimeout(() => {
+          onClick?.(); // Fire single-click action after delay
+          clickTimeout.current = null;
+        }, 250); // 250ms delay to wait for a potential second click
+      }
+    } else {
+      // If no double-click handler is provided, just fire the single-click action immediately.
+      onClick?.();
     }
-    // Left and Right clicks are handled by onClick and onContextMenu respectively
-  }, [disabled, onSimilaritySearch, onSubmit, onDislike, onSending, thumbnail, id]);
+  }, [disabled, onClick, onDoubleClick, onSimilaritySearch, thumbnail, id]);
+
+  // ✅ CHANGED: Simplified to handle non-left-click actions.
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (disabled) {
+      e.preventDefault();
+      return;
+    }
+    
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    // Ctrl + Middle Click for Submit
+    if (isCtrl && e.button === 1 && onSubmit) {
+      e.preventDefault();
+      onSubmit();
+    }
+    // Ctrl + Right Click for Dislike
+    else if (isCtrl && e.button === 2 && onDislike) {
+        e.preventDefault();
+        onDislike();
+    }
+    // Standard Middle Click for Sending
+    else if (e.button === 1 && onSending) {
+      e.preventDefault();
+      onSending();
+    }
+  }, [disabled, onSubmit, onDislike, onSending]);
   
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return;
@@ -160,16 +157,10 @@ const ResultCard: React.FC<ResultCardProps> = ({
     }
   }, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
 
-  // --- Render Logic ---
+  // --- Render Logic (No changes below this line) ---
 
-  // Using a library like `clsx` here would be cleaner, but template literals work too.
   const cardClasses = [
-    cardClass,
-    'group',
-    'result-item',
-    'relative',
-    'overflow-hidden',
-    'rounded-lg',
+    cardClass, 'group', 'result-item', 'relative', 'overflow-hidden', 'rounded-lg',
     'transition-all duration-300 ease-out',
     isSelected ? 'ring-2 ring-blue-500 ring-opacity-60' : '',
     disabled ? 'opacity-50 cursor-not-allowed' : (onClick ? 'cursor-pointer' : ''),
@@ -210,8 +201,9 @@ const ResultCard: React.FC<ResultCardProps> = ({
     <div
       className={cardClasses}
       tabIndex={disabled ? -1 : 0}
+      // ✅ USE THE NEW HANDLERS
       onMouseDown={handleMouseDown}
-      onClick={disabled ? undefined : handleSingleOrDoubleClick}
+      onClick={disabled ? undefined : handleClick}
       onContextMenu={disabled ? undefined : onContextMenu}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
@@ -244,7 +236,6 @@ const ResultCard: React.FC<ResultCardProps> = ({
         </div>
       </div>
 
-      {/* Focus / Selection Ring */}
       {isSelected && (
         <div className="absolute inset-0 rounded-lg ring-2 ring-blue-400 ring-opacity-75 pointer-events-none" />
       )}
@@ -252,8 +243,4 @@ const ResultCard: React.FC<ResultCardProps> = ({
   );
 };
 
-// By default, React.memo does a shallow comparison of props.
-// This is usually sufficient if you ensure that complex props (like onClick functions)
-// are memoized in the parent component using `useCallback`.
-// This is more robust than a custom comparison function.
 export default React.memo(ResultCard);
