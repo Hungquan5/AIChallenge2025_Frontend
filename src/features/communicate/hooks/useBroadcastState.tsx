@@ -62,13 +62,11 @@ export const useBroadcastState = (): UseBroadcastStateReturn => {
     setIsTrackModeActive(prev => !prev);
   }, []);
 
-  // Broadcast Message Handlers
-  const handleRemoveBroadcastMessage = useCallback((messageId: string, index: number) => {
+const handleRemoveBroadcastMessage = useCallback((messageId: string) => { // Removed 'index: number'
     setBroadcastMessages(prevMessages =>
-      prevMessages.filter((_, i) => i !== index)
+      prevMessages.filter(msg => msg.id !== messageId) // Filter by messageId
     );
   }, []);
-
   const handleClearBroadcastFeed = useCallback(() => {
     setBroadcastMessages([]);
     setVqaQuestions({}); // Also clear VQA questions when clearing feed

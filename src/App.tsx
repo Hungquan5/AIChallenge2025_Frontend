@@ -242,7 +242,7 @@ const App: React.FC = () => {
         broadcastMessages={broadcastState.broadcastMessages}
         isConnected={isConnected}
         activeUsers={broadcastState.activeUsers}
-        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage}
+        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage} // This is correct if eventHandlers is updated
         videoModal={videoPanelInstance}
         onBroadcastResultClick={eventHandlers.handleMasterResultClick}
         onBroadcastRightClick={eventHandlers.handleBroadcastFeedRightClick}
