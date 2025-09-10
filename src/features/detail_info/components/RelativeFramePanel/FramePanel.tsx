@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import type { ResultItem } from '../../../search/types';
 import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
 import { getImageUrl } from '../../../../utils/getImageURL';
@@ -56,6 +56,32 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
     prevFrameCount: number;
   } | null>(null);
 
+  // Memoized frame processing to prevent unnecessary recalculations
+  const processedFrames = useMemo(() => {
+    return frames.map(frame => {
+      const isActive = frame.timestamp === activeFrameId?.toString();
+      
+      return {
+        ...frame,
+        thumbnail: getImageUrl(frame.videoId, frame.thumbnail),
+        title: `${frame.timestamp}`,
+        isActive
+      };
+    });
+  }, [frames, activeFrameId]);
+
+  // Memoized handlers to prevent child re-renders
+  const handleSending = useCallback((item: ResultItem) => {
+    const message = {
+      type: 'broadcast_image',
+      payload: { ...item, submittedBy: currentUser },
+    };
+    sendMessage(JSON.stringify(message));
+  }, [currentUser, sendMessage]);
+
+  // Memoized empty handler to prevent re-renders
+  const emptyHandler = useCallback(() => {}, []);
+
   useLayoutEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer || !scrollStateRef.current) return;
@@ -71,7 +97,6 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
     scrollStateRef.current = null;
   }, [frames.length]);
 
-
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer || isLoading) return;
@@ -86,7 +111,8 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
       }
     };
 
-    checkAndLoadMore();
+    // Use requestIdleCallback to avoid blocking rendering
+    requestIdleCallback(checkAndLoadMore);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -98,23 +124,17 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                 scrollTop: scrollContainer.scrollTop,
                 prevFrameCount: frames.length,
               };
-              loadPreviousFrames();
+              // Use setTimeout to avoid blocking the intersection callback
+              setTimeout(() => loadPreviousFrames(), 0);
             }
             else if (entry.target === bottomSentinelRef.current && hasMoreNext && !isFetchingNext) {
-              loadNextFrames();
+              setTimeout(() => loadNextFrames(), 0);
             }
           }
         });
       },
       {
         root: scrollContainer,
-        // This is the key to loading frames before the user hits the bottom.
-        // The 'rootMargin' effectively extends the viewport. A value of '600px'
-        // means the observer will trigger when the sentinel is still 600px
-        // away from being visible.
-        // If your grid rows are about 250px high, this will trigger the next
-        // load when the user is about two rows away from the end.
-        // Increase this value to load earlier, or decrease it to load later.
         rootMargin: '600px 0px',
       }
     );
@@ -138,20 +158,12 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
     isFetchingPrev,
   ]);
 
-  const handleSending = (item: ResultItem) => {
-    const message = {
-      type: 'broadcast_image',
-      payload: { ...item, submittedBy: currentUser },
-    };
-    sendMessage(JSON.stringify(message));
-  };
-
   const modalClass = `${styles.modalClass} w-11/12 max-w-7xl h-[85vh] flex flex-col bg-white/90 backdrop-blur-lg`;
 
   return (
     <div className={styles.overlayClass} onClick={onClose}>
       <div className={modalClass} onClick={(e) => e.stopPropagation()}>
-        {/* Panel Header */}
+        {/* Panel Header - Memoized content */}
         <div className="flex justify-between items-center p-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-slate-800 truncate pr-4">
@@ -174,7 +186,7 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
         </div>
 
         {/* Panel Body */}
-        {isLoading ? (
+        {isLoading && frames.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
           </div>
@@ -183,7 +195,7 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300"
           >
-            {frames.length > 0 ? (
+            {processedFrames.length > 0 ? (
               <div className={styles.gridClass}>
                 {hasMorePrev && (
                   <div
@@ -191,40 +203,34 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
                     className="w-full h-2 col-span-full"
                   />
                 )}
-                {frames.map(frame => {
-                  const isActive = frame.timestamp === activeFrameId?.toString();
-                  return (
-                    <ResultCard
-                      key={frame.id}
-                      id={frame.id}
-                      thumbnail={getImageUrl(frame.videoId, frame.thumbnail)}
-                      title={`${frame.timestamp}`}
-                      confidence={frame.confidence}
-                      timestamp={frame.timestamp}
-                      loaded={true}
-                      onLoad={() => { }}
-                      onClick={() => onFrameClick(frame)}
-                      onContextMenu={(event) => onRightClick(frame, event)}
-                      onSimilaritySearch={onSimilaritySearch}
-                      onSubmit={() => onSubmission(frame)}
-                      onSending={() => handleSending(frame)}
-                      onDoubleClick={() => onResultDoubleClick(frame)}
-                      showConfidence
-                      showTimestamp
-                      isSelected={isActive}
-                    />
-                  );
-                })}
+                {processedFrames.map(frame => (
+                  <ResultCard
+                    key={frame.id}
+                    item={frame}
+                    loaded={true}
+                    onLoad={emptyHandler}
+                    onClick={onFrameClick}
+                    onContextMenu={onRightClick}
+                    onSimilaritySearch={onSimilaritySearch}
+                    onSubmit={onSubmission}
+                    onSending={handleSending}
+                    onDoubleClick={onResultDoubleClick}
+                    showConfidence
+                    showTimestamp
+                    isSelected={frame.isActive}
+                    priority={frame.isActive} // Prioritize loading active frame
+                  />
+                ))}
                 {hasMoreNext && (
                    <div
                     ref={bottomSentinelRef}
                     className="w-full h-2 col-span-full"
                   />
                 )}
-                {!hasMoreNext && frames.length > 10 && (
+                {!hasMoreNext && processedFrames.length > 10 && (
                   <div className="col-span-full flex items-center justify-center py-4">
                     <div className="text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
-                      All frames loaded ({frames.length} total)
+                      All frames loaded ({processedFrames.length} total)
                     </div>
                   </div>
                 )}
@@ -236,25 +242,10 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
             )}
           </div>
         )}
-
-        {/* Footer */}
-        <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-          <span>
-            Showing {frames.length} frames
-            {!hasMoreNext && !hasMorePrev && frames.length > 0 && " (complete)"}
-          </span>
-          <div className="flex gap-4">
-            {hasMorePrev && (
-              <span className="text-blue-600">Scroll up to load more</span>
-            )}
-            {hasMoreNext && (
-              <span className="text-blue-600">Scroll down to load more</span>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
-export default FramesPanel;
+// Memoize the component to prevent unnecessary re-renders
+export default React.memo(FramesPanel);

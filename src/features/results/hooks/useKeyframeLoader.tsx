@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import type { ResultItem } from '../types';
 
 // Backend Keyframe structure
@@ -8,8 +8,7 @@ interface Keyframe {
   filename: string;
 }
 
-// Reduced batch size for better UX - smaller chunks load faster
-const FETCH_ALL_BATCH_SIZE = 15;
+const FETCH_ALL_BATCH_SIZE = 20;
 
 export const useKeyframeLoader = () => {
   const [carouselFrames, setCarouselFrames] = useState<ResultItem[] | null>(null);
@@ -17,33 +16,59 @@ export const useKeyframeLoader = () => {
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Split loading states for better UX feedback
   const [isFetchingNext, setIsFetchingNext] = useState(false);
   const [isFetchingPrev, setIsFetchingPrev] = useState(false);
   
-  // Track if more frames exist
   const [hasMoreNext, setHasMoreNext] = useState(true);
   const [hasMorePrev, setHasMorePrev] = useState(true);
   
-  // Debounce mechanism to prevent rapid API calls
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   const lastRequestTimeRef = useRef<{ [key: string]: number }>({});
+  
+  // Cache for processed frames to avoid recomputation
+  const framesCacheRef = useRef<Map<string, ResultItem>>(new Map());
 
-  const createFrameItem = useCallback((kf: Keyframe): ResultItem => ({
-    id: `${kf.video_id}_${kf.frame_index}`,
-    videoId: kf.video_id,
-    title: `${kf.video_id}/${kf.frame_index}`,
-    thumbnail: kf.filename,
-    confidence: 1.0,
-    timestamp: kf.frame_index.toString(),
-  }), []);
+  const createFrameItem = useCallback((kf: Keyframe): ResultItem => {
+    const frameId = `${kf.video_id}_${kf.frame_index}`;
+    
+    // Check cache first
+    const cached = framesCacheRef.current.get(frameId);
+    if (cached) return cached;
+    
+    const frameItem: ResultItem = {
+      id: frameId,
+      videoId: kf.video_id,
+      title: `${kf.video_id}/${kf.frame_index}`,
+      thumbnail: kf.filename,
+      confidence: 1.0,
+      timestamp: kf.frame_index.toString(),
+    };
+    
+    // Cache the result
+    framesCacheRef.current.set(frameId, frameItem);
+    return frameItem;
+  }, []);
+
+  // Optimized deduplication using Set for O(n) instead of O(n²)
+  const deduplicateFrames = useCallback((frames: ResultItem[]): ResultItem[] => {
+    const seen = new Set<string>();
+    return frames.filter(frame => {
+      if (seen.has(frame.id)) return false;
+      seen.add(frame.id);
+      return true;
+    });
+  }, []);
+
+  // Memoized sorting function
+  const sortFramesByTimestamp = useCallback((frames: ResultItem[]): ResultItem[] => {
+    return [...frames].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
+  }, []);
 
   const fetchFramesBatch = useCallback(async (
     videoId: string,
     startIndex: number,
     direction: 'next' | 'prev'
   ): Promise<ResultItem[]> => {
-    // Debounce mechanism - prevent calls within 500ms of each other for same direction
     const requestKey = `${videoId}-${direction}`;
     const now = Date.now();
     const lastRequest = lastRequestTimeRef.current[requestKey] || 0;
@@ -81,14 +106,29 @@ export const useKeyframeLoader = () => {
     }
   }, [createFrameItem]);
 
+  // Image preloader function
+  const preloadImages = useCallback((frames: ResultItem[]) => {
+    frames.forEach(frame => {
+      const img = new Image();
+      img.src = frame.thumbnail;
+      // Don't wait for load, just start the request
+    });
+  }, []);
+
   /**
-   * Initial load when clicking a result item
+   * OPTIMIZED: Initial load with immediate UI feedback
    */
   const handleResultClick = useCallback(async (item: ResultItem) => {
+    const clickedFrameIndex = parseInt(item.timestamp, 10);
+    const currentFrame: ResultItem = { ...item, id: `${item.videoId}_${clickedFrameIndex}` };
+
+    // IMMEDIATE: Update UI state first for instant feedback
     setIsLoading(true);
     setCurrentVideoId(item.videoId);
     setActiveFrameId(item.timestamp);
-    setCarouselFrames([]); // Clear previous results
+    
+    // Show the clicked frame immediately while loading others
+    setCarouselFrames([currentFrame]);
     
     // Reset pagination state
     setHasMoreNext(true);
@@ -96,45 +136,63 @@ export const useKeyframeLoader = () => {
     setIsFetchingNext(false);
     setIsFetchingPrev(false);
 
-    const clickedFrameIndex = parseInt(item.timestamp, 10);
-    const currentFrame: ResultItem = { ...item, id: `${item.videoId}_${clickedFrameIndex}` };
+    // src/features/results/hooks/useKeyframeLoader.ts
 
-    try {
-      // Load initial batches in parallel
-      const [prevFrames, nextFrames] = await Promise.all([
-        fetchFramesBatch(item.videoId, clickedFrameIndex, 'prev'),
-        fetchFramesBatch(item.videoId, clickedFrameIndex, 'next')
-      ]);
+// ... inside the handleResultClick function ...
+try {
+  // Start preloading the clicked frame image immediately
+  preloadImages([currentFrame]);
 
-      // Combine and deduplicate frames
-      const combinedFrames = [...prevFrames, currentFrame, ...nextFrames];
-      const uniqueFrames = Array.from(
-        new Map(combinedFrames.map(f => [f.id, f])).values()
-      );
+  // Load batches with reduced blocking
+  const batchPromises = [
+    fetchFramesBatch(item.videoId, clickedFrameIndex, 'prev'),
+    fetchFramesBatch(item.videoId, clickedFrameIndex, 'next')
+  ];
 
-      // Sort by frame index
-      uniqueFrames.sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
+  // Use Promise.allSettled to handle partial failures gracefully
+  const [prevResult, nextResult] = await Promise.allSettled(batchPromises);
+  
+  const prevFrames = prevResult.status === 'fulfilled' ? prevResult.value : [];
+  const nextFrames = nextResult.status === 'fulfilled' ? nextResult.value : [];
 
-      // Update state based on what we received
-      setHasMoreNext(nextFrames.length >= FETCH_ALL_BATCH_SIZE);
-      setHasMorePrev(prevFrames.length >= FETCH_ALL_BATCH_SIZE);
+  // Combine frames efficiently
+  const allFrames = [
+    ...prevFrames,
+    currentFrame,
+    ...nextFrames
+  ];
 
-      setCarouselFrames(uniqueFrames);
-    } catch (error) {
-      console.error('Error in initial frame load:', error);
-      setCarouselFrames([currentFrame]); // At least show the clicked frame
-      setHasMoreNext(false);
-      setHasMorePrev(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [fetchFramesBatch]);
+  // ✅ FIXED: REMOVE requestIdleCallback and process immediately
+  const uniqueFrames = deduplicateFrames(allFrames);
+  const sortedFrames = sortFramesByTimestamp(uniqueFrames);
+    
+  // Update state with optimized frames
+  setCarouselFrames(sortedFrames);
+    
+  // Start preloading all images
+  preloadImages(sortedFrames);
+    
+  // Update pagination flags
+  setHasMoreNext(nextFrames.length >= FETCH_ALL_BATCH_SIZE);
+  setHasMorePrev(prevFrames.length >= FETCH_ALL_BATCH_SIZE);
+
+} catch (error) {
+  console.error('Error in initial frame load:', error);
+  setCarouselFrames([currentFrame]);
+  setHasMoreNext(false);
+  setHasMorePrev(false);
+} finally {
+  setIsLoading(false);
+}
+}, [fetchFramesBatch, deduplicateFrames, sortFramesByTimestamp, preloadImages]);
 
   const handleCarouselClose = useCallback(() => {
-    // Clear debounce timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
+    
+    // Clear cache on close to prevent memory leaks
+    framesCacheRef.current.clear();
     
     setCarouselFrames(null);
     setActiveFrameId(null);
@@ -150,7 +208,6 @@ export const useKeyframeLoader = () => {
   }, []);
 
   const loadNextFrames = useCallback(async () => {
-    // Comprehensive guard clauses
     if (
       isFetchingNext || 
       !hasMoreNext || 
@@ -173,10 +230,13 @@ export const useKeyframeLoader = () => {
       );
 
       if (nextFrames.length > 0) {
+        // Start preloading new images immediately
+        preloadImages(nextFrames);
+        
         setCarouselFrames(currentFrames => {
           if (!currentFrames) return currentFrames;
           
-          // Deduplicate based on frame ID
+          // Optimized deduplication
           const existingIds = new Set(currentFrames.map(f => f.id));
           const newFrames = nextFrames.filter(f => !existingIds.has(f.id));
           
@@ -184,7 +244,6 @@ export const useKeyframeLoader = () => {
         });
       }
       
-      // Update hasMoreNext based on batch size
       setHasMoreNext(nextFrames.length >= FETCH_ALL_BATCH_SIZE);
       
     } catch (error) {
@@ -193,10 +252,9 @@ export const useKeyframeLoader = () => {
     } finally {
       setIsFetchingNext(false);
     }
-  }, [isFetchingNext, hasMoreNext, currentVideoId, carouselFrames, isLoading, fetchFramesBatch]);
+  }, [isFetchingNext, hasMoreNext, currentVideoId, carouselFrames, isLoading, fetchFramesBatch, preloadImages]);
 
   const loadPreviousFrames = useCallback(async () => {
-    // Comprehensive guard clauses
     if (
       isFetchingPrev || 
       !hasMorePrev || 
@@ -219,10 +277,13 @@ export const useKeyframeLoader = () => {
       );
 
       if (prevFrames.length > 0) {
+        // Start preloading new images immediately
+        preloadImages(prevFrames);
+        
         setCarouselFrames(currentFrames => {
           if (!currentFrames) return currentFrames;
           
-          // Deduplicate based on frame ID
+          // Optimized deduplication
           const existingIds = new Set(currentFrames.map(f => f.id));
           const newFrames = prevFrames.filter(f => !existingIds.has(f.id));
           
@@ -230,7 +291,6 @@ export const useKeyframeLoader = () => {
         });
       }
       
-      // Update hasMorePrev based on batch size
       setHasMorePrev(prevFrames.length >= FETCH_ALL_BATCH_SIZE);
       
     } catch (error) {
@@ -239,7 +299,7 @@ export const useKeyframeLoader = () => {
     } finally {
       setIsFetchingPrev(false);
     }
-  }, [isFetchingPrev, hasMorePrev, currentVideoId, carouselFrames, isLoading, fetchFramesBatch]);
+  }, [isFetchingPrev, hasMorePrev, currentVideoId, carouselFrames, isLoading, fetchFramesBatch, preloadImages]);
 
   return {
     carouselFrames,

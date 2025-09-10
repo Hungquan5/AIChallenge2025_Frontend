@@ -1,6 +1,6 @@
 // components/ResultCard.tsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-
+import type { ResultItem } from '../../types';
 // --- Style Definitions ---
 import {
   cardClass,
@@ -10,20 +10,21 @@ import {
 
 // --- Prop Definitions ---
 interface ResultCardProps {
-  id: string;
-  thumbnail: string;
-  title: string;
-  confidence: number;
-  timestamp:string;
+  // ✅ CHANGED: We now accept the full item object.
+  item: ResultItem;
+
   loaded: boolean;
   onLoad: (id: string) => void;
-  onClick?: () => void;
-  onDoubleClick?: () => void;
-  onContextMenu?: (event: React.MouseEvent) => void;
+  onClick?: (item: ResultItem) => void;
+  onDoubleClick?: (item: ResultItem) => void;
+  onContextMenu?: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch?: (imageSrc: string, cardId: string) => void;
-  onSubmit?: () => void;
-  onSending?: () => void;
-  onDislike?: () => void;
+  
+  // ✅ CHANGED: The signature is now explicit: it provides the item.
+  onSubmit?: (item: ResultItem) => void;
+  onSending?: (item: ResultItem) => void;
+  onDislike?: (item: ResultItem) => void;
+  
   priority?: boolean;
   alt?: string;
   showConfidence?: boolean;
@@ -36,11 +37,7 @@ interface ResultCardProps {
 // ✅ REFACTORED: This component is now cleaner and more robust.
 
 const ResultCard: React.FC<ResultCardProps> = ({
-  id,
-  thumbnail,
-  title,
-  confidence,
-  timestamp,
+  item,
   loaded,
   onLoad,
   onClick,
@@ -58,6 +55,8 @@ const ResultCard: React.FC<ResultCardProps> = ({
   disabled = false,
   imageClassName,
 }) => {
+  const { id, thumbnail, title, confidence, timestamp } = item;
+
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   
@@ -78,69 +77,52 @@ const ResultCard: React.FC<ResultCardProps> = ({
   const handleImageLoad = useCallback(() => onLoad(id), [id, onLoad]);
   const handleImageError = useCallback(() => setImageError(true), []);
 
-  // ✅ CHANGED: All left-click logic is now consolidated here.
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    if (disabled) {
-      e.preventDefault();
-      return;
-    }
+ // ✅ FIXED: All handlers now pass the 'item' object back up to the parent.
+ const handleClick = useCallback((e: React.MouseEvent) => {
+  if (disabled) return;
+  const isCtrl = e.ctrlKey || e.metaKey;
 
-    const isCtrl = e.ctrlKey || e.metaKey;
-
-    // --- Modifier Key Logic (Priority #1) ---
-    // If Ctrl is pressed, perform the similarity search and STOP.
-    if (isCtrl && onSimilaritySearch) {
-      e.preventDefault();
-      onSimilaritySearch(thumbnail, id);
-      return; // Prevents the single/double-click logic below from running.
-    }
-
-    // --- Standard Single/Double-Click Logic (Priority #2) ---
-    if (onDoubleClick) {
-      if (clickTimeout.current) {
-        // This is a double-click
-        clearTimeout(clickTimeout.current);
-        clickTimeout.current = null;
-        onDoubleClick();
-      } else {
-        // This is the first click, start a timer
-        clickTimeout.current = window.setTimeout(() => {
-          onClick?.(); // Fire single-click action after delay
-          clickTimeout.current = null;
-        }, 250); // 250ms delay to wait for a potential second click
-      }
-    } else {
-      // If no double-click handler is provided, just fire the single-click action immediately.
-      onClick?.();
-    }
-  }, [disabled, onClick, onDoubleClick, onSimilaritySearch, thumbnail, id]);
-
-  // ✅ CHANGED: Simplified to handle non-left-click actions.
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (disabled) {
-      e.preventDefault();
-      return;
-    }
-    
-    const isCtrl = e.ctrlKey || e.metaKey;
-
-    // Ctrl + Middle Click for Submit
-    if (isCtrl && e.button === 1 && onSubmit) {
-      e.preventDefault();
-      onSubmit();
-    }
-    // Ctrl + Right Click for Dislike
-    else if (isCtrl && e.button === 2 && onDislike) {
-        e.preventDefault();
-        onDislike();
-    }
-    // Standard Middle Click for Sending
-    else if (e.button === 1 && onSending) {
-      e.preventDefault();
-      onSending();
-    }
-  }, [disabled, onSubmit, onDislike, onSending]);
+  if (isCtrl && onSimilaritySearch) {
+    e.preventDefault();
+    onSimilaritySearch(thumbnail, id);
+    return;
+  }
   
+  if (onDoubleClick) {
+    if (clickTimeout.current) {
+      clearTimeout(clickTimeout.current);
+      clickTimeout.current = null;
+      onDoubleClick(item); // Pass item
+    } else {
+      clickTimeout.current = window.setTimeout(() => {
+        onClick?.(item); // Pass item
+        clickTimeout.current = null;
+      }, 250);
+    }
+  } else {
+    onClick?.(item); // Pass item
+  }
+}, [disabled, onClick, onDoubleClick, onSimilaritySearch, thumbnail, id, item]);
+
+const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  if (disabled) return;
+  
+  const isCtrl = e.ctrlKey || e.metaKey;
+
+  // ✅ FIXED: Pass the 'item' object in the callback.
+  if (isCtrl && e.button === 1 && onSubmit) {
+    e.preventDefault();
+    onSubmit(item);
+  }
+  else if (isCtrl && e.button === 2 && onDislike) {
+    e.preventDefault();
+    onDislike(item);
+  }
+  else if (e.button === 1 && onSending) {
+    e.preventDefault();
+    onSending(item);
+  }
+}, [disabled, onSubmit, onDislike, onSending, item]);
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return;
     
@@ -152,11 +134,23 @@ const ResultCard: React.FC<ResultCardProps> = ({
         if (isCtrl && onSimilaritySearch) {
             onSimilaritySearch(thumbnail, id);
         } else if (onClick) {
-            onClick();
+            onClick(item);
         }
     }
   }, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
+// ✅ SOLUTION: Create an intermediate handler for the context menu
+const handleContextMenu = useCallback((event: React.MouseEvent) => {
+  // If the card is disabled, do nothing.
+  if (disabled) {
+    event.preventDefault(); // Still a good idea to prevent the default menu
+    return;
+  }
+  
+  // Call the onContextMenu prop passed from the parent,
+  // providing it with BOTH the item and the event.
+  onContextMenu?.(item, event);
 
+}, [disabled, item, onContextMenu]); // Add dependencies for the useCallback hook
   // --- Render Logic (No changes below this line) ---
 
   const cardClasses = [
@@ -188,7 +182,9 @@ const ResultCard: React.FC<ResultCardProps> = ({
       <img
         src={thumbnail}
         alt={alt || title}
-        loading={priority ? "eager" : "lazy"}
+        loading={"lazy"}
+        // ✅ CORRECTED: Use camelCase for the JSX prop
+        fetchPriority={priority ? "high" : "auto"}        
         decoding="async"
         className={imageClasses}
         onLoad={handleImageLoad}
@@ -204,7 +200,8 @@ const ResultCard: React.FC<ResultCardProps> = ({
       // ✅ USE THE NEW HANDLERS
       onMouseDown={handleMouseDown}
       onClick={disabled ? undefined : handleClick}
-      onContextMenu={disabled ? undefined : onContextMenu}
+      // ✅ CHANGED: Use the new intermediate handler
+      onContextMenu={disabled ? undefined : handleContextMenu}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

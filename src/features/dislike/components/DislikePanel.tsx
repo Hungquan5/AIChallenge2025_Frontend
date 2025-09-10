@@ -26,7 +26,6 @@ const DislikePanel: React.FC<DislikePanelProps> = ({
   onSimilaritySearch,
 }) => {
   return (
-    // ✅ Remove absolute positioning - it's now handled by the parent container
     <div 
       className="
         h-full w-[10vw] min-w-[150px]
@@ -68,17 +67,17 @@ const DislikePanel: React.FC<DislikePanelProps> = ({
             {items.map(item => (
               <ResultCard
                 key={item.id}
-                id={item.id}
-                thumbnail={item.thumbnail}
-                title={item.title}
-                confidence={item.confidence}
-                timestamp={item.timestamp}
+                item={item}
                 loaded={true} // Assume loaded since they were already displayed
                 onLoad={() => {}} // No-op needed
-                onClick={() => onResultClick(item)}
-                // Re-purpose Ctrl+Right-Click to mean "remove from this list"
-                onDislike={() => onUndislike(item)}
+                onClick={onResultClick}
+                // Re-purpose onDislike to mean "remove from this list"
+                onDislike={onUndislike}
                 onSimilaritySearch={onSimilaritySearch}
+                // Optional: Show smaller cards in the dislike panel
+                imageClassName="transition-all duration-200"
+                showConfidence={true}
+                showTimestamp={true}
               />
             ))}
           </div>

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import type { ResultItem } from '../../../results/types'; // Correct path to types
+import type { ResultItem } from '../../../results/types';
 import { Users, Send } from 'lucide-react';
-import ResultCard from '../../../results/components/ResultsPanel/ResultCard'; // Correct path to ResultCard
+import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
 import { getImageUrl } from '../../../../utils/getImageURL';
 
 interface BroadcastFeedProps {
@@ -85,9 +85,17 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 p-1">
             {group.items.map((msg, index) => {
               const imageUrl = msg.thumbnail.startsWith('http') ? msg.thumbnail : getImageUrl(msg.videoId, msg.thumbnail);
+              
+              // Create the complete ResultItem with proper image URL
+              const messageItem: ResultItem = {
+                ...msg,
+                thumbnail: imageUrl,
+              };
+
               const handleVqaInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 onVqaQuestionChange(msg.id, e.target.value);
               };
+              
               const handleLocalVqaSubmit = () => {
                 const question = vqaQuestions[msg.id] || '';
                 if (question.trim()) {
@@ -96,22 +104,23 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                 }
               };
 
+              // Handler for similarity search that extracts imageUrl and cardId from the item
+              const handleSimilaritySearch = (imageSrc: string, cardId: string) => {
+                onSimilaritySearch(imageUrl, msg.id);
+              };
+
               return (
                 <div key={`${msg.id}-${index}`} className="relative group flex flex-col items-center">
                   <div className="w-full">
                     <ResultCard
-                      id={msg.timestamp}
-                      thumbnail={imageUrl}
-                      title={msg.title}
-                      timestamp={msg.timestamp ?? ''}
-                      confidence={msg.confidence ?? 0}
-                      onClick={() => onResultClick(msg)}
-                      onContextMenu={(event) => onRightClick(msg, event)}
-                      onSimilaritySearch={() => onSimilaritySearch(imageUrl, msg.id)}
-                      onSubmit={() => onSubmission(msg)}
-                      onDoubleClick={() => onResultDoubleClick(msg)}
+                      item={messageItem}
                       loaded={true}
                       onLoad={() => {}}
+                      onClick={onResultClick}
+                      onContextMenu={onRightClick}
+                      onSimilaritySearch={handleSimilaritySearch}
+                      onSubmit={onSubmission}
+                      onDoubleClick={onResultDoubleClick}
                     />
                   </div>
 
@@ -121,7 +130,7 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                       value={vqaQuestions[msg.id] || ''}
                       onChange={handleVqaInputChange}
                       onKeyDown={(e) => {
-                        // ✅ CHANGE 1: Handle Ctrl+S for new line
+                        // Handle Ctrl+S for new line
                         if (e.key === 's' && e.ctrlKey) {
                           e.preventDefault(); // Prevent browser's save action
                           
@@ -142,7 +151,7 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                           }, 0);
                         }
 
-                        // ✅ CHANGE 2: Handle Enter (without modifiers) for submission
+                        // Handle Enter (without modifiers) for submission
                         if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
                           e.preventDefault(); // Prevent new line on Enter
                           handleLocalVqaSubmit();

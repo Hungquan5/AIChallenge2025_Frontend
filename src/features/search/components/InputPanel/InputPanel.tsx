@@ -36,55 +36,64 @@ const useInputPanel = ({ onSearch, isAutoTranslateEnabled, user }: InputPanelPro
 
   // --- Core Action Handlers ---
 
-  const handleSearch = async (searchMode: SearchMode = 'normal') => {
-    setLoading(true);
-    try {
-      // 1. Translate queries if necessary
-      const translatePromises = queries.map(async (q) => {
-        if (isAutoTranslateEnabled && q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
-          try {
-            const translated = await translateText(q.origin.trim());
-            return { ...q, text: translated, lang: 'eng' as const };
-          } catch (error) {
-            console.error(`Translation failed for "${q.origin}", searching with original text.`, error);
-            return q; // Fallback to original on error
-          }
-        }
-        return q;
-      });
-      const translatedQueries = await Promise.all(translatePromises);
-      setQueries(translatedQueries); // Update UI with translated text used for search
+  // src/features/search/components/InputPanel/InputPanel.tsx
 
-      // 2. Prepare queries for the API
-      const apiQueryPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
-        const base: Omit<ApiQuery, 'text' | 'image'> = {
-          asr: q.asr.trim(), ocr: q.ocr.trim(), origin: q.origin.trim(), obj: q.obj, lang: q.lang,
-        };
-        if (q.imageFile) {
-          const image = await fileToBase64(q.imageFile);
-          return { ...base, text: '', image };
+// Inside the useInputPanel custom hook...
+const handleSearch = async (searchMode: SearchMode = 'normal') => {
+  setLoading(true);
+  try {
+    // 1. Translate queries as before
+    const translatePromises = queries.map(async (q) => {
+      if (isAutoTranslateEnabled && q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
+        try {
+          const translated = await translateText(q.origin.trim());
+          return { ...q, text: translated, lang: 'eng' as const };
+        } catch (error) {
+          console.error(`Translation failed for "${q.origin}", searching with original text.`, error);
+          return q; // Fallback to original on error
         }
-        return { ...base, text: q.text.trim(), image: "" };
-      });
-      const apiQueries = await Promise.all(apiQueryPromises);
-
-      // 3. Validate that there's something to search for
-      const isSearchable = apiQueries.some(q => q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image);
-      if (!isSearchable) {
-        alert('Please enter a query or specify other search criteria.');
-        return;
       }
+      return q;
+    });
+    const translatedQueries = await Promise.all(translatePromises);
 
-      // 4. Pass the prepared queries to the parent component
-      onSearch(apiQueries, searchMode);
+    // 2. Prepare queries for the API immediately
+    const apiQueryPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
+      const base: Omit<ApiQuery, 'text' | 'image'> = {
+        asr: q.asr.trim(), ocr: q.ocr.trim(), origin: q.origin.trim(), obj: q.obj, lang: q.lang,
+      };
+      if (q.imageFile) {
+        const image = await fileToBase64(q.imageFile);
+        return { ...base, text: '', image };
+      }
+      return { ...base, text: q.text.trim(), image: "" };
+    });
+    const apiQueries = await Promise.all(apiQueryPromises);
 
-    } catch (error) {
-      console.error("Error preparing search:", error);
-      alert("An error occurred while preparing your search.");
-    } finally {
-      setLoading(false);
+    // 3. Validate that there's something to search for
+    const isSearchable = apiQueries.some(q => q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image);
+    if (!isSearchable) {
+      alert('Please enter a query or specify other search criteria.');
+      setLoading(false); // Make sure to stop loading
+      return;
     }
-  };
+
+    // ✅ SOLUTION: Dispatch the search FIRST
+    onSearch(apiQueries, searchMode);
+
+    // ✅ THEN, update the UI state. This will happen in the background
+    // without delaying the critical network request.
+    setQueries(translatedQueries);
+
+  } catch (error) {
+    console.error("Error preparing search:", error);
+    alert("An error occurred while preparing your search.");
+  } finally {
+    // The parent component's isLoading state will take over from here,
+    // so we can set the internal loading to false.
+    setLoading(false);
+  }
+};
 
   const handleTranslateAll = async () => {
     setLoading(true);

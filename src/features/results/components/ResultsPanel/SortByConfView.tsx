@@ -12,18 +12,19 @@
   import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';  
   interface Props {
     results: ResultItem[];
-    onResultClick: (item: ResultItem) => void;
-    onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
-    onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  // ✅ The signatures of these handlers should match what ResultCard expects
+  onResultClick: (item: ResultItem) => void;
+  onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  onResultDoubleClick: (item: ResultItem) => void;
+  onSubmission: (item: ResultItem) => void; // This prop is already correct
+  onDislike: (item: ResultItem) => void;
     // --- NEW PROPS ---
     currentUser: string; // The name of the current user for broadcasting
     sendMessage: (message: string) => void; // WebSocket send function
-    onResultDoubleClick: (item: ResultItem) => void; // Add prop
-    onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
+  // Change the function signature
     submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
     optimisticSubmissions: Set<string>; // Add new prop
-    onDislike: (item: ResultItem) => void; // ✅ Add the new prop
-
   }
 
 
@@ -49,22 +50,14 @@
       setLoadedImages(prev => new Set([...prev, id]));
     }, []);
     // ✅ FIX: This handler now sends a complete and consistent ResultItem payload
-    const handleSending = useCallback((item: ResultItem) => {
-      const message = {
-        type: 'broadcast_image',
-        payload: {
-          // Ensure all fields from the ResultItem type are present
-          id: item.id,
-          videoId: item.videoId,
-          thumbnail: item.thumbnail,
-          title: item.title,
-          timestamp: item.timestamp,
-          confidence: item.confidence, // Pass confidence as well
-          submittedBy: currentUser, // Add the sender's name
-        },
-      };
-      sendMessage(JSON.stringify(message));
-    }, [currentUser, sendMessage]);
+    // ✅ This handler now expects to receive the item from the child
+  const handleSending = useCallback((item: ResultItem) => {
+    const message = {
+      type: 'broadcast_image',
+      payload: { ...item, submittedBy: currentUser },
+    };
+    sendMessage(JSON.stringify(message));
+  }, [currentUser, sendMessage]);
 
 
     if (results.length === 0) {
@@ -84,23 +77,26 @@
           return (
             <ResultCard
             key={item.id}
-            id={item.id}
-            thumbnail={item.thumbnail}
-            title={item.title}
-            confidence={item.confidence}
-            timestamp={item.timestamp}
+            item={item}
             loaded={loadedImages.has(item.id)}
             onLoad={handleImageLoad}
-            onClick={onResultClick ? () => onResultClick(item) : undefined}
-            onContextMenu={(event) => onRightClick(item, event)}
-            // ✅ FIX 2: Pass the `onSimilaritySearch` prop down to the ResultCard
+            
+            // ✅ FIX #1: Pass the handler directly. No more arrow function.
+            onClick={onResultClick}
+            
+            // ✅ FIX #2: Pass the handler directly.
+            onContextMenu={onRightClick}
+            
             onSimilaritySearch={onSimilaritySearch}
-            onSubmit={() => onSubmission(item)}
-            onSending={() => handleSending(item)}
-            imageClassName={imageClass} // Use the imported class for image styling
-            onDoubleClick={() => onResultDoubleClick(item)}
-            disabled={isDisabledByServer || isDisabledOptimistically} // Use the combined result
-            onDislike={() => onDislike(item)} // ✅ Pass it to the card
+            onSubmit={onSubmission}
+            
+            // ✅ FIX #3: Pass the handler directly.
+            onSending={handleSending}
+            
+            imageClassName={imageClass}
+            onDoubleClick={onResultDoubleClick}
+            disabled={isDisabledByServer || isDisabledOptimistically}
+            onDislike={onDislike}
           />
         );
       })}
