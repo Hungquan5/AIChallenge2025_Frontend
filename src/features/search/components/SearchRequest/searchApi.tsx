@@ -1,5 +1,5 @@
 import type { ResultItem, SearchMode, ApiQuery,HistoryItem } from '../../types';
-
+import type { ModelSelection } from '../../types';
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
 
@@ -28,18 +28,25 @@ export const translateText = async (text: string): Promise<string> => {
     return result[0].map((item: [string]) => item[0]).join('');
 };
 
+// ✅ UPDATED: Add modelSelection parameter
 export const searchByText = async (
   queries: ApiQuery[],
   user_id: string,
   mode: SearchMode = 'normal',
   page: number = 1,
-  pageSize: number = 100
+  pageSize: number = 100,
+  modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<ResultItem[]> => {
   const endpoint = mode === 'chain' ? '/embeddings/chain_search' : '/embeddings/search';
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('page', page.toString());
   url.searchParams.append('page_size', pageSize.toString());
   url.searchParams.append('user_id', user_id);
+  
+  // ✅ ADD: Model selection parameters
+  url.searchParams.append('use_clip', modelSelection.use_clip.toString());
+  url.searchParams.append('use_siglip2', modelSelection.use_siglip2.toString());
+  url.searchParams.append('use_beit3', modelSelection.use_beit3.toString());
 
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -69,17 +76,24 @@ export const searchByText = async (
 /**
  * ✅ MODIFIED: This function now accepts page and pageSize for pagination
  */
+// ✅ UPDATED: Add modelSelection parameter to single query search too
 export const searchBySingleQuery = async (
   query: ApiQuery, 
   user_id: string,
   page: number = 1,
-  pageSize: number = 100
+  pageSize: number = 100,
+  modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<ResultItem[]> => {
   const endpoint = '/embeddings/stage';
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   url.searchParams.append('user_id', user_id);
   url.searchParams.append('page', page.toString());
   url.searchParams.append('page_size', pageSize.toString());
+  
+  // ✅ ADD: Model selection parameters
+  url.searchParams.append('use_clip', modelSelection.use_clip.toString());
+  url.searchParams.append('use_siglip2', modelSelection.use_siglip2.toString());
+  url.searchParams.append('use_beit3', modelSelection.use_beit3.toString());
 
   const res = await fetch(url.toString(), {
     method: 'POST',
@@ -103,7 +117,7 @@ export const searchBySingleQuery = async (
           videoId: item.videoId,
           timestamp: item.timestamp,
           confidence: item.confidence,
-          id: `${page}-${index}`, // ✅ Use page number for unique ID
+          id: `${page}-${index}`,
           title: `${item.videoId} - ${item.timestamp}`,
           thumbnail: adjustThumbnail(thumbnailPath),
       };

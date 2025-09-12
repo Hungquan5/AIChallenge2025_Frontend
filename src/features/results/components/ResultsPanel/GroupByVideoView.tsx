@@ -13,7 +13,6 @@ import {
   imageClass
 } from './styles';
 import ResultCard from './ResultCard';
-import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';
 
 interface Props {
   groupedResults: GroupedResult[];
@@ -22,16 +21,14 @@ interface Props {
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
   currentUser: string;
   sendMessage: (message: string) => void;
-  // This prop was correctly added to the interface already.
   onResultDoubleClick: (item: ResultItem) => void;
-  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
-  submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
-  optimisticSubmissions: Set<string>; // Add new prop
-  onDislike: (item: ResultItem) => void; // ✅ Add the new prop
+  onSubmission: (item: ResultItem) => void;
+  submissionStatuses: { [key: string]: string };
+  optimisticSubmissions: Set<string>;
+  onDislike: (item: ResultItem) => void;
 
 }
 
-// ✅ FIX 1: Destructure the `onResultDoubleClick` prop from the component's props.
 const GroupedByVideoView: React.FC<Props> = ({ 
   groupedResults, 
   onResultClick, 
@@ -39,11 +36,11 @@ const GroupedByVideoView: React.FC<Props> = ({
   onSimilaritySearch, 
   currentUser, 
   sendMessage,
-  onResultDoubleClick, // <-- Destructure it here
-submissionStatuses,
+  onResultDoubleClick,
+  submissionStatuses,
   onSubmission,
-optimisticSubmissions,
-onDislike
+  optimisticSubmissions,
+  onDislike
 }) => {
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
@@ -51,18 +48,12 @@ onDislike
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
   
+  // This handler is now consistent with SortedByConfidenceView
   const handleSending = useCallback((item: ResultItem) => {
     const message = {
       type: 'broadcast_image',
-      payload: {
-        id: item.id,
-        videoId: item.videoId,
-        thumbnail: item.thumbnail,
-        title: item.title,
-        timestamp: item.timestamp,
-        confidence: item.confidence,
-        submittedBy: currentUser,
-      },
+      // ✅ FIX: Spread the item to ensure a complete and consistent payload
+      payload: { ...item, submittedBy: currentUser },
     };
     sendMessage(JSON.stringify(message));
   }, [currentUser, sendMessage]);
@@ -85,28 +76,33 @@ onDislike
             <span className={groupCountClass}>({group.items.length})</span>
           </h2>
           <div className={gridClass}>
-            {group.items.map(item => (
-              <ResultCard
-                key={item.id}
-                id={item.id}
-                thumbnail={item.thumbnail}
-                title={item.title}
-                confidence={item.confidence}
-                timestamp={item.timestamp}
-                loaded={loadedImages.has(item.id)}
-                onLoad={handleImageLoad}
-                onClick={onResultClick ? () => onResultClick(item) : undefined}
-                onContextMenu={(event) => onRightClick(item, event)}
-                onSubmit={() => onSubmission(item)}
-                onSending={() => handleSending(item)}
-                onSimilaritySearch={onSimilaritySearch}
-                imageClassName={imageClass}
-                onDislike={() => onDislike(item)} // ✅ Pass it to the card
+            {group.items.map(item => {
+              // ✅ CHANGE 1: Add disabled state logic, same as in SortedByConfidenceView.
+              const isDisabledByServer = !!submissionStatuses[item.thumbnail];
+              const isDisabledOptimistically = optimisticSubmissions.has(item.thumbnail);
 
-                // ✅ FIX 2: Pass the handler down to the ResultCard's onDoubleClick prop.
-                onDoubleClick={() => onResultDoubleClick(item)}
-              />
-            ))}
+              return (
+                <ResultCard
+                  key={item.id}
+                  // ✅ CHANGE 2: Pass the entire `item` object directly for cleaner code.
+                  item={item}
+                  loaded={loadedImages.has(item.id)}
+                  onLoad={handleImageLoad}
+                  imageClassName={imageClass}
+                  // ✅ CHANGE 3: Pass event handlers directly without wrapping them.
+                  // The ResultCard component is responsible for passing the `item` back.
+                  onClick={onResultClick}
+                  onContextMenu={onRightClick}
+                  onDoubleClick={onResultDoubleClick}
+                  onSubmit={onSubmission}
+                  onSending={handleSending}
+                  onDislike={onDislike}
+                  onSimilaritySearch={onSimilaritySearch}
+                  // ✅ CHANGE 4: Pass the calculated disabled state to the card.
+                  disabled={isDisabledByServer || isDisabledOptimistically}
+                />
+              );
+            })}
           </div>
         </div>
       ))}

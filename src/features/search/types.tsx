@@ -27,7 +27,24 @@ export interface GroupedResult {
 
 export type SearchMode = 'normal' | 'chain';
 
-// Define a separate type for the API payload
+
+
+// ✅ ADD THIS TYPE DEFINITION
+export interface HistoryItem {
+  queries: Query[];
+  dislike_labels: string[];
+}
+
+
+// 1. First, update your types to include model selection
+
+// src/features/search/types.ts
+export interface ModelSelection {
+  use_clip: boolean;
+  use_siglip2: boolean;
+  use_beit3: boolean;
+}
+
 export interface ApiQuery {
   text: string;
   asr: string;
@@ -35,12 +52,15 @@ export interface ApiQuery {
   origin: string;
   obj: string[];
   lang: 'eng' | 'ori';
-  image: string; // For the base64 encoded image
+  image: string;
 }
 
-
-// ✅ ADD THIS TYPE DEFINITION
-export interface HistoryItem {
-  queries: Query[];
-  dislike_labels: string[];
+// Add to existing search function signature
+export interface SearchParams {
+  queries: ApiQuery[];
+  mode: SearchMode;
+  page?: number;
+  page_size?: number;
+  user_id?: string;
+  modelSelection?: ModelSelection;
 }

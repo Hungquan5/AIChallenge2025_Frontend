@@ -12,7 +12,6 @@ import FramesPanel from './features/detail_info/components/RelativeFramePanel/Fr
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
 import DislikePanel from './features/dislike/components/DislikePanel';
-
 // --- Custom Hooks ---
 import { useAppState } from './hooks/useAppState';
 import { useModalState } from './hooks/useModalState';
@@ -113,6 +112,8 @@ const App: React.FC = () => {
     isAutoTranslateEnabled: appState.isAutoTranslateEnabled,
     isLoading: appState.isLoading,
     user: user,
+        // ✅ PASS THE CURRENT MODEL SELECTION
+        modelSelection: appState.modelSelection, 
   });
 
   const leftPanel = (
@@ -139,6 +140,8 @@ const App: React.FC = () => {
           hasNextPage={appState.hasNextPage}
           isLoading={appState.isLoading}
           totalResults={appState.results.length}
+          modelSelection={appState.modelSelection}
+          onModelSelectionChange={appState.setModelSelection}        
         />
       </div>
 

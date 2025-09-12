@@ -27,7 +27,7 @@ const loginToDres = async (username: string = 'quannh', password: string='123456
 };
 
 const getEvaluationId = async (sessionId: string) => {
-  const response = await fetch(`http://192.168.28.151:5000/api/v2/client/evaluation/list?session=${sessionId}`, {
+  const response = await fetch(`http://192.168.20.156:5601/api/v2/client/evaluation/list?session=${sessionId}`, {
     method: 'GET',
   });
 
@@ -69,7 +69,7 @@ const submitToDres = async (
       ],
     };
 
-    const response = await fetch(`http://192.168.28.151:5000/api/v2/submit/${evaluationId}?session=${sessionId}`, {
+    const response = await fetch(`http://192.168.20.156:5601/api/v2/submit/${evaluationId}?session=${sessionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -91,7 +91,7 @@ const submitToDres = async (
 };
 
 const fullSubmissionFlow = async (result: ResultItem) => {
-  const sessionId = "PZxbvRe5HgYq0LjvcauF3hZ9bXASJoNF";
+  const sessionId = "eC3sC1hr_sck62XJZ6smYQ0N6HrfZFwK";
   const evaluationId = await getEvaluationId(sessionId);
   return await submitToDres(result, sessionId, evaluationId);
 };

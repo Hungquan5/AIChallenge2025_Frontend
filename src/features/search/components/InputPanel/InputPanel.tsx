@@ -8,24 +8,27 @@ import { fileToBase64 } from '../../../../utils/fileConverter';
 import { translateText, getHistory } from '../SearchRequest/searchApi';
 import HistoryPanel from '../../../history/components/HistoryPanel';
 import { Search, Zap, Loader2 } from 'lucide-react';
-
+import type { ModelSelection } from '../../types';
+import ModelSelectionPanel from '../ModelSelection/ModelSelection';
 // ============================================================================
 // === 1. PROPS INTERFACE (No changes needed) =================================
 // ============================================================================
 
+// Add to InputPanelProps interface:
 interface InputPanelProps {
-  onSearch: (queries: ApiQuery[], mode: SearchMode) => void;
+  onSearch: (queries: ApiQuery[], mode: SearchMode, modelSelection: ModelSelection) => void;
   isAutoTranslateEnabled: boolean;
   isLoading: boolean;
   onSingleSearchResult: (results: ResultItem[]) => void;
   user: User | null;
+  modelSelection: ModelSelection; // Add this
 }
 
 // ============================================================================
 // === 2. NEW CUSTOM HOOK `useInputPanel` (No changes needed) =================
 // ============================================================================
 
-const useInputPanel = ({ onSearch, isAutoTranslateEnabled, user }: InputPanelProps) => {
+const useInputPanel = ({ onSearch, isAutoTranslateEnabled, user, modelSelection}: InputPanelProps) => {
   const [queries, setQueries] = useState<Query[]>([
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
   ]);
@@ -79,7 +82,7 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
     }
 
     // ✅ SOLUTION: Dispatch the search FIRST
-    onSearch(apiQueries, searchMode);
+    onSearch(apiQueries, searchMode,modelSelection);
 
     // ✅ THEN, update the UI state. This will happen in the background
     // without delaying the critical network request.

@@ -1,7 +1,7 @@
-// src/features/search/hooks/useSearch.ts
+
 import { useCallback} from 'react';
 import type { RefObject } from 'react';
-import type { ApiQuery, SearchMode } from '../types';
+import type { ApiQuery, SearchMode, ModelSelection } from '../types';
 import type { ResultItem } from '../../results/types';
 import { searchByText } from '../components/SearchRequest/searchApi';
 import { performSimilaritySearch } from '../components/SimilaritySearch/SimilaritySearch';
@@ -9,14 +9,14 @@ import { performSimilaritySearch } from '../components/SimilaritySearch/Similari
 const PAGE_SIZE = 100;
 
 interface UseSearchProps {
-  appState: any; // You can make this more specific with the actual type
+  appState: any;
   user: any;
   resultsRef: RefObject<HTMLDivElement>;
 }
 
 interface UseSearchReturn {
-  executeSearch: (queries: ApiQuery[], mode: SearchMode, page: number) => Promise<void>;
-  handleInitiateSearch: (queries: ApiQuery[], mode: SearchMode) => void;
+  executeSearch: (queries: ApiQuery[], mode: SearchMode, page: number, modelSelection?: ModelSelection) => Promise<void>;
+  handleInitiateSearch: (queries: ApiQuery[], mode: SearchMode, modelSelection?: ModelSelection) => void;
   handlePageChange: (newPage: number) => void;
   handleSingleItemSearch: (newResults: ResultItem[]) => void;
   handleSimilaritySearch: (imageSrc: string, cardId: string) => Promise<void>;
@@ -24,16 +24,22 @@ interface UseSearchReturn {
 }
 
 export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSearchReturn => {
-  const executeSearch = useCallback(async (queries: ApiQuery[], mode: SearchMode, page: number) => {
+  // ✅ UPDATED: Add modelSelection parameter
+  const executeSearch = useCallback(async (
+    queries: ApiQuery[], 
+    mode: SearchMode, 
+    page: number, 
+    modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
+  ) => {
     if (!user) return;
     
     appState.setIsLoading(true);
     try {
-      const newResults = await searchByText(queries, user?.username, mode, page, PAGE_SIZE);
+      // ✅ UPDATED: Pass modelSelection to searchByText
+      const newResults = await searchByText(queries, user?.username, mode, page, PAGE_SIZE, modelSelection);
       appState.updateResultsWithGrouped(newResults);
       appState.setHasNextPage(newResults.length === PAGE_SIZE);
 
-      // Scroll to top of results view
       resultsRef.current?.scrollTo(0, 0);
     } catch (error) {
       console.error("Search failed:", error);
@@ -44,21 +50,30 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
     }
   }, [user, appState, resultsRef]);
 
-  const handleInitiateSearch = useCallback((queries: ApiQuery[], mode: SearchMode) => {
+  // ✅ UPDATED: Add modelSelection parameter and store it in app state
+  const handleInitiateSearch = useCallback((
+    queries: ApiQuery[], 
+    mode: SearchMode, 
+    modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
+  ) => {
     if (!user?.username) return;
     
     appState.setCurrentPage(1);
     appState.setLastQueries(queries);
     appState.setLastSearchMode(mode);
-    executeSearch(queries, mode, 1);
+    // ✅ ADD: Store model selection for pagination
+    appState.setLastModelSelection(modelSelection);
+    executeSearch(queries, mode, 1, modelSelection);
   }, [executeSearch, user, appState]);
 
+  // ✅ UPDATED: Use stored model selection for pagination
   const handlePageChange = useCallback((newPage: number) => {
     if (appState.lastQueries.length > 0) {
       appState.setCurrentPage(newPage);
-      executeSearch(appState.lastQueries, appState.lastSearchMode, newPage);
+      const modelSelection = appState.lastModelSelection || { use_clip: true, use_siglip2: true, use_beit3: true };
+      executeSearch(appState.lastQueries, appState.lastSearchMode, newPage, modelSelection);
     }
-  }, [appState.lastQueries, appState.lastSearchMode, executeSearch, appState]);
+  }, [appState.lastQueries, appState.lastSearchMode, appState.lastModelSelection, executeSearch, appState]);
 
   const handleSingleItemSearch = useCallback((newResults: ResultItem[]) => {
     appState.updateResultsWithGrouped(newResults);

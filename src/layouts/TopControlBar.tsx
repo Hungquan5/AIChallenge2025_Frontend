@@ -1,11 +1,13 @@
 // src/layouts/TopControlBar.tsx
 
-import React from 'react';
-// ✅ 1. Import necessary icons
-import { ListChecks, Library, Keyboard, Languages } from 'lucide-react';
+import React, { useState } from 'react';
+// ✅ Add ChevronDown and Settings to existing imports
+import { ListChecks, Library, Keyboard, Languages, Settings, ChevronDown } from 'lucide-react';
 import type { ViewMode } from '../features/results/types';
+import type { ModelSelection } from '../features/search/types';
 import PaginationControls from '../features/results/components/ResultsPanel/PaginationControls';
-
+// ✅ Import the existing ModelSelectionPanel
+import ModelSelectionPanel from '../features/search/components/ModelSelection/ModelSelection';
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
@@ -13,12 +15,16 @@ interface Props {
   isAutoTranslateEnabled: boolean;
   onAutoTranslateChange: (enabled: boolean) => void;
   
-  // ✅ 2. Add all pagination-related props
+  // Pagination props
   currentPage: number;
   onPageChange: (newPage: number) => void;
   hasNextPage: boolean;
   isLoading: boolean;
-  totalResults: number; // To know when to show the controls
+  totalResults: number;
+  
+  // ✅ Model selection props
+  modelSelection: ModelSelection;
+  onModelSelectionChange: (selection: ModelSelection) => void;
 }
 
 const TopControlBar: React.FC<Props> = ({
@@ -32,14 +38,19 @@ const TopControlBar: React.FC<Props> = ({
   hasNextPage,
   isLoading,
   totalResults,
+  modelSelection,
+  onModelSelectionChange,
 }) => {
+  // ✅ State for model dropdown
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+
+  const enabledModelsCount = Object.values(modelSelection).filter(Boolean).length;
+
   return (
-    // ✅ Remove background classes since they're now applied by the parent container
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
         {/* View Mode Toggles */}
         <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-xl">
-          {/* ✅ 2. Add icons to view mode buttons */}
           <button
             onClick={() => onViewModeChange('sortByConfidence')}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
@@ -64,7 +75,34 @@ const TopControlBar: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* ✅ 3. Add icon to Auto-Translate toggle label */}
+        {/* ✅ Model Selection Dropdown using existing ModelSelectionPanel */}
+        <div className="relative border-l border-slate-300/60 pl-4">
+          <button
+            onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Models ({enabledModelsCount}/3)</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* ✅ Dropdown using the existing ModelSelectionPanel */}
+          {isModelDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+              <div className="p-4">
+                {/* ✅ Use the existing ModelSelectionPanel component */}
+                <ModelSelectionPanel
+                  modelSelection={modelSelection}
+                  onModelSelectionChange={onModelSelectionChange}
+                  isCollapsed={false}
+                  onToggleCollapse={undefined} // No collapse functionality in dropdown
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Auto-Translate toggle */}
         <div className="border-l border-slate-300/60 pl-4">
           <label htmlFor="auto-translate-toggle" className="flex items-center cursor-pointer select-none">
             <Languages className="w-5 h-5 mr-3 text-slate-600" />
@@ -84,7 +122,7 @@ const TopControlBar: React.FC<Props> = ({
         </div>
       </div>  
 
-      {/* ✅ 4. Add the PaginationControls in the center */}
+      {/* Pagination Controls */}
       <div className="flex-grow flex justify-center">
         {(totalResults > 0 || currentPage > 1) && (
           <PaginationControls
@@ -95,7 +133,7 @@ const TopControlBar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* ✅ 4. Add icon to Shortcuts Button */}
+      {/* Shortcuts Button */}
       <button
         onClick={onShowShortcuts}
         className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
@@ -103,6 +141,14 @@ const TopControlBar: React.FC<Props> = ({
         <Keyboard className="w-5 h-5" />
         <span>Shortcuts</span>
       </button>
+
+      {/* Click outside handler to close dropdown */}
+      {isModelDropdownOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsModelDropdownOpen(false)}
+        />
+      )}
     </div>
   );
 };

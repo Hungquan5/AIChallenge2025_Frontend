@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import type { ResultItem, GroupedResult, ViewMode } from '../features/results/types';
 import type { ApiQuery, SearchMode } from '../features/search/types';
 import { mockResults, mockGroupedResults } from '../utils/mockData';
-
+import type { ModelSelection } from '../features/search/types';
 interface UseAppStateReturn {
   // State
   results: ResultItem[];
@@ -16,6 +16,9 @@ interface UseAppStateReturn {
   lastSearchMode: SearchMode;
   isAutoTranslateEnabled: boolean;
   currentVideoTitle: string;
+  // ✅ ADD: Model selection state
+  lastModelSelection: ModelSelection;
+  modelSelection: ModelSelection;
 
   // Setters
   setResults: React.Dispatch<React.SetStateAction<ResultItem[]>>;
@@ -28,6 +31,9 @@ interface UseAppStateReturn {
   setLastSearchMode: React.Dispatch<React.SetStateAction<SearchMode>>;
   setIsAutoTranslateEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setCurrentVideoTitle: React.Dispatch<React.SetStateAction<string>>;
+  // ✅ ADD: Model selection setters
+  setLastModelSelection: React.Dispatch<React.SetStateAction<ModelSelection>>;
+  setModelSelection: React.Dispatch<React.SetStateAction<ModelSelection>>;
 
   // Helper methods
   toggleViewMode: () => void;
@@ -40,7 +46,19 @@ export const useAppState = (): UseAppStateReturn => {
   const [results, setResults] = useState<ResultItem[]>(mockResults);
   const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
-  
+  // Update src/hooks/useAppState.ts (add these to your existing hook)
+// In your useAppState hook, add:
+const [lastModelSelection, setLastModelSelection] = useState<ModelSelection>({
+  use_clip: true,
+  use_siglip2: true, 
+  use_beit3: true
+});
+
+const [modelSelection, setModelSelection] = useState<ModelSelection>({
+  use_clip: true,
+  use_siglip2: true,
+  use_beit3: true,
+});
   // Pagination & Search Context State
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,6 +112,10 @@ export const useAppState = (): UseAppStateReturn => {
     lastSearchMode,
     isAutoTranslateEnabled,
     currentVideoTitle,
+lastModelSelection,
+setLastModelSelection,
+modelSelection,
+setModelSelection,
 
     // Setters
     setResults,

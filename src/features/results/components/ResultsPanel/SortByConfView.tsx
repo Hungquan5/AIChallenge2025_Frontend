@@ -9,7 +9,6 @@
     imageClass
   } from './styles';
   import ResultCard from './ResultCard';
-  import { fullSubmissionFlow } from '../../../submit/components/SubmitAPI';  
   interface Props {
     results: ResultItem[];
   // ✅ The signatures of these handlers should match what ResultCard expects
