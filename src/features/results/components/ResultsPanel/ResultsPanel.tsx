@@ -1,27 +1,31 @@
 // src/features/results/components/ResultsPanel.tsx
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
 import { useShortcuts } from '../../../../utils/shortcuts';
-import PaginationControls from './PaginationControls';
+
+// Define the specific status type once to be reusable
+type SubmissionStatus = 'PENDING' | 'WRONG';
+
 interface ResultsPanelProps {
   viewMode: ViewMode;
   results: ResultItem[];
   groupedResults?: GroupedResult[];
   onResultClick: (item: ResultItem) => void;
-  // ✅ CHANGED: The prop for handling right-clicks is now received from App.tsx.
   onResultRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
   currentUser: string;
   sendMessage: (message: string) => void;
   onItemBroadcast?: (item: ResultItem) => void;
-  onSubmission: (item: ResultItem) => void; // ✅ Add the new prop
-  submissionStatuses: { [key: string]: string }; // --- NEW PROP ---
-  optimisticSubmissions: Set<string>; // Add new prop
-
-  onResultDoubleClick: (item: ResultItem) => void; // Add prop
-  onResultDislike: (item: ResultItem) => void; // ✅ Add the new pr
+  onSubmission: (item: ResultItem) => void;
+  
+  // ✅ FIX: Use the more specific type for the submission statuses object.
+  submissionStatuses: { [key: string]: SubmissionStatus };
+  
+  optimisticSubmissions: Set<string>;
+  onResultDoubleClick: (item: ResultItem) => void;
+  onResultDislike: (item: ResultItem) => void;
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -29,164 +33,80 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   results,
   groupedResults = [],
   onResultClick,
-  onResultRightClick, // ✅ Destructure the new handler.
-  onSimilaritySearch, // We will use THIS prop directly.
-  currentUser, sendMessage,onItemBroadcast,
+  onResultRightClick,
+  onSimilaritySearch,
+  currentUser, sendMessage,
   onResultDoubleClick,
   onSubmission,
-  submissionStatuses, // --- Destructure the new prop ---
+  submissionStatuses,
   optimisticSubmissions,
   onResultDislike
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [modalData, setModalData] = useState<ResultItem | null>(null);
+  
+  // No need for this local state as it's handled in App.tsx or parent
+  // const [modalData, setModalData] = useState<ResultItem | null>(null);
 
-  // --- REMOVE ALL THIS LOCAL STATE AND LOGIC ---
-  // const [isSearchingSimilar, setIsSearchingSimilar] = useState(false);
-  // const [similarityError, setSimilarityError] = useState<string | null>(null);
-  // const handleSimilaritySearch = useSimilaritySearch(...); // This is the line causing the issue.
-
-  const handleRightClick = (item: ResultItem, event: React.MouseEvent) => {
-    event.preventDefault();
-    setModalData(item);
-  };
-
-  const closeModal = () => {
-    setModalData(null);
-  };
-
-  // Keyboard shortcut logic can remain
- const focusNextResult = () => {
-
-
-
+  // Keyboard shortcut logic (no changes)
+  const focusNextResult = () => {
     const container = containerRef.current;
-
-
     if (!container) return;
-
-
-
-
-
     const items = container.querySelectorAll('.result-item');
-
-
     const currentFocus = document.activeElement;
-
-
     const currentIndex = Array.from(items).indexOf(currentFocus as Element);
-
-
-    
-
-
     if (currentIndex === -1 && items.length > 0) {
-
-
-      // No item focused, focus first item
-
-
       (items[0] as HTMLElement).focus();
-
-
     } else if (currentIndex < items.length - 1) {
-
-
-      // Focus next item
-
-
       (items[currentIndex + 1] as HTMLElement).focus();
-
-
     }
-
-
   };
 
   const focusPrevResult = () => {
-
-
     const container = containerRef.current;
-
-
     if (!container) return;
-
-
-
-
-
     const items = container.querySelectorAll('.result-item');
-
-
     const currentFocus = document.activeElement;
-
-
     const currentIndex = Array.from(items).indexOf(currentFocus as Element);
-
-
-    
-
-
     if (currentIndex === -1 && items.length > 0) {
-
-
-      // No item focused, focus last item
-
-
       (items[items.length - 1] as HTMLElement).focus();
-
-
     } else if (currentIndex > 0) {
-
-
-      // Focus previous item
-
-
       (items[currentIndex - 1] as HTMLElement).focus();
-
-
     }
-
-
   };
+  
   useShortcuts({ NEXT_RESULT: focusNextResult, PREV_RESULT: focusPrevResult });
 
   return (
     <div className="min-h-full">
-
-
       {viewMode === 'sortByConfidence' ? (
         <SortedByConfidenceView
           results={results}
           onResultClick={onResultClick}
           onRightClick={onResultRightClick}
-          // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
           currentUser={currentUser}
           sendMessage={sendMessage}
-          onResultDoubleClick={onResultDoubleClick} // Pass it down
-          onSubmission={onSubmission} // ✅ Pass it to the view
-          submissionStatuses={submissionStatuses} // --- Pass it down ---
+          onResultDoubleClick={onResultDoubleClick}
+          onSubmission={onSubmission}
+          // --- This prop now matches the expected type ---
+          submissionStatuses={submissionStatuses}
           optimisticSubmissions={optimisticSubmissions}
-          onDislike={onResultDislike} // ✅ Pass it down
-
+          onDislike={onResultDislike}
         />
       ) : (
         <GroupedByVideoView
           groupedResults={groupedResults}
           onResultClick={onResultClick}
           onRightClick={onResultRightClick}
-          // ✅ Pass the PROP from App.tsx down to the view
           onSimilaritySearch={onSimilaritySearch}
           currentUser={currentUser}
           sendMessage={sendMessage}
-          onResultDoubleClick={onResultDoubleClick} // Pass it down
-          onSubmission={onSubmission} // ✅ Pass it to the view
-          submissionStatuses={submissionStatuses} // --- Pass it down ---
+          onResultDoubleClick={onResultDoubleClick}
+          onSubmission={onSubmission}
+           // --- This prop now matches the expected type ---
+          submissionStatuses={submissionStatuses}
           optimisticSubmissions={optimisticSubmissions}
-          onDislike={onResultDislike} // ✅ Pass it down
-
+          onDislike={onResultDislike}
         />
       )}
     </div>

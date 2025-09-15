@@ -1,6 +1,7 @@
 // components/ResultCard.tsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ResultItem } from '../../types';
+import { Clock, Ban } from 'lucide-react'; 
 // --- Style Definitions ---
 import {
   cardClass,
@@ -32,6 +33,7 @@ interface ResultCardProps {
   isSelected?: boolean;
   disabled?: boolean;
   imageClassName?: string;
+  submissionStatus?: 'PENDING' | 'WRONG';
 }
 
 // ✅ REFACTORED: This component is now cleaner and more robust.
@@ -54,6 +56,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
   isSelected = false,
   disabled = false,
   imageClassName,
+  submissionStatus
 }) => {
   const { id, thumbnail, title, confidence, timestamp } = item;
 
@@ -153,12 +156,16 @@ const handleContextMenu = useCallback((event: React.MouseEvent) => {
 }, [disabled, item, onContextMenu]); // Add dependencies for the useCallback hook
   // --- Render Logic (No changes below this line) ---
 
-  const cardClasses = [
+   // ✅ SOLUTION: Conditionally apply classes based on the submissionStatus prop.
+   const cardClasses = [
     cardClass, 'group', 'result-item', 'relative', 'overflow-hidden', 'rounded-lg',
     'transition-all duration-300 ease-out',
     isSelected ? 'ring-2 ring-blue-500 ring-opacity-60' : '',
     disabled ? 'opacity-50 cursor-not-allowed' : (onClick ? 'cursor-pointer' : ''),
     isHovered && !disabled ? 'transform scale-[1.02] shadow-2xl' : 'shadow-lg',
+    // --- NEW STATUS STYLES ---
+    submissionStatus === 'PENDING' && 'opacity-60', // Reduce opacity for pending
+    submissionStatus === 'WRONG' && 'opacity-60 ring-2 ring-red-500', // Opacity + red border for wrong
   ].filter(Boolean).join(' ');
 
   const imageClasses = [
@@ -167,6 +174,38 @@ const handleContextMenu = useCallback((event: React.MouseEvent) => {
     isHovered && !disabled ? 'scale-[1.03]' : '',
   ].filter(Boolean).join(' ');
 
+  const renderStatusIcon = () => {
+    if (!submissionStatus) return null;
+
+    // ✅ 2. USE THE IMPORTED LUCIDE COMPONENTS DIRECTLY
+    let iconDetails = {
+      Icon: null as React.ElementType | null,
+      bgColor: '',
+      title: '',
+    };
+
+    switch (submissionStatus) {
+      case 'PENDING':
+        iconDetails = { Icon: Clock, bgColor: 'bg-blue-500/80', title: 'Submission Pending' };
+        break;
+      case 'WRONG':
+        iconDetails = { Icon: Ban, bgColor: 'bg-red-500/80', title: 'Incorrect Submission' };
+        break;
+      default:
+        return null;
+    }
+
+    const { Icon, bgColor, title } = iconDetails;
+
+    return (
+      <div
+        title={title}
+        className={`absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-white backdrop-blur-sm ${bgColor} pointer-events-none`}
+      >
+        {Icon && <Icon className="w-4 h-4" />}
+      </div>
+    );
+  };
 
   const renderImage = () => {
     if (imageError) {
@@ -195,21 +234,20 @@ const handleContextMenu = useCallback((event: React.MouseEvent) => {
 
   return (
     <div
-      className={cardClasses}
-      tabIndex={disabled ? -1 : 0}
-      // ✅ USE THE NEW HANDLERS
-      onMouseDown={handleMouseDown}
-      onClick={disabled ? undefined : handleClick}
-      // ✅ CHANGED: Use the new intermediate handler
-      onContextMenu={disabled ? undefined : handleContextMenu}
-      onKeyDown={handleKeyDown}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      role={onClick ? "button" : undefined}
-      aria-label={onClick ? `View ${title}${onSimilaritySearch ? ', Ctrl+click for similarity search' : ''}` : undefined}
-      aria-disabled={disabled}
-      data-testid={`result-card-${id}`}
-    >
+    className={cardClasses}
+    tabIndex={onClick && !disabled ? 0 : -1}
+    onMouseDown={handleMouseDown}
+    onClick={disabled ? undefined : handleClick}
+    onContextMenu={disabled ? undefined : handleContextMenu}
+    onKeyDown={handleKeyDown}
+    onMouseEnter={() => setIsHovered(true)}
+    onMouseLeave={() => setIsHovered(false)}
+    role={onClick ? "button" : undefined}
+    aria-label={onClick ? `View ${title}${onSimilaritySearch ? ', Ctrl+click for similarity search' : ''}` : undefined}
+    aria-disabled={disabled}
+    data-testid={`result-card-${id}`}
+  >
+    {renderStatusIcon()}
       <div className={imageContainerClass}>
         {renderImage()}
         {!loaded && !imageError && (

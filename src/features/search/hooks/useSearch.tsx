@@ -1,3 +1,4 @@
+// src/features/search/hooks/useSearch.ts
 
 import { useCallback} from 'react';
 import type { RefObject } from 'react';
@@ -24,7 +25,6 @@ interface UseSearchReturn {
 }
 
 export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSearchReturn => {
-  // ✅ UPDATED: Add modelSelection parameter
   const executeSearch = useCallback(async (
     queries: ApiQuery[], 
     mode: SearchMode, 
@@ -35,7 +35,6 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
     
     appState.setIsLoading(true);
     try {
-      // ✅ UPDATED: Pass modelSelection to searchByText
       const newResults = await searchByText(queries, user?.username, mode, page, PAGE_SIZE, modelSelection);
       appState.updateResultsWithGrouped(newResults);
       appState.setHasNextPage(newResults.length === PAGE_SIZE);
@@ -50,7 +49,6 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
     }
   }, [user, appState, resultsRef]);
 
-  // ✅ UPDATED: Add modelSelection parameter and store it in app state
   const handleInitiateSearch = useCallback((
     queries: ApiQuery[], 
     mode: SearchMode, 
@@ -61,12 +59,10 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
     appState.setCurrentPage(1);
     appState.setLastQueries(queries);
     appState.setLastSearchMode(mode);
-    // ✅ ADD: Store model selection for pagination
     appState.setLastModelSelection(modelSelection);
     executeSearch(queries, mode, 1, modelSelection);
   }, [executeSearch, user, appState]);
 
-  // ✅ UPDATED: Use stored model selection for pagination
   const handlePageChange = useCallback((newPage: number) => {
     if (appState.lastQueries.length > 0) {
       appState.setCurrentPage(newPage);
@@ -82,6 +78,7 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
     resultsRef.current?.scrollTo(0, 0);
   }, [appState, resultsRef]);
 
+
   const handleSimilarityResults = useCallback((newResults: ResultItem[]) => {
     appState.updateResultsWithGrouped(newResults);
     resultsRef.current?.scrollTo(0, 0);
@@ -90,10 +87,22 @@ export const useSearch = ({ appState, user, resultsRef }: UseSearchProps): UseSe
   const handleSimilaritySearch = useCallback(async (imageSrc: string, cardId: string) => {
     console.log(`Starting similarity search for card: ${cardId} with image: ${imageSrc}`);
     
-    await performSimilaritySearch(imageSrc, cardId, (newResults: ResultItem[]) => {
-      handleSimilarityResults(newResults);
-    });
-  }, [handleSimilarityResults]);
+    const modelSelection = appState.modelSelection || { use_clip: true, use_siglip2: true, use_beit3: true };
+
+    await performSimilaritySearch(
+        imageSrc, 
+        cardId, 
+        (newResults: ResultItem[]) => {
+            handleSimilarityResults(newResults);
+        },
+        undefined, // onError
+        (loading) => appState.setIsLoading(loading), // onLoading
+        'normal', // searchMode
+        1, // page
+        PAGE_SIZE, // pageSize
+        modelSelection
+    );
+  }, [handleSimilarityResults, appState]);
 
   return {
     executeSearch,

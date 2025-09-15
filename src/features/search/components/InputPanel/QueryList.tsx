@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback} from 'react';
 import type { RefObject, SetStateAction } from 'react';
 import { containerClass } from './styles';
-import type { Query, ResultItem, ApiQuery } from '../../types';
+import type { Query, ResultItem, ApiQuery, ModelSelection } from '../../types';
 import type { User } from '../../../communicate/types';
 import QueryItem from './QueryItem';
 import { useShortcuts } from '../../../../utils/shortcuts';
@@ -22,6 +22,8 @@ firstInputRef?: RefObject<HTMLTextAreaElement>;
 onSingleSearchResult: (results: ResultItem[]) => void;
 isAutoTranslateEnabled: boolean;
 user: User | null;
+modelSelection: ModelSelection;
+
 }
 
 type FocusField = 'ocr' | 'asr' | 'obj';
@@ -32,7 +34,7 @@ type TranslationStatus = 'idle' | 'pending' | 'error';
 // ============================================================================
 // === 2. CUSTOM HOOK useQueryListManager (CORRECTED) =========================
 // ============================================================================
-const useQueryListManager = ({ queries, onQueriesChange, isAutoTranslateEnabled, maxQueries, user, onSingleSearchResult }: QueryListProps) => {
+const useQueryListManager = ({ queries, onQueriesChange, isAutoTranslateEnabled, maxQueries, user, onSingleSearchResult, modelSelection }: QueryListProps) => { // ✅ Destructure modelSelection
 const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 const [focusRequest, setFocusRequest] = useState<{ index: number; field: FocusField } | null>(null);
 const [modeChangeRequest, setModeChangeRequest] = useState<{ index: number; mode: Mode } | null>(null);
@@ -50,7 +52,27 @@ queries.map((q, i) => (i === index ? { ...q, ...updated } : q))
 
 const insertQueryAfter = (index: number) => { if (maxQueries && queries.length >= maxQueries) return; const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }; const updated = [...queries.slice(0, index + 1), newQuery, ...queries.slice(index + 1)]; onQueriesChange(updated); return updated.length; };
 const removeQuery = (index: number) => { if (queries.length <= 1) return; if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current); translationAbortControllerRef.current?.abort(); const updated = queries.filter((_, i) => i !== index); onQueriesChange(updated); };
-const handleItemSearch = useCallback(async (index: number | null) => { if (index === null || !user || searchingIndex !== null) return; setSearchingIndex(index); try { const query = queries[index]; const { asr, ocr, origin, obj, lang, imageFile, text } = query; const apiQuery: ApiQuery = { asr, ocr, origin, obj, lang, text, image: '' }; if (imageFile) { apiQuery.image = await fileToBase64(imageFile); apiQuery.text = ''; } const results = await searchBySingleQuery(apiQuery, user.username); onSingleSearchResult(results); } catch (error) { console.error(`Single item search failed for index ${index}:`, error); alert(`Search for this item failed: ${error instanceof Error ? error.message : 'Unknown error'}`); } finally { setSearchingIndex(null); } }, [queries, user, onSingleSearchResult, searchingIndex]);
+// ✅ MODIFIED: The handleItemSearch function now accepts and uses modelSelection
+const handleItemSearch = useCallback(async (index: number | null) => {
+  if (index === null || !user || searchingIndex !== null) return;
+  setSearchingIndex(index);
+  try {
+      const query = queries[index];
+      const { asr, ocr, origin, obj, lang, imageFile, text } = query;
+      const apiQuery: ApiQuery = { asr, ocr, origin, obj, lang, text, image: '' };
+      if (imageFile) {
+          apiQuery.image = await fileToBase64(imageFile);
+          apiQuery.text = '';
+      }
+      const results = await searchBySingleQuery(apiQuery, user.username, 1, 100, modelSelection);
+      onSingleSearchResult(results);
+  } catch (error) {
+      console.error(`Single item search failed for index ${index}:`, error);
+      alert(`Search for this item failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+      setSearchingIndex(null);
+  }
+}, [queries, user, onSingleSearchResult, searchingIndex, modelSelection]); // ✅ Add modelSelection to dependency array
 
 
 useEffect(() => {

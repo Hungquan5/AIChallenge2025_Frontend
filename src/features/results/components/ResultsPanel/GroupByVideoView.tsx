@@ -23,18 +23,18 @@ interface Props {
   sendMessage: (message: string) => void;
   onResultDoubleClick: (item: ResultItem) => void;
   onSubmission: (item: ResultItem) => void;
-  submissionStatuses: { [key: string]: string };
+  // ✅ CHANGE 1: Type submissionStatuses for better clarity, matching SortedByConfidenceView.
+  submissionStatuses: { [key: string]: 'PENDING' | 'WRONG' };
   optimisticSubmissions: Set<string>;
   onDislike: (item: ResultItem) => void;
-
 }
 
-const GroupedByVideoView: React.FC<Props> = ({ 
-  groupedResults, 
-  onResultClick, 
-  onRightClick, 
-  onSimilaritySearch, 
-  currentUser, 
+const GroupedByVideoView: React.FC<Props> = ({
+  groupedResults,
+  onResultClick,
+  onRightClick,
+  onSimilaritySearch,
+  currentUser,
   sendMessage,
   onResultDoubleClick,
   submissionStatuses,
@@ -47,12 +47,10 @@ const GroupedByVideoView: React.FC<Props> = ({
   const handleImageLoad = useCallback((id: string) => {
     setLoadedImages(prev => new Set([...prev, id]));
   }, []);
-  
-  // This handler is now consistent with SortedByConfidenceView
+
   const handleSending = useCallback((item: ResultItem) => {
     const message = {
       type: 'broadcast_image',
-      // ✅ FIX: Spread the item to ensure a complete and consistent payload
       payload: { ...item, submittedBy: currentUser },
     };
     sendMessage(JSON.stringify(message));
@@ -77,20 +75,21 @@ const GroupedByVideoView: React.FC<Props> = ({
           </h2>
           <div className={gridClass}>
             {group.items.map(item => {
-              // ✅ CHANGE 1: Add disabled state logic, same as in SortedByConfidenceView.
-              const isDisabledByServer = !!submissionStatuses[item.thumbnail];
-              const isDisabledOptimistically = optimisticSubmissions.has(item.thumbnail);
+              // ✅ CHANGE 2: Implement the exact same status logic as in SortedByConfidenceView.
+              // 1. Get the status from the server state (the source of truth).
+              const serverStatus = submissionStatuses[item.thumbnail];
+              // 2. Check if the submission is pending on the client-side (optimistic update).
+              const isOptimisticallyPending = optimisticSubmissions.has(item.thumbnail);
+              // 3. Determine the final status, giving precedence to the server status.
+              const status = serverStatus ? serverStatus : (isOptimisticallyPending ? 'PENDING' : undefined);
 
               return (
                 <ResultCard
                   key={item.id}
-                  // ✅ CHANGE 2: Pass the entire `item` object directly for cleaner code.
                   item={item}
                   loaded={loadedImages.has(item.id)}
                   onLoad={handleImageLoad}
                   imageClassName={imageClass}
-                  // ✅ CHANGE 3: Pass event handlers directly without wrapping them.
-                  // The ResultCard component is responsible for passing the `item` back.
                   onClick={onResultClick}
                   onContextMenu={onRightClick}
                   onDoubleClick={onResultDoubleClick}
@@ -98,8 +97,11 @@ const GroupedByVideoView: React.FC<Props> = ({
                   onSending={handleSending}
                   onDislike={onDislike}
                   onSimilaritySearch={onSimilaritySearch}
-                  // ✅ CHANGE 4: Pass the calculated disabled state to the card.
-                  disabled={isDisabledByServer || isDisabledOptimistically}
+                  // ✅ CHANGE 3: Remove the old 'disabled' prop.
+                  // disabled={...}
+
+                  // ✅ CHANGE 4: Add the new 'submissionStatus' prop to pass the calculated state.
+                  submissionStatus={status}
                 />
               );
             })}

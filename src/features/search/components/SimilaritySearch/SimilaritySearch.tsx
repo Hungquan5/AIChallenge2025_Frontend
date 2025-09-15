@@ -1,5 +1,7 @@
-import type { ResultItem, SearchMode, ApiQuery } from '../../types';
+// src/features/search/components/SimilaritySearch/SimilaritySearch.ts
 
+import type { ResultItem, SearchMode, ApiQuery } from '../../types';
+import type { ModelSelection } from '../../types';
 const API_BASE_URL = 'http://localhost:5731';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
 
@@ -37,19 +39,12 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
   }
 };
 
-/**
- * Perform similarity search using an image URL
- * @param imageSrc - The image URL to search for similar images
- * @param searchMode - The search mode ('normal' or 'chain')
- * @param page - The page number to retrieve
- * @param pageSize - The number of results per page
- * @returns Promise<ResultItem[]> - Array of similar images
- */
 export const searchBySimilarImage = async (
   imageSrc: string,
   searchMode: SearchMode = 'normal',
   page: number = 1,
-  pageSize: number = 100
+  pageSize: number = 100,
+  modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<ResultItem[]> => {
   try {
     console.log(`Starting similarity search for image: ${imageSrc}, page: ${page}`);
@@ -74,7 +69,11 @@ export const searchBySimilarImage = async (
     url.searchParams.append('page', page.toString());
     url.searchParams.append('page_size', pageSize.toString());
 
-    console.log('Sending similarity search request...');
+    url.searchParams.append('use_clip', modelSelection.use_clip.toString());
+    url.searchParams.append('use_siglip2', modelSelection.use_siglip2.toString());
+    url.searchParams.append('use_beit3', modelSelection.use_beit3.toString());
+
+    console.log('Sending similarity search request with models:', modelSelection);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -100,7 +99,7 @@ export const searchBySimilarImage = async (
         videoId: item.videoId,
         timestamp: item.timestamp,
         confidence: item.confidence,
-        id: `${page}-${index}`, // ✅ Use page number for unique ID
+        id: `${page}-${index}`,
         title: `${item.videoId} - ${item.timestamp}`,
         thumbnail: adjustThumbnail(thumbnailPath),
       };
@@ -112,10 +111,6 @@ export const searchBySimilarImage = async (
   }
 };
 
-/**
- * Perform similarity search and handle UI feedback
- * ✅ ADDED: page and pageSize parameters to support pagination
- */
 export const performSimilaritySearch = async (
   imageSrc: string,
   cardId: string,
@@ -124,14 +119,15 @@ export const performSimilaritySearch = async (
   onLoading?: (loading: boolean) => void,
   searchMode: SearchMode = 'normal',
   page: number = 1,
-  pageSize: number = 100
+  pageSize: number = 100,
+  modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<void> => {
   try {
     console.log(`Performing similarity search for card ${cardId} with image: ${imageSrc}`);
     
     onLoading?.(true);
     
-    const results = await searchBySimilarImage(imageSrc, searchMode, page, pageSize);
+    const results = await searchBySimilarImage(imageSrc, searchMode, page, pageSize, modelSelection);
     
     onResults(results);
     

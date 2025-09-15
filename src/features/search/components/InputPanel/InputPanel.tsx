@@ -188,7 +188,7 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
 // ============================================================================
 
 const InputPanel = (props: InputPanelProps) => {
-  const { isAutoTranslateEnabled, isLoading, onSingleSearchResult, user } = props;
+  const { isAutoTranslateEnabled, isLoading, onSingleSearchResult, user,modelSelection } = props;
 
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const chainSearchButtonRef = useRef<HTMLButtonElement>(null);
@@ -252,6 +252,7 @@ const InputPanel = (props: InputPanelProps) => {
           onSingleSearchResult={onSingleSearchResult}
           isAutoTranslateEnabled={isAutoTranslateEnabled}
           user={user}
+          modelSelection={modelSelection}
         />
         <HistoryPanel
           isVisible={isHistoryPanelVisible}
