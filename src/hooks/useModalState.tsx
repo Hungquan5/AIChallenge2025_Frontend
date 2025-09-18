@@ -1,4 +1,4 @@
-// src/hooks/useModalState.ts
+// src/hooks/useModalState.ts - Updated to support enhanced VideoPanel
 import { useState, useCallback } from 'react';
 import type { ResultItem } from '../features/results/types';
 
@@ -6,13 +6,6 @@ interface VideoPanelState {
   isOpen: boolean;
   videoId: string | null;
   timestamp: string | null;
-}
-
-interface FramesPanelState {
-  isOpen: boolean;
-  frames: ResultItem[];
-  videoTitle: string;
-  isLoading: boolean;
 }
 
 interface UseModalStateReturn {
@@ -30,11 +23,11 @@ interface UseModalStateReturn {
   isDislikePanelOpen: boolean;
   handleToggleDislikePanel: () => void;
 
-  // Shortcuts State
+  // Shortcuts Modal State
   showShortcuts: boolean;
   setShowShortcuts: React.Dispatch<React.SetStateAction<boolean>>;
 
-  // Generic close handler for ESC key
+  // Generic Modal Handlers
   handleCloseModal: () => void;
 }
 
@@ -52,17 +45,24 @@ export const useModalState = (): UseModalStateReturn => {
   // Dislike Panel State
   const [isDislikePanelOpen, setIsDislikePanelOpen] = useState(false);
 
-  // Shortcuts State
+  // Shortcuts Modal State
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Video Panel Handlers
   const handleOpenVideoPanel = useCallback((videoId: string, timestamp: string) => {
-    console.log(`Opening VideoPanel for videoId: ${videoId} at timestamp: ${timestamp}`);
-    setVideoPanelState({ isOpen: true, videoId, timestamp });
+    setVideoPanelState({
+      isOpen: true,
+      videoId,
+      timestamp,
+    });
   }, []);
 
   const handleCloseVideoPanel = useCallback(() => {
-    setVideoPanelState({ isOpen: false, videoId: null, timestamp: null });
+    setVideoPanelState({
+      isOpen: false,
+      videoId: null,
+      timestamp: null,
+    });
   }, []);
 
   // Detail Modal Handlers
@@ -79,36 +79,26 @@ export const useModalState = (): UseModalStateReturn => {
     setIsDislikePanelOpen(prev => !prev);
   }, []);
 
-  // Generic close handler for ESC key
+  // Generic Close Handler (for shortcuts)
   const handleCloseModal = useCallback(() => {
-    // Close modals in priority order (top-most first)
+    // Close whatever modal is currently open
     if (videoPanelState.isOpen) {
       handleCloseVideoPanel();
-      return;
-    }
-    
-    if (detailModalItem) {
+    } else if (detailModalItem) {
       handleCloseDetailModal();
-      return;
-    }
-
-    if (isDislikePanelOpen) {
-      handleToggleDislikePanel();
-      return;
-    }
-
-    if (showShortcuts) {
+    } else if (showShortcuts) {
       setShowShortcuts(false);
-      return;
+    } else if (isDislikePanelOpen) {
+      handleToggleDislikePanel();
     }
   }, [
-    videoPanelState.isOpen, 
-    detailModalItem, 
-    isDislikePanelOpen, 
+    videoPanelState.isOpen,
+    detailModalItem,
     showShortcuts,
+    isDislikePanelOpen,
     handleCloseVideoPanel,
     handleCloseDetailModal,
-    handleToggleDislikePanel
+    handleToggleDislikePanel,
   ]);
 
   return {
@@ -126,11 +116,11 @@ export const useModalState = (): UseModalStateReturn => {
     isDislikePanelOpen,
     handleToggleDislikePanel,
 
-    // Shortcuts
+    // Shortcuts Modal
     showShortcuts,
     setShowShortcuts,
 
-    // Generic
+    // Generic Handler
     handleCloseModal,
   };
 };

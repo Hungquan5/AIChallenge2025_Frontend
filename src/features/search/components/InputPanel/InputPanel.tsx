@@ -2,14 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
 import { searchButtonClass, containerClass } from './styles';
 import type { ResultItem, Query, SearchMode, ApiQuery, HistoryItem} from '../../types';
-import type { User } from '../../../communicate/types';
+// import type { User } from '../../../communicate/types';
+import type { UserStatusMessage as User } from '../../../communicate/types';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
 import { translateText, getHistory } from '../SearchRequest/searchApi';
 import HistoryPanel from '../../../history/components/HistoryPanel';
 import { Search, Zap, Loader2 } from 'lucide-react';
 import type { ModelSelection } from '../../types';
-import ModelSelectionPanel from '../ModelSelection/ModelSelection';
+import InteractiveChatPanel from '../InteractiveChatPanel/InteractiveChatPanel';
 // ============================================================================
 // === 1. PROPS INTERFACE (No changes needed) =================================
 // ============================================================================
@@ -36,7 +37,8 @@ const useInputPanel = ({ onSearch, isAutoTranslateEnabled, user, modelSelection}
   const [historyItems, setHistoryItems] = useState<HistoryItem[] | null>(null);
   const [isHistoryPanelVisible, setIsHistoryPanelVisible] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-
+  const [isChatPanelVisible, setIsChatPanelVisible] = useState(false); // State for chat panel visibility
+  const [queryToParaphrase, setQueryToParaphrase] = useState<{ query: Query; index: number } | null>(null);
   // --- Core Action Handlers ---
 
   // src/features/search/components/InputPanel/InputPanel.tsx
@@ -124,6 +126,12 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
   const addNewQuery = () => setQueries(prev => [...prev, { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
   const removeLastQuery = () => queries.length > 1 && setQueries(prev => prev.slice(0, -1));
   const clearAllQueries = () => setQueries([{ text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
+  // Add a function to handle applying the paraphrase
+  const handleApplyParaphrase = (text: string, index: number) => {
+    setQueries(prev =>
+      prev.map((q, i) => (i === index ? { ...q, text, origin: text, lang: 'eng' } : q))
+    );
+  };
 
   // --- History Panel Logic ---
 

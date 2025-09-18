@@ -1,5 +1,5 @@
-// src/App.tsx (Refactored)
-import React, { useMemo, useRef } from 'react'; // ✅ Import useMemo
+// src/App.tsx (Updated with new features)
+import React, { useMemo, useRef } from 'react';
 import './App.css';
 
 // --- Core Components & Layouts ---
@@ -7,11 +7,12 @@ import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
 import InputPanel from './features/search/components/InputPanel/InputPanel';
 import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
-import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
+import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel'; // Updated VideoPanel
 import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
 import DislikePanel from './features/dislike/components/DislikePanel';
+
 // --- Custom Hooks ---
 import { useAppState } from './hooks/useAppState';
 import { useModalState } from './hooks/useModalState';
@@ -26,6 +27,10 @@ import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
 import { useSearch } from './features/search/hooks/useSearch';
 import { useEventHandlers } from './hooks/useEventHandlers';
 import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketHandlers';
+
+// --- Notification System ---
+// import { useNotificationManager } from './features/communicate/components/NotificationManager';
+import { useNotificationManager } from './features/notifications/NotificationsManagers';
 
 // --- Other Components ---
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
@@ -45,6 +50,14 @@ const App: React.FC = () => {
   const submissionState = useSubmissionState();
   const dislikeState = useDislikeState();
 
+  // Notification System
+  const {
+    NotificationContainer,
+    showVideoNotification,
+    showEventFrameNotification,
+    showDresSubmissionNotification,
+  } = useNotificationManager();
+
   // Session and User
   const { user, createSession, isLoading: isSessionLoading } = useSession();
 
@@ -58,10 +71,14 @@ const App: React.FC = () => {
     resultsRef
   });
 
-  // WebSocket Handlers
+  // WebSocket Handlers (Updated with new features)
   const webSocketHandlers = useWebSocketHandlers({
     broadcastState,
-    submissionState
+    submissionState,
+    modalState,
+    onShowVideoNotification: showVideoNotification,
+    onEventFrameAdded: showEventFrameNotification,
+    onDresSubmission: showDresSubmissionNotification,
   });
 
   // WebSocket Connection
@@ -83,14 +100,13 @@ const App: React.FC = () => {
     sendMessage
   });
 
-  // ✅ Create a memoized object for shortcut handlers
+  // Shortcut handlers
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
     TOGGLE_AUTO_TRANSLATE: appState.toggleAutoTranslate,
     CLOSE_MODAL: modalState.handleCloseModal,
     TOGGLE_DISLIKE_PANEL: modalState.handleToggleDislikePanel,
-    // ✅ ADD THE DYNAMIC PAGE NAVIGATION HANDLER
     GO_TO_PAGE: searchHandlers.handlePageChange,
   }), [
     appState.toggleViewMode,
@@ -100,10 +116,7 @@ const App: React.FC = () => {
     searchHandlers.handlePageChange,
   ]);
   
-  // ✅ Pass the memoized handlers to the hook
   useShortcuts(shortcutHandlers);
-
-
 
   // Create panel instances
   const { panelContent, searchButton, chainSearchButton } = InputPanel({
@@ -112,8 +125,7 @@ const App: React.FC = () => {
     isAutoTranslateEnabled: appState.isAutoTranslateEnabled,
     isLoading: appState.isLoading,
     user: user,
-        // ✅ PASS THE CURRENT MODEL SELECTION
-        modelSelection: appState.modelSelection, 
+    modelSelection: appState.modelSelection, 
   });
 
   const leftPanel = (
@@ -121,10 +133,12 @@ const App: React.FC = () => {
       {panelContent}
     </div>
   );
+
   // Early return for authentication
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
   }
+
   const rightPanel = (
     <div className="relative h-full flex flex-col">
       {/* Top Control Bar */}
@@ -224,7 +238,7 @@ const App: React.FC = () => {
     />
   ) : null;
 
-  // Video Panel Instance
+  // Enhanced Video Panel Instance with new features
   const videoPanelInstance = modalState.videoPanelState.isOpen && 
     modalState.videoPanelState.videoId && 
     modalState.videoPanelState.timestamp ? (
@@ -234,6 +248,7 @@ const App: React.FC = () => {
       onClose={modalState.handleCloseVideoPanel}
       onBroadcast={eventHandlers.handleItemBroadcast}
       currentUser={user.username}
+      sendMessage={sendMessage} // Pass sendMessage for new features
     />
   ) : null;
 
@@ -256,7 +271,7 @@ const App: React.FC = () => {
         broadcastMessages={broadcastState.broadcastMessages}
         isConnected={isConnected}
         activeUsers={broadcastState.activeUsers}
-        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage} // This is correct if eventHandlers is updated
+        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage}
         videoModal={videoPanelInstance}
         onBroadcastResultClick={eventHandlers.handleMasterResultClick}
         onBroadcastRightClick={eventHandlers.handleBroadcastFeedRightClick}
@@ -270,6 +285,11 @@ const App: React.FC = () => {
         onToggleTrackMode={broadcastState.handleToggleTrackMode}
         vqaQuestions={broadcastState.vqaQuestions}
         onVqaQuestionChange={broadcastState.handleVqaQuestionChange}
+      />
+
+      {/* Notification System */}
+      <NotificationContainer 
+        onOpenVideo={(videoId, timestamp) => modalState.handleOpenVideoPanel(videoId, timestamp)}
       />
 
       {/* Modals */}

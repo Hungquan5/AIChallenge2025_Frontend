@@ -1,74 +1,83 @@
-import type { ResultItem } from '../results/types'; // Make sure this import path is correct for your project structure
+// src/features/communicate/types.ts - Updated with new message types
+import type { ResultItem } from '../results/types';
 
-export interface User {
-  username: string;
+export interface WebSocketMessage {
+  type: string;
+  payload?: any;
+  [key: string]: any;
 }
 
-// --- MESSAGE TYPE DEFINITIONS ---
-
-// 1. This is the message format for broadcasting an image.
-export interface BroadcastImageMessage {
+export interface BroadcastImageMessage extends WebSocketMessage {
   type: 'broadcast_image';
   payload: ResultItem;
 }
 
-// 2. This is a message type for general status updates.
-export interface StatusMessage {
-  type: 'status';
-  message: string;
-  username?: string;
-}
-
-// ✅ 3. ADD THE NEW DEFINITION FOR A SUBMISSION RESULT
-// This defines the structure of the data sent when a submission is broadcasted.
-export interface SubmissionResultPayload {
-  itemId: string; // ✅ ADD THIS LINE: The unique ID of the submitted item
-  submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
-  description: string;
-  username?: string;
-}
-
-export interface SubmissionResultMessage {
-    type: 'submission_result';
-    payload: SubmissionResultPayload;
-}
-
-// 1. Define the payload for the new message
-export interface SubmissionStatusUpdatePayload {
-  [key: string]: 'PENDING' | 'WRONG'; // A dictionary where key is the image thumbnail URL
-}
-
-// 2. Define the full message structure
-export interface SubmissionStatusUpdateMessage {
-  type: 'submission_status_update';
-  payload: SubmissionStatusUpdatePayload;
-}
-
-// 3. Add the new type to your main WebSocketMessage union type
-export type WebSocketMessage = 
-  | BroadcastImageMessage 
-  | StatusMessage 
-  | SubmissionResultMessage
-  | SubmissionStatusUpdateMessage; // Add this new type
-
-
-// --- Your other API-related types can remain as they are. ---
-
-export interface ApiError {
-  detail: string;
-}
-
-export interface ApiResponse<T> {
-  data?: T;
-  error?: ApiError;
-}
-
-export interface SessionResponse {
-  session_data: {
-    username: string;
+export interface BroadcastVideoMessage extends WebSocketMessage {
+  type: 'broadcast_video';
+  payload: {
+    videoId: string;
+    timestamp: number;
+    submittedBy: string;
+    message: string;
   };
 }
 
-export interface UserStatusResponse {
-  session_data: User;
+export interface EventFrameAddedMessage extends WebSocketMessage {
+  type: 'event_frame_added';
+  payload: {
+    eventId: string;
+    frame: ResultItem;
+    submittedBy: string;
+  };
 }
+
+export interface DresSubmissionMessage extends WebSocketMessage {
+  type: 'dres_submission';
+  payload: {
+    eventId: string;
+    frames: ResultItem[];
+    submittedBy: string;
+    timestamp: number;
+  };
+}
+
+export interface SubmissionResultMessage extends WebSocketMessage {
+  type: 'submission_result';
+  payload: {
+    itemId: string;
+    submission: 'CORRECT' | 'WRONG' | 'DUPLICATE' | 'ERROR';
+    message?: string;
+  };
+}
+
+export interface SubmissionStatusUpdateMessage extends WebSocketMessage {
+  type: 'submission_status_update';
+  payload: {
+    [imageKey: string]: 'PENDING' | 'WRONG';
+  };
+}
+
+export interface UserStatusMessage extends WebSocketMessage {
+  type: 'user_status';
+  payload: {
+    message: string;
+  };
+}
+
+export interface RemoveBroadcastMessage extends WebSocketMessage {
+  type: 'remove_broadcast';
+  messageId: string;
+  username: string;
+  timestamp: number;
+}
+
+// Union type for all message types
+export type AllWebSocketMessages = 
+  | BroadcastImageMessage
+  | BroadcastVideoMessage
+  | EventFrameAddedMessage
+  | DresSubmissionMessage
+  | SubmissionResultMessage
+  | SubmissionStatusUpdateMessage
+  | UserStatusMessage
+  | RemoveBroadcastMessage;
