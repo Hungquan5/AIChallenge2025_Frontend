@@ -1,13 +1,15 @@
-// src/App.tsx (Updated with new features)
-import React, { useMemo, useRef } from 'react';
+// src/App.tsx (Updated with Chatbot integration)
+import React, { useMemo, useRef, useState } from 'react';
 import './App.css';
 
 // --- Core Components & Layouts ---
 import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
+import type { SearchMode } from './layouts/TopControlBar';
 import InputPanel from './features/search/components/InputPanel/InputPanel';
+import Chatbot from './features/chat/components/ChatComponents';
 import ResultsPanel from './features/results/components/ResultsPanel/ResultsPanel';
-import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel'; // Updated VideoPanel
+import VideoPanel from './features/detail_info/components/VideoPanel/VideoPanel';
 import FramesPanel from './features/detail_info/components/RelativeFramePanel/FramePanel';
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
@@ -29,7 +31,6 @@ import { useEventHandlers } from './hooks/useEventHandlers';
 import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketHandlers';
 
 // --- Notification System ---
-// import { useNotificationManager } from './features/communicate/components/NotificationManager';
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
 
 // --- Other Components ---
@@ -37,11 +38,15 @@ import { UsernamePrompt } from './features/communicate/components/User/UsernameP
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import { X } from 'lucide-react';
-
+import { convertAgentOutputToResults } from './utils/AgentUtils';
+import type { AgentToolOutput } from './utils/AgentUtils';
 const App: React.FC = () => {
   // Refs
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // ✅ NEW: Search Mode State
+  const [searchMode, setSearchMode] = useState<SearchMode>('manual');
 
   // Core State Hooks
   const appState = useAppState();
@@ -71,7 +76,7 @@ const App: React.FC = () => {
     resultsRef
   });
 
-  // WebSocket Handlers (Updated with new features)
+  // WebSocket Handlers
   const webSocketHandlers = useWebSocketHandlers({
     broadcastState,
     submissionState,
@@ -100,6 +105,13 @@ const App: React.FC = () => {
     sendMessage
   });
 
+  // // ✅ NEW: Chatbot search handler
+  // const handleChatbotSearch = (query: string) => {
+  //   // Convert natural language to search query
+  //   // For now, use it as a text query
+  //   searchHandlers.handleInitiateSearch([{ type: 'text', value: query }], 'normal');
+  // };
+
   // Shortcut handlers
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
@@ -118,22 +130,33 @@ const App: React.FC = () => {
   
   useShortcuts(shortcutHandlers);
 
-  // Create panel instances
+
+  // Create panel instances based on search mode
   const { panelContent, searchButton, chainSearchButton } = InputPanel({
     onSearch: searchHandlers.handleInitiateSearch,
     onSingleSearchResult: searchHandlers.handleSingleItemSearch,
     isAutoTranslateEnabled: appState.isAutoTranslateEnabled,
     isLoading: appState.isLoading,
     user: user,
-    modelSelection: appState.modelSelection, 
+    modelSelection: appState.modelSelection,
   });
 
-  const leftPanel = (
-    <div ref={inputPanelRef} tabIndex={-1}>
-      {panelContent}
-    </div>
-  );
-
+  // ✅ NEW: Conditional left panel based on search mode
+  // Update the leftPanel to include the new handler:
+const leftPanel = (
+  <div ref={inputPanelRef} tabIndex={-1} className="h-full">
+    {searchMode === 'manual' ? (
+      panelContent
+    ) : (
+      <Chatbot 
+        // onSearch={handleChatbotSearch}
+        onToolOutputs={eventHandlers.handleAgentToolOutputs}
+        isLoading={appState.isLoading}
+        user={user}
+      />
+    )}
+  </div>
+);
   // Early return for authentication
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
@@ -155,7 +178,9 @@ const App: React.FC = () => {
           isLoading={appState.isLoading}
           totalResults={appState.results.length}
           modelSelection={appState.modelSelection}
-          onModelSelectionChange={appState.setModelSelection}        
+          onModelSelectionChange={appState.setModelSelection}
+          searchMode={searchMode}
+          onSearchModeChange={setSearchMode}
         />
       </div>
 
@@ -238,7 +263,7 @@ const App: React.FC = () => {
     />
   ) : null;
 
-  // Enhanced Video Panel Instance with new features
+  // Video Panel Instance
   const videoPanelInstance = modalState.videoPanelState.isOpen && 
     modalState.videoPanelState.videoId && 
     modalState.videoPanelState.timestamp ? (
@@ -248,7 +273,7 @@ const App: React.FC = () => {
       onClose={modalState.handleCloseVideoPanel}
       onBroadcast={eventHandlers.handleItemBroadcast}
       currentUser={user.username}
-      sendMessage={sendMessage} // Pass sendMessage for new features
+      sendMessage={sendMessage}
     />
   ) : null;
 
@@ -265,8 +290,8 @@ const App: React.FC = () => {
       <AppShell
         leftPanel={leftPanel}
         rightPanel={rightPanel}
-        searchButton={searchButton}
-        chainSearchButton={chainSearchButton}
+        searchButton={searchMode === 'manual' ? searchButton : null}
+        chainSearchButton={searchMode === 'manual' ? chainSearchButton : null}
         carouselOverlay={framesPanelInstance}
         broadcastMessages={broadcastState.broadcastMessages}
         isConnected={isConnected}
@@ -285,6 +310,7 @@ const App: React.FC = () => {
         onToggleTrackMode={broadcastState.handleToggleTrackMode}
         vqaQuestions={broadcastState.vqaQuestions}
         onVqaQuestionChange={broadcastState.handleVqaQuestionChange}
+        isChatbotMode={searchMode === 'chatbot'}
       />
 
       {/* Notification System */}

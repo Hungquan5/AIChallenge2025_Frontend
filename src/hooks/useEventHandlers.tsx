@@ -1,7 +1,8 @@
 // src/hooks/useEventHandlers.ts
-import { useCallback } from 'react';
+import { useCallback,useRef } from 'react';
 import type { ResultItem } from '../features/results/types';
-
+import { convertAgentOutputToResults } from '../utils/AgentUtils';
+import type { AgentToolOutput } from '../utils/AgentUtils';
 interface UseEventHandlersProps {
   appState: any;
   modalState: any;
@@ -23,6 +24,7 @@ interface UseEventHandlersReturn {
   handleRemoveBroadcastMessage: (messageId: string, index: number) => void;
   handleBroadcastFeedRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   handleExportBroadcast: () => void;
+  handleAgentToolOutputs: (toolOutputs: AgentToolOutput[]) => void;
 }
 
 export const useEventHandlers = ({
@@ -36,6 +38,7 @@ export const useEventHandlers = ({
   user,
   sendMessage,
 }: UseEventHandlersProps): UseEventHandlersReturn => {
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const handleMasterResultClick = useCallback((item: ResultItem) => {
     // 1. Capture the title of the video that was clicked
@@ -169,7 +172,42 @@ export const useEventHandlers = ({
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
   }, [broadcastState]);
+const handleAgentToolOutputs = useCallback((toolOutputs: AgentToolOutput[]) => {
+  if (!toolOutputs || toolOutputs.length === 0) return;
 
+  // Show loading state
+  appState.setIsLoading(true);
+
+  try {
+    // Convert tool outputs to ResultItem format using the utility function
+    const newResults = convertAgentOutputToResults(toolOutputs);
+    
+    if (newResults.length === 0) {
+      console.warn('No results found in agent tool outputs');
+      appState.setIsLoading(false);
+      return;
+    }
+    // console.log('Agent tool outputs converted to results:', newResults);
+    // Update app state with new results
+    appState.updateResultsWithGrouped(newResults);
+    appState.setCurrentPage(1);
+    appState.setHasNextPage(false);
+    
+    // Store the last search context
+    appState.setLastSearchMode('normal');
+    appState.setLastQueries([{ type: 'text', value: 'agent_search' }]);
+    
+    // Scroll to results panel
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+
+  } catch (error) {
+    console.error('Error processing agent tool outputs:', error);
+  } finally {
+    appState.setIsLoading(false);
+  }
+}, [appState]);
   return {
     handleMasterResultClick,
     handleResultRightClick,
@@ -179,5 +217,6 @@ export const useEventHandlers = ({
     handleRemoveBroadcastMessage,
     handleBroadcastFeedRightClick,
     handleExportBroadcast,
+    handleAgentToolOutputs
   };
 };

@@ -1,36 +1,34 @@
-// AppShell.tsx
-import React,{ useState } from 'react';
+// src/layouts/AppShell.tsx (Updated with dynamic left panel width)
+import React, { useState } from 'react';
 import type { ResultItem } from '../features/search/types';
-import { ChevronUp, ChevronDown, Users, Wifi, WifiOff ,Trash2,FileText,GitMerge} from 'lucide-react';
+import { ChevronUp, Users, Wifi, WifiOff, Trash2, FileText, GitMerge } from 'lucide-react';
 import { BroadcastFeed } from '../features/communicate/components/Communicate/BroadcastFeed';
+
 interface AppShellProps {
   leftPanel: React.ReactNode;
   rightPanel: React.ReactNode;
   searchButton: React.ReactNode;
   chainSearchButton: React.ReactNode;
   carouselOverlay?: React.ReactNode;
-  // NEW: BroadcastFeed props
   broadcastMessages?: ResultItem[];
   isConnected?: boolean;
   activeUsers?: number;
   onRemoveBroadcastMessage?: (messageId: string, index: number) => void;
-    // ✅ ADD NEW PROP FOR THE VIDEO MODAL
-    videoModal?: React.ReactNode;
-      // ✅ 1. Add the new handler props for the feed
+  videoModal?: React.ReactNode;
   onBroadcastResultClick: (item: ResultItem) => void;
   onBroadcastRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onBroadcastSimilaritySearch: (imageSrc: string, cardId: string) => void;
   onClearBroadcastFeed: () => void;
   onVqaSubmit: (item: ResultItem, question: string) => void;
-  onBroadcastResultSubmission: (item: ResultItem) => void; // ✅ Add the new prop
-  onBroadcastResultDoubleClick: (item: ResultItem) => void; // Add prop
+  onBroadcastResultSubmission: (item: ResultItem) => void;
+  onBroadcastResultDoubleClick: (item: ResultItem) => void;
   onExportBroadcastFeed: () => void;
-  // ✅ 1. ADD THE NEW PROPS FOR VQA STATE
   vqaQuestions: { [key: string]: string };
   onVqaQuestionChange: (itemId: string, question: string) => void;
-  // ✅ 2. ADD THE NEW PROPS FOR TRACK MODE
   isTrackModeActive: boolean;
   onToggleTrackMode: () => void;
+  // ✅ NEW: Add prop to determine if chatbot is active
+  isChatbotMode?: boolean;
 }
 
 const AppShell: React.FC<AppShellProps> = ({ 
@@ -51,14 +49,12 @@ const AppShell: React.FC<AppShellProps> = ({
   onBroadcastResultDoubleClick,
   onClearBroadcastFeed,
   onVqaSubmit,
-  onExportBroadcastFeed, // Destructure the new prop
-  
-  // ✅ 2. DESTRUCTURE THE NEW PROPS
+  onExportBroadcastFeed,
   vqaQuestions,
   onVqaQuestionChange,
-  // ✅ 3. DESTRUCTURE THE NEW PROPS
   isTrackModeActive,
   onToggleTrackMode,
+  isChatbotMode = false, // ✅ NEW: Default to false
 }) => {
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
 
@@ -66,22 +62,24 @@ const AppShell: React.FC<AppShellProps> = ({
     setIsBroadcastOpen(!isBroadcastOpen);
   };
 
+  // ✅ NEW: Dynamic width based on mode
+  const leftPanelWidth = isChatbotMode ? 'w-[420px] min-w-[420px] max-w-[420px]' : 'w-[200px] min-w-[200px] max-w-[360px]';
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 text-slate-900">
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel */}
-        <aside className="w-[200px] min-w-[200px] max-w-[360px] h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative">
+        {/* Left Panel with Dynamic Width */}
+        <aside className={`${leftPanelWidth} h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative transition-all duration-300 ease-in-out`}>
           <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {leftPanel}
           </div>
         </aside>
 
-        {/* Right-side Container - REMOVED SCROLLING */}
+        {/* Right-side Container */}
         <div className="relative flex-1 overflow-hidden">
-          {/* Right Panel Content - NO MORE SCROLLING HERE */}
+          {/* Right Panel Content */}
           <main className="h-full bg-white/30 backdrop-blur-sm">
-            {/* ✅ REMOVED overflow-y-auto and scrollbar classes */}
             <div className="h-full text-slate-900">
               <div className="h-full bg-gradient-to-br from-white/40 to-transparent">
                 {rightPanel}
@@ -91,16 +89,14 @@ const AppShell: React.FC<AppShellProps> = ({
           
           {/* Carousel Overlay */}
           {carouselOverlay}
-          {/* ✅ RENDER THE VIDEO MODAL HERE */}
-          {/* It will overlay the main content and carousel */}
+          
+          {/* Video Modal */}
           {videoModal}
         </div>
       </div>
 
-       {/* Broadcast Feed Panel - Bottom Slide Up */}
-       <div className="relative z-30">
-        
-        {/* ✅ FIX: This container now has a higher z-index to stay on top */}
+      {/* Broadcast Feed Panel - Bottom Slide Up */}
+      <div className="relative z-30">
         <div className="relative flex justify-center items-end pointer-events-none">
           {/* Action Buttons on the left */}
           <div className="absolute left-4 bottom-1 flex items-center pointer-events-auto">
@@ -144,7 +140,7 @@ const AppShell: React.FC<AppShellProps> = ({
           <button
             onClick={toggleBroadcast}
             className={`
-              pointer-events-auto /* Make sure this button is always clickable */
+              pointer-events-auto
               relative px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
               text-white rounded-t-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5
               flex items-center gap-2 border-t border-l border-r border-blue-300/30
@@ -198,34 +194,30 @@ const AppShell: React.FC<AppShellProps> = ({
           ${isBroadcastOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}
         `}>
           <div className="">
-            {/* Connection Status Bar */}
-              {activeUsers > 0 && (
-                <span className="text-sm text-gray-600">
-                  {activeUsers} user{activeUsers !== 1 ? 's' : ''} online
-                </span>
-              )}
-            </div>
- {/* ✅ 4. ADD a dedicated header inside the panel */}
-
-            {/* Broadcast Feed Content */}
-            <BroadcastFeed 
-              messages={broadcastMessages} 
-              onRemoveMessage={onRemoveBroadcastMessage}
-              onResultClick={onBroadcastResultClick}
-              onRightClick={onBroadcastRightClick}
-              onSimilaritySearch={onBroadcastSimilaritySearch}
-              onVqaSubmit={onVqaSubmit}
-              onSubmission={onBroadcastResultSubmission}
-              onResultDoubleClick ={onBroadcastResultDoubleClick}
-              // ✅ 3. PASS THE PROPS DOWN TO BroadcastFeed
-              vqaQuestions={vqaQuestions}
-              onVqaQuestionChange={onVqaQuestionChange}
-                            // ✅ 5. PASS TRACK MODE STATE DOWN TO THE FEED
-                            isTrackModeActive={isTrackModeActive}
-            />
+            {activeUsers > 0 && (
+              <span className="text-sm text-gray-600">
+                {activeUsers} user{activeUsers !== 1 ? 's' : ''} online
+              </span>
+            )}
           </div>
+
+          {/* Broadcast Feed Content */}
+          <BroadcastFeed 
+            messages={broadcastMessages} 
+            onRemoveMessage={onRemoveBroadcastMessage}
+            onResultClick={onBroadcastResultClick}
+            onRightClick={onBroadcastRightClick}
+            onSimilaritySearch={onBroadcastSimilaritySearch}
+            onVqaSubmit={onVqaSubmit}
+            onSubmission={onBroadcastResultSubmission}
+            onResultDoubleClick={onBroadcastResultDoubleClick}
+            vqaQuestions={vqaQuestions}
+            onVqaQuestionChange={onVqaQuestionChange}
+            isTrackModeActive={isTrackModeActive}
+          />
         </div>
       </div>
+    </div>
   );
 };
 
