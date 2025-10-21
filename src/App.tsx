@@ -32,19 +32,18 @@ import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketH
 
 // --- Notification System ---
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
-
+import BubbleChat from './features/chat/components/ChatBubbleComponent';
+import type { BubbleChatRef } from './features/chat/components/ChatBubbleComponent';
 // --- Other Components ---
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import { X } from 'lucide-react';
-import { convertAgentOutputToResults } from './utils/AgentUtils';
-import type { AgentToolOutput } from './utils/AgentUtils';
 const App: React.FC = () => {
   // Refs
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-
+const bubbleChatRef = useRef<BubbleChatRef>(null);
   // ✅ NEW: Search Mode State
   const [searchMode, setSearchMode] = useState<SearchMode>('manual');
 
@@ -139,6 +138,11 @@ const App: React.FC = () => {
     isLoading: appState.isLoading,
     user: user,
     modelSelection: appState.modelSelection,
+    // ✅ NEW: Add this callback to send queries to bubble chat
+    onSendToBubbleChat: (query) => {
+      // Automatically send the search query to bubble chat
+      bubbleChatRef.current?.sendMessage(query);
+    }
   });
 
   // ✅ NEW: Conditional left panel based on search mode
@@ -344,6 +348,12 @@ const leftPanel = (
           </div>
         </div>
       )}
+      <BubbleChat
+        ref={bubbleChatRef}
+        onToolOutputs={eventHandlers.handleAgentToolOutputs}
+        user={user}
+        isVisible={searchMode === 'manual'}
+      />
     </>
   );
 };

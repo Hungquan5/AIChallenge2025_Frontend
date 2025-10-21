@@ -10,95 +10,110 @@ import { translateText, getHistory } from '../SearchRequest/searchApi';
 import HistoryPanel from '../../../history/components/HistoryPanel';
 import { Search, Zap, Loader2 } from 'lucide-react';
 import type { ModelSelection } from '../../types';
-import InteractiveChatPanel from '../InteractiveChatPanel/InteractiveChatPanel';
 // ============================================================================
 // === 1. PROPS INTERFACE (No changes needed) =================================
 // ============================================================================
 
 // Add to InputPanelProps interface:
+// Add new prop to InputPanelProps
 interface InputPanelProps {
   onSearch: (queries: ApiQuery[], mode: SearchMode, modelSelection: ModelSelection) => void;
   isAutoTranslateEnabled: boolean;
   isLoading: boolean;
   onSingleSearchResult: (results: ResultItem[]) => void;
   user: User | null;
-  modelSelection: ModelSelection; // Add this
+  modelSelection: ModelSelection;
+  onSendToBubbleChat?: (query: string) => void; // NEW: Add this prop
 }
 
 // ============================================================================
 // === 2. NEW CUSTOM HOOK `useInputPanel` (No changes needed) =================
 // ============================================================================
 
-const useInputPanel = ({ onSearch, isAutoTranslateEnabled, user, modelSelection}: InputPanelProps) => {
+
+
+// Update the useInputPanel hook to accept the new prop
+const useInputPanel = ({ 
+  onSearch, 
+  isAutoTranslateEnabled, 
+  user, 
+  modelSelection,
+  onSendToBubbleChat // NEW: Add this parameter
+}: InputPanelProps) => {
   const [queries, setQueries] = useState<Query[]>([
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
   ]);
-  const [loading, setLoading] = useState(false); // Internal loading for preparation tasks
+  const [loading, setLoading] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[] | null>(null);
   const [isHistoryPanelVisible, setIsHistoryPanelVisible] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [isChatPanelVisible, setIsChatPanelVisible] = useState(false); // State for chat panel visibility
-  const [queryToParaphrase, setQueryToParaphrase] = useState<{ query: Query; index: number } | null>(null);
-  // --- Core Action Handlers ---
 
-  // src/features/search/components/InputPanel/InputPanel.tsx
+  const handleSearch = async (searchMode: SearchMode = 'normal') => {
+    setLoading(true);
+    try {
+      // 1. Translate queries as before
+      const translatePromises = queries.map(async (q) => {
+        if (isAutoTranslateEnabled && q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
+          try {
+            const translated = await translateText(q.origin.trim());
+            return { ...q, text: translated, lang: 'eng' as const };
+          } catch (error) {
+            console.error(`Translation failed for "${q.origin}", searching with original text.`, error);
+            return q;
+          }
+        }
+        return q;
+      });
+      const translatedQueries = await Promise.all(translatePromises);
 
-// Inside the useInputPanel custom hook...
-const handleSearch = async (searchMode: SearchMode = 'normal') => {
-  setLoading(true);
-  try {
-    // 1. Translate queries as before
-    const translatePromises = queries.map(async (q) => {
-      if (isAutoTranslateEnabled && q.lang === 'ori' && q.origin && !q.text && !q.imageFile) {
-        try {
-          const translated = await translateText(q.origin.trim());
-          return { ...q, text: translated, lang: 'eng' as const };
-        } catch (error) {
-          console.error(`Translation failed for "${q.origin}", searching with original text.`, error);
-          return q; // Fallback to original on error
+      // 2. Prepare queries for the API immediately
+      const apiQueryPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
+        const base: Omit<ApiQuery, 'text' | 'image'> = {
+          asr: q.asr.trim(), ocr: q.ocr.trim(), origin: q.origin.trim(), obj: q.obj, lang: q.lang,
+        };
+        if (q.imageFile) {
+          const image = await fileToBase64(q.imageFile);
+          return { ...base, text: '', image };
+        }
+        return { ...base, text: q.text.trim(), image: "" };
+      });
+      const apiQueries = await Promise.all(apiQueryPromises);
+
+      // 3. Validate that there's something to search for
+      const isSearchable = apiQueries.some(q => q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image);
+      if (!isSearchable) {
+        alert('Please enter a query or specify other search criteria.');
+        setLoading(false);
+        return;
+      }
+
+      // ✅ NEW: Send query to bubble chat if callback is provided
+      if (onSendToBubbleChat) {
+        // Construct a natural language query from the search queries
+        const queryText = apiQueries
+          .map(q => q.text || q.origin || q.asr || q.ocr)
+          .filter(Boolean)
+          .join(', ');
+        
+        if (queryText) {
+          onSendToBubbleChat(queryText);
         }
       }
-      return q;
-    });
-    const translatedQueries = await Promise.all(translatePromises);
 
-    // 2. Prepare queries for the API immediately
-    const apiQueryPromises = translatedQueries.map(async (q): Promise<ApiQuery> => {
-      const base: Omit<ApiQuery, 'text' | 'image'> = {
-        asr: q.asr.trim(), ocr: q.ocr.trim(), origin: q.origin.trim(), obj: q.obj, lang: q.lang,
-      };
-      if (q.imageFile) {
-        const image = await fileToBase64(q.imageFile);
-        return { ...base, text: '', image };
-      }
-      return { ...base, text: q.text.trim(), image: "" };
-    });
-    const apiQueries = await Promise.all(apiQueryPromises);
+      // Dispatch the search
+      onSearch(apiQueries, searchMode, modelSelection);
 
-    // 3. Validate that there's something to search for
-    const isSearchable = apiQueries.some(q => q.text || q.asr || q.ocr || q.obj.length > 0 || q.origin || q.image);
-    if (!isSearchable) {
-      alert('Please enter a query or specify other search criteria.');
-      setLoading(false); // Make sure to stop loading
-      return;
+      // Update the UI state
+      setQueries(translatedQueries);
+
+    } catch (error) {
+      console.error("Error preparing search:", error);
+      alert("An error occurred while preparing your search.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // ✅ SOLUTION: Dispatch the search FIRST
-    onSearch(apiQueries, searchMode,modelSelection);
-
-    // ✅ THEN, update the UI state. This will happen in the background
-    // without delaying the critical network request.
-    setQueries(translatedQueries);
-
-  } catch (error) {
-    console.error("Error preparing search:", error);
-    alert("An error occurred while preparing your search.");
-  } finally {
-    // The parent component's isLoading state will take over from here,
-    // so we can set the internal loading to false.
-    setLoading(false);
-  }
-};
 
   const handleTranslateAll = async () => {
     setLoading(true);
@@ -126,12 +141,7 @@ const handleSearch = async (searchMode: SearchMode = 'normal') => {
   const addNewQuery = () => setQueries(prev => [...prev, { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
   const removeLastQuery = () => queries.length > 1 && setQueries(prev => prev.slice(0, -1));
   const clearAllQueries = () => setQueries([{ text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null }]);
-  // Add a function to handle applying the paraphrase
-  const handleApplyParaphrase = (text: string, index: number) => {
-    setQueries(prev =>
-      prev.map((q, i) => (i === index ? { ...q, text, origin: text, lang: 'eng' } : q))
-    );
-  };
+
 
   // --- History Panel Logic ---
 
