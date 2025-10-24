@@ -19,7 +19,7 @@ interface BroadcastFeedProps {
   isTrackModeActive: boolean;
 }
 
-export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
+const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
   messages,
   onRemoveMessage,
   onResultClick,
@@ -198,3 +198,5 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
     </div>
   );
 };
+
+export default React.memo(BroadcastFeed);

@@ -1,7 +1,7 @@
-// src/App.tsx (Updated with Chatbot integration)
-import React, { useMemo, useRef, useState } from 'react';
+// src/App.tsx (FIXED)
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import './App.css';
-
+import { Keyboard } from 'lucide-react';
 // --- Core Components & Layouts ---
 import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
@@ -14,7 +14,7 @@ import FramesPanel from './features/detail_info/components/RelativeFramePanel/Fr
 import FrameDetailModal from './features/detail_info/components/FrameDetailModal/FrameDetailModal';
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
 import DislikePanel from './features/dislike/components/DislikePanel';
-
+import PaginationContainer from './features/results/components/ResultsPanel/PaginationContainer';
 // --- Custom Hooks ---
 import { useAppState } from './hooks/useAppState';
 import { useModalState } from './hooks/useModalState';
@@ -29,7 +29,7 @@ import { useKeyframeLoader } from './features/results/hooks/useKeyframeLoader';
 import { useSearch } from './features/search/hooks/useSearch';
 import { useEventHandlers } from './hooks/useEventHandlers';
 import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketHandlers';
-
+import type { ResultItem } from './features/results/types';
 // --- Notification System ---
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
 import BubbleChat from './features/chat/components/ChatBubbleComponent';
@@ -39,12 +39,16 @@ import { UsernamePrompt } from './features/communicate/components/User/UsernameP
 import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
 import { X } from 'lucide-react';
+import type { ViewMode } from './features/results/types';
+import type { ModelSelection } from './features/search/types';
+
 const App: React.FC = () => {
-  // Refs
+  // =================================================================
+  // 1. ALL HOOKS ARE CALLED UNCONDITIONALLY AT THE TOP
+  // =================================================================
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-const bubbleChatRef = useRef<BubbleChatRef>(null);
-  // ✅ NEW: Search Mode State
+  const bubbleChatRef = useRef<BubbleChatRef>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>('manual');
 
   // Core State Hooks
@@ -104,14 +108,22 @@ const bubbleChatRef = useRef<BubbleChatRef>(null);
     sendMessage
   });
 
-  // // ✅ NEW: Chatbot search handler
-  // const handleChatbotSearch = (query: string) => {
-  //   // Convert natural language to search query
-  //   // For now, use it as a text query
-  //   searchHandlers.handleInitiateSearch([{ type: 'text', value: query }], 'normal');
-  // };
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    appState.setViewMode(mode);
+  }, [appState.setViewMode]);
 
-  // Shortcut handlers
+  const handleAutoTranslateChange = useCallback((enabled: boolean) => {
+    appState.setIsAutoTranslateEnabled(enabled);
+  }, [appState.setIsAutoTranslateEnabled]);
+
+  const handleModelSelectionChange = useCallback((selection: ModelSelection) => {
+    appState.setModelSelection(selection);
+  }, [appState.setModelSelection]);
+
+  const handleShowShortcuts = useCallback(() => {
+    modalState.setShowShortcuts(true);
+  }, [modalState.setShowShortcuts]);
+
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
@@ -128,122 +140,132 @@ const bubbleChatRef = useRef<BubbleChatRef>(null);
   ]);
   
   useShortcuts(shortcutHandlers);
+  const handleRemoveBroadcastMessage = useCallback((messageId: string) => {
+    // The original signature in AppShell had an 'index', but the hook doesn't use it.
+    // We align with the hook's implementation for correctness.
+    broadcastState.handleRemoveBroadcastMessage(messageId);
+  }, [broadcastState.handleRemoveBroadcastMessage]);
 
+  const handleClearBroadcastFeed = useCallback(() => {
+    broadcastState.handleClearBroadcastFeed();
+  }, [broadcastState.handleClearBroadcastFeed]);
 
-  // Create panel instances based on search mode
-  const { panelContent, searchButton, chainSearchButton } = InputPanel({
-    onSearch: searchHandlers.handleInitiateSearch,
-    onSingleSearchResult: searchHandlers.handleSingleItemSearch,
-    isAutoTranslateEnabled: appState.isAutoTranslateEnabled,
-    isLoading: appState.isLoading,
-    user: user,
-    modelSelection: appState.modelSelection,
-    // ✅ NEW: Add this callback to send queries to bubble chat
-    onSendToBubbleChat: (query) => {
-      // Automatically send the search query to bubble chat
-      bubbleChatRef.current?.sendMessage(query);
-    }
-  });
+  const handleToggleTrackMode = useCallback(() => {
+    broadcastState.handleToggleTrackMode();
+  }, [broadcastState.handleToggleTrackMode]);
+  
+  const handleBroadcastResultSubmission = useCallback((item: ResultItem) => {
+    // This was previously an inline arrow function, which is a common
+    // cause of performance issues with memoized components.
+    submissionState.handleSubmission(item, user, sendMessage);
+  }, [submissionState, user, sendMessage]); // Dependencies that the function relies on
+  // =================================================================
+  // 2. DEFINE UI LOGIC (Can use hooks' return values)
+  // =================================================================
+  const leftPanel = (
+      <div ref={inputPanelRef} tabIndex={-1} className="h-full">
+          {searchMode === 'manual' ? (
+              <InputPanel 
+                  onSearch={searchHandlers.handleInitiateSearch}
+                  onSingleSearchResult={searchHandlers.handleSingleItemSearch}
+                  isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+                  isLoading={appState.isLoading}
+                  user={user}
+                  modelSelection={appState.modelSelection}
+                  onSendToBubbleChat={(query) => {
+                      bubbleChatRef.current?.sendMessage(query);
+                  }}
+              />
+          ) : (
+              <Chatbot 
+                  onToolOutputs={eventHandlers.handleAgentToolOutputs}
+                  isLoading={appState.isLoading}
+                  user={user}
+              />
+          )}
+      </div>
+  );
 
-  // ✅ NEW: Conditional left panel based on search mode
-  // Update the leftPanel to include the new handler:
-const leftPanel = (
-  <div ref={inputPanelRef} tabIndex={-1} className="h-full">
-    {searchMode === 'manual' ? (
-      panelContent
-    ) : (
-      <Chatbot 
-        // onSearch={handleChatbotSearch}
-        onToolOutputs={eventHandlers.handleAgentToolOutputs}
-        isLoading={appState.isLoading}
-        user={user}
+  // src/App.tsx (FIXED rightPanel)
+
+// src/App.tsx (MODIFIED rightPanel)
+
+const rightPanel = (
+  <div className="relative h-full flex flex-col">
+    {/* ✅ MODIFICATION: The container is now a flexbox layout */}
+    <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70 flex justify-between items-center">
+      {/* 1. The now-static TopControlBar */}
+      <TopControlBar
+        viewMode={appState.viewMode}
+        onViewModeChange={handleViewModeChange}
+        onShowShortcuts={handleShowShortcuts}
+        isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+        onAutoTranslateChange={handleAutoTranslateChange}
+        modelSelection={appState.modelSelection}
+        onModelSelectionChange={handleModelSelectionChange}
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
       />
-    )}
-  </div>
-);
-  // Early return for authentication
-  if (!user) {
-    return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
-  }
-
-  const rightPanel = (
-    <div className="relative h-full flex flex-col">
-      {/* Top Control Bar */}
-      <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70">
-        <TopControlBar
-          viewMode={appState.viewMode}
-          onViewModeChange={appState.setViewMode}
-          onShowShortcuts={() => modalState.setShowShortcuts(true)}
-          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
-          onAutoTranslateChange={appState.setIsAutoTranslateEnabled}
+      
+      {/* 2. The new dynamic PaginationContainer, centered */}
+      <div className="flex-grow flex justify-center">
+        <PaginationContainer
           currentPage={appState.currentPage}
           onPageChange={searchHandlers.handlePageChange}
           hasNextPage={appState.hasNextPage}
-          isLoading={appState.isLoading}
           totalResults={appState.results.length}
-          modelSelection={appState.modelSelection}
-          onModelSelectionChange={appState.setModelSelection}
-          searchMode={searchMode}
-          onSearchModeChange={setSearchMode}
+        />
+      </div>
+    </div>
+    {/* 2. Main content area - NOW A FLEX CONTAINER */}
+    {/* ✅ FIX: This container now uses Flexbox to manage its children side-by-side. */}
+    <div
+      ref={resultsRef}
+      className="flex flex-1 overflow-hidden" // Use flex and hide potential overflow
+    >
+      {/* ResultsPanel container will grow and shrink */}
+      {/* ✅ FIX: This div is now a flex item that grows to fill available space. */}
+      <div
+        className="flex-1 overflow-y-auto"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <ResultsPanel
+          viewMode={appState.viewMode}
+          results={appState.results}
+          groupedResults={appState.groupedResults}
+          onResultClick={eventHandlers.handleMasterResultClick}
+          onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+          onResultRightClick={eventHandlers.handleResultRightClick}
+          currentUser={user?.username ?? ''}
+          sendMessage={sendMessage}
+          onItemBroadcast={eventHandlers.handleItemBroadcast}
+          onResultDoubleClick={modalState.handleOpenDetailModal}
+          onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
+          submissionStatuses={submissionState.submissionStatuses}
+          optimisticSubmissions={submissionState.optimisticSubmissions}
+          onResultDislike={(item) => dislikeState.handleDislike(
+            item, 
+            user, 
+            modalState.isDislikePanelOpen, 
+            modalState.handleToggleDislikePanel
+          )}
         />
       </div>
 
-      {/* Content area with DislikePanel */}
-      <div className="relative flex-1 overflow-hidden">
-        {/* Dislike Panel */}
-        <div className={`
-          absolute top-0 bottom-0 right-0 z-20
-          transition-transform duration-300 ease-in-out
-          ${modalState.isDislikePanelOpen ? 'translate-x-0' : 'translate-x-full'}
-        `}>
-          <DislikePanel
-            isOpen={modalState.isDislikePanelOpen}
-            items={dislikeState.dislikedItems}
-            onClose={modalState.handleToggleDislikePanel}
-            onClear={() => dislikeState.handleClearDislikes(user)}
-            onUndislike={(item) => dislikeState.handleUndislike(item, user)}
-            onResultClick={eventHandlers.handleMasterResultClick}
-            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
-          />
-        </div>
-
-        {/* Results Panel */}
-        <div
-          ref={resultsRef}
-          className={`
-            h-full overflow-y-auto p-2
-            transition-all duration-300 ease-in-out
-            ${modalState.isDislikePanelOpen ? 'pr-[calc(10vw+8px)]' : 'pr-2'}
-          `}
-          style={{ scrollbarGutter: 'stable' }}
-        >
-          <ResultsPanel
-            viewMode={appState.viewMode}
-            results={appState.results}
-            groupedResults={appState.groupedResults}
-            onResultClick={eventHandlers.handleMasterResultClick}
-            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
-            onResultRightClick={eventHandlers.handleResultRightClick}
-            currentUser={user.username}
-            sendMessage={sendMessage}
-            onItemBroadcast={eventHandlers.handleItemBroadcast}
-            onResultDoubleClick={modalState.handleOpenDetailModal}
-            onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
-            submissionStatuses={submissionState.submissionStatuses}
-            optimisticSubmissions={submissionState.optimisticSubmissions}
-            onResultDislike={(item) => dislikeState.handleDislike(
-              item, 
-              user, 
-              modalState.isDislikePanelOpen, 
-              modalState.handleToggleDislikePanel
-            )}
-          />
-        </div>
-      </div>
+      {/* DislikePanel is now a direct flex child. */}
+      {/* ✅ FIX: No more absolute positioning. It's now part of the flex layout and will "push" the ResultsPanel. */}
+      <DislikePanel
+        isOpen={modalState.isDislikePanelOpen}
+        items={dislikeState.dislikedItems}
+        onClose={modalState.handleToggleDislikePanel}
+        onClear={() => dislikeState.handleClearDislikes(user)}
+        onUndislike={(item) => dislikeState.handleUndislike(item, user)}
+        onResultClick={eventHandlers.handleMasterResultClick}
+        onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+      />
     </div>
-  );
-
-  // Frames Panel Instance
+  </div>
+);
   const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
     <FramesPanel
       frames={keyframeLoader.carouselFrames}
@@ -258,7 +280,7 @@ const leftPanel = (
       onFrameClick={eventHandlers.handleFrameClickInPanel}
       onRightClick={eventHandlers.handleFrameRightClickInPanel}
       onSimilaritySearch={searchHandlers.handleSimilaritySearch}
-      currentUser={user.username}
+      currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
       onResultDoubleClick={modalState.handleOpenDetailModal}
       onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
@@ -267,7 +289,6 @@ const leftPanel = (
     />
   ) : null;
 
-  // Video Panel Instance
   const videoPanelInstance = modalState.videoPanelState.isOpen && 
     modalState.videoPanelState.videoId && 
     modalState.videoPanelState.timestamp ? (
@@ -276,56 +297,63 @@ const leftPanel = (
       timestamp={modalState.videoPanelState.timestamp}
       onClose={modalState.handleCloseVideoPanel}
       onBroadcast={eventHandlers.handleItemBroadcast}
-      currentUser={user.username}
+      currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
     />
   ) : null;
 
-  // Detail Modal Instance
   const detailModalInstance = modalState.detailModalItem ? (
     <FrameDetailModal
       item={modalState.detailModalItem}
       onClose={modalState.handleCloseDetailModal}
     />
   ) : null;
-
+  
+  // =================================================================
+  // 3. ✅ FIX: Moved the early return for authentication HERE.
+  //    This is now AFTER all hooks have been called.
+  // =================================================================
+  if (!user) {
+    return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
+  }
+  
+  // =================================================================
+  // 4. FINAL RENDER (when user exists)
+  // =================================================================
   return (
     <>
       <AppShell
         leftPanel={leftPanel}
         rightPanel={rightPanel}
-        searchButton={searchMode === 'manual' ? searchButton : null}
-        chainSearchButton={searchMode === 'manual' ? chainSearchButton : null}
         carouselOverlay={framesPanelInstance}
         broadcastMessages={broadcastState.broadcastMessages}
         isConnected={isConnected}
         activeUsers={broadcastState.activeUsers}
-        onRemoveBroadcastMessage={eventHandlers.handleRemoveBroadcastMessage}
         videoModal={videoPanelInstance}
         onBroadcastResultClick={eventHandlers.handleMasterResultClick}
         onBroadcastRightClick={eventHandlers.handleBroadcastFeedRightClick}
         onBroadcastSimilaritySearch={searchHandlers.handleSimilaritySearch}
-        onClearBroadcastFeed={broadcastState.handleClearBroadcastFeed}
         onBroadcastResultDoubleClick={modalState.handleOpenDetailModal}
-        onBroadcastResultSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
         onVqaSubmit={broadcastState.handleVqaSubmit}
         onExportBroadcastFeed={eventHandlers.handleExportBroadcast}
         isTrackModeActive={broadcastState.isTrackModeActive}
-        onToggleTrackMode={broadcastState.handleToggleTrackMode}
         vqaQuestions={broadcastState.vqaQuestions}
         onVqaQuestionChange={broadcastState.handleVqaQuestionChange}
         isChatbotMode={searchMode === 'chatbot'}
+
+        // ✅ FIX: Pass the newly created stable handlers
+        onRemoveBroadcastMessage={handleRemoveBroadcastMessage}
+        onClearBroadcastFeed={handleClearBroadcastFeed}
+        onToggleTrackMode={handleToggleTrackMode}
+        onBroadcastResultSubmission={handleBroadcastResultSubmission}
       />
 
-      {/* Notification System */}
       <NotificationContainer 
         onOpenVideo={(videoId, timestamp) => modalState.handleOpenVideoPanel(videoId, timestamp)}
       />
 
-      {/* Modals */}
       {detailModalInstance}
 
-      {/* Submission Status Panel */}
       {submissionState.submissionResult && (
         <SubmissionStatusPanel
           key={submissionState.submissionResult.itemId}
@@ -334,7 +362,6 @@ const leftPanel = (
         />
       )}
 
-      {/* Shortcuts Modal */}
       {modalState.showShortcuts && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="relative bg-white rounded-lg shadow-xl">

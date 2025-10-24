@@ -9,7 +9,6 @@
 
   /* Derived colors for UI */
   --bg-primary: var(--color-dark);
-  --bg-secondary: var(--color-medium);
   --bg-tertiary: rgba(58, 71, 80, 0.5);  /* Lighter version of medium */
   --text-primary: var(--color-light);
   --text-secondary: rgba(238, 238, 238, 0.7);  /* Dimmed light */
@@ -104,3 +103,17 @@ body {
   .animate-slide-in-right {
   animation: slide-in-right 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
   }
+  /* src/App.css (ADD THIS CODE) */
+
+/* Target the class we added to the react-window Grid */
+.no-scrollbar {
+  /* For Firefox */
+  scrollbar-width: none;
+  /* For Internet Explorer and Edge */
+  -ms-overflow-style: none;
+}
+
+/* For Chrome, Safari, and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

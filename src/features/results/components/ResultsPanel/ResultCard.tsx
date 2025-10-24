@@ -20,7 +20,7 @@ interface ResultCardProps {
   onDoubleClick?: (item: ResultItem) => void;
   onContextMenu?: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch?: (imageSrc: string, cardId: string) => void;
-  
+    onCardContextMenu?: (event: React.MouseEvent, item: ResultItem) => void;
   // ✅ CHANGED: The signature is now explicit: it provides the item.
   onSubmit?: (item: ResultItem) => void;
   onSending?: (item: ResultItem) => void;
@@ -56,6 +56,8 @@ const ResultCard: React.FC<ResultCardProps> = ({
   isSelected = false,
   disabled = false,
   imageClassName,
+    onCardContextMenu,
+
   submissionStatus
 }) => {
   const { id, thumbnail, title, confidence, timestamp } = item;
@@ -142,18 +144,19 @@ const handleMouseDown = useCallback((e: React.MouseEvent) => {
     }
   }, [onClick, onSimilaritySearch, thumbnail, id, disabled]);
 // ✅ SOLUTION: Create an intermediate handler for the context menu
-const handleContextMenu = useCallback((event: React.MouseEvent) => {
-  // If the card is disabled, do nothing.
-  if (disabled) {
-    event.preventDefault(); // Still a good idea to prevent the default menu
-    return;
-  }
-  
-  // Call the onContextMenu prop passed from the parent,
-  // providing it with BOTH the item and the event.
-  onContextMenu?.(item, event);
+const handleContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      if (disabled) {
+        event.preventDefault();
+        return;
+      }
+      // Pass (event, item) to avoid the DOM handler signature confusion
+      onCardContextMenu?.(event, item);
+    },
+    [disabled, item, onCardContextMenu]
+  );
 
-}, [disabled, item, onContextMenu]); // Add dependencies for the useCallback hook
+
   // --- Render Logic (No changes below this line) ---
 
    // ✅ SOLUTION: Conditionally apply classes based on the submissionStatus prop.
@@ -234,11 +237,11 @@ const handleContextMenu = useCallback((event: React.MouseEvent) => {
 
   return (
     <div
-    className={cardClasses}
+  className={`${cardClasses} h-full`}
     tabIndex={onClick && !disabled ? 0 : -1}
     onMouseDown={handleMouseDown}
     onClick={disabled ? undefined : handleClick}
-    onContextMenu={disabled ? undefined : handleContextMenu}
+      onContextMenu={disabled ? undefined : handleContextMenu}
     onKeyDown={handleKeyDown}
     onMouseEnter={() => setIsHovered(true)}
     onMouseLeave={() => setIsHovered(false)}

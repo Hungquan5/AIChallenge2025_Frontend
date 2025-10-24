@@ -19,7 +19,7 @@ interface UseBroadcastStateReturn {
   handleVqaQuestionChange: (itemId: string, question: string) => void;
   handleVqaSubmit: (item: ResultItem, question: string) => void;
   handleToggleTrackMode: () => void;
-  handleRemoveBroadcastMessage: (messageId: string, index: number) => void;
+  handleRemoveBroadcastMessage: (messageId: string) => void;
   handleClearBroadcastFeed: () => void;
   handleAddBroadcastMessage: (message: ResultItem) => void;
 }

@@ -2,13 +2,11 @@
 import React, { useState } from 'react';
 import type { ResultItem } from '../features/search/types';
 import { ChevronUp, Users, Wifi, WifiOff, Trash2, FileText, GitMerge } from 'lucide-react';
-import { BroadcastFeed } from '../features/communicate/components/Communicate/BroadcastFeed';
+import BroadcastFeed  from '../features/communicate/components/Communicate/BroadcastFeed';
 
 interface AppShellProps {
   leftPanel: React.ReactNode;
   rightPanel: React.ReactNode;
-  searchButton: React.ReactNode;
-  chainSearchButton: React.ReactNode;
   carouselOverlay?: React.ReactNode;
   broadcastMessages?: ResultItem[];
   isConnected?: boolean;
@@ -34,8 +32,6 @@ interface AppShellProps {
 const AppShell: React.FC<AppShellProps> = ({ 
   leftPanel, 
   rightPanel,   
-  searchButton, 
-  chainSearchButton, 
   carouselOverlay,
   broadcastMessages = [],
   isConnected = false,
@@ -221,4 +217,4 @@ const AppShell: React.FC<AppShellProps> = ({
   );
 };
 
-export default AppShell;
+export default React.memo(AppShell);

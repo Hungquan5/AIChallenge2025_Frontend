@@ -1,5 +1,5 @@
 // src/features/results/components/ResultsPanel.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, memo } from 'react';
 import SortedByConfidenceView from './SortByConfView';
 import GroupedByVideoView from './GroupByVideoView';
 import type { ResultItem, GroupedResult, ViewMode } from '../../types';
@@ -77,7 +77,7 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   useShortcuts({ NEXT_RESULT: focusNextResult, PREV_RESULT: focusPrevResult });
 
   return (
-    <div className="min-h-full">
+    <div className="h-full flex flex-col">
       {viewMode === 'sortByConfidence' ? (
         <SortedByConfidenceView
           results={results}
@@ -113,4 +113,4 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   );
 };
 
-export default ResultsPanel;
+export default memo(ResultsPanel);

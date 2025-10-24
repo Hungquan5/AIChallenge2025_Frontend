@@ -4,12 +4,10 @@ import React, { useState } from 'react';
 import { ListChecks, Library, Keyboard, Languages, Settings, ChevronDown, MessageSquare, Search } from 'lucide-react';
 import type { ViewMode } from '../features/results/types';
 import type { ModelSelection } from '../features/search/types';
-import PaginationControls from '../features/results/components/ResultsPanel/PaginationControls';
 import ModelSelectionPanel from '../features/search/components/ModelSelection/ModelSelection';
-
+import PaginationContainer from '../features/results/components/ResultsPanel/PaginationContainer';
 // ✅ ADD: SearchMode type
 export type SearchMode = 'manual' | 'chatbot';
-
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
@@ -17,18 +15,12 @@ interface Props {
   isAutoTranslateEnabled: boolean;
   onAutoTranslateChange: (enabled: boolean) => void;
   
-  // Pagination props
-  currentPage: number;
-  onPageChange: (newPage: number) => void;
-  hasNextPage: boolean;
-  isLoading: boolean;
-  totalResults: number;
   
   // Model selection props
   modelSelection: ModelSelection;
   onModelSelectionChange: (selection: ModelSelection) => void;
   
-  // ✅ ADD: Search mode props
+  // Search mode props
   searchMode: SearchMode;
   onSearchModeChange: (mode: SearchMode) => void;
 }
@@ -39,11 +31,6 @@ const TopControlBar: React.FC<Props> = ({
   onShowShortcuts,
   isAutoTranslateEnabled,
   onAutoTranslateChange,
-  currentPage,
-  onPageChange,
-  hasNextPage,
-  isLoading,
-  totalResults,
   modelSelection,
   onModelSelectionChange,
   searchMode,
@@ -54,10 +41,10 @@ const TopControlBar: React.FC<Props> = ({
   const enabledModelsCount = Object.values(modelSelection).filter(Boolean).length;
 
   return (
-    <div className="flex justify-between items-center">
+    <div className="flex flex-1 justify-between items-center">
       <div className="flex items-center gap-4">
         {/* ✅ NEW: Search Mode Toggle - First Position */}
-        <div className="flex items-center gap-2 p-1 bg-slate-100/80 rounded-xl">
+        <div className="flex items-center gap-2 bg-slate-100/80 rounded-xl">
           <button
             onClick={() => onSearchModeChange('manual')}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
@@ -67,18 +54,16 @@ const TopControlBar: React.FC<Props> = ({
             }`}
           >
             <Search className="w-5 h-5" />
-            Manual
           </button>
           <button
             onClick={() => onSearchModeChange('chatbot')}
-            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3  text-sm font-semibold rounded-lg transition-all duration-300 ${
               searchMode === 'chatbot'
                 ? 'bg-white text-blue-600 shadow-md'
                 : 'bg-transparent text-slate-600 hover:bg-white/70'
             }`}
           >
             <MessageSquare className="w-5 h-5" />
-            AI Chat
           </button>
         </div>
 
@@ -93,7 +78,6 @@ const TopControlBar: React.FC<Props> = ({
             }`}
           >
             <ListChecks className="w-5 h-5" />
-            Conf
           </button>
           <button
             onClick={() => onViewModeChange('groupByVideo')}
@@ -104,7 +88,6 @@ const TopControlBar: React.FC<Props> = ({
             }`}
           >
             <Library className="w-5 h-5" />
-            Group
           </button>
         </div>
 
@@ -112,10 +95,9 @@ const TopControlBar: React.FC<Props> = ({
         <div className="relative border-l border-slate-300/60 pl-4">
           <button
             onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
+            className="flex items-center gap-2 px-3 py-1.5  text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
           >
             <Settings className="w-4 h-4" />
-            <span>Models ({enabledModelsCount}/3)</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
@@ -137,7 +119,6 @@ const TopControlBar: React.FC<Props> = ({
         <div className="border-l border-slate-300/60 pl-4">
           <label htmlFor="auto-translate-toggle" className="flex items-center cursor-pointer select-none">
             <Languages className="w-5 h-5 mr-3 text-slate-600" />
-            <span className="mr-3 text-sm font-semibold text-slate-700">Auto-Translate</span>
             <div className="relative">
               <input
                 type="checkbox"
@@ -153,25 +134,7 @@ const TopControlBar: React.FC<Props> = ({
         </div>
       </div>  
 
-      {/* Pagination Controls */}
-      <div className="flex-grow flex justify-center">
-        {(totalResults > 0 || currentPage > 1) && (
-          <PaginationControls
-            currentPage={currentPage}
-            onPageChange={onPageChange}
-            hasNextPage={hasNextPage}
-          />
-        )}
-      </div>
 
-      {/* Shortcuts Button */}
-      <button
-        onClick={onShowShortcuts}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
-      >
-        <Keyboard className="w-5 h-5" />
-        <span>Shortcuts</span>
-      </button>
 
       {/* Click outside handler to close dropdown */}
       {isModelDropdownOpen && (
@@ -184,4 +147,4 @@ const TopControlBar: React.FC<Props> = ({
   );
 };
 
-export default TopControlBar;
+export default React.memo(TopControlBar);
