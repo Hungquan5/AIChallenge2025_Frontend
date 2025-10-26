@@ -11,7 +11,7 @@ export const overlayClass = `absolute
   flex items-center justify-center
   bg-black/70
   backdrop-blur-sm
-  transition-opacity duration-300 ease-in-out
+  transition-opacity
 `;
 
 // === Modal Panel Container ===
@@ -23,7 +23,7 @@ export const modalClass = `
   rounded-2xl
   shadow-2xl shadow-black/40
   border border-slate-200/50
-  transform transition-all duration-300 ease-in-out
+  transform transition-all 
 `;
 
 // === Panel Header ===
@@ -51,7 +51,6 @@ export const closeButtonClass = `
   bg-slate-200/70 hover:bg-slate-300/90 active:bg-slate-300
   rounded-full
   text-slate-600 hover:text-slate-800
-  transition-all duration-200 ease-out
   hover:scale-110 active:scale-95
   ${focusRingClass}
 `;

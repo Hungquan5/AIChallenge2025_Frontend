@@ -1,10 +1,17 @@
-import React, { useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
-import type { ResultItem } from '../../../search/types';
-import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
-import { getImageUrl } from '../../../../utils/getImageURL';
+// src/features/detail_info/components/RelativeFramePanel/FramePanel.tsx
 
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useCallback, memo, useState } from 'react';
+import { getImageUrl } from '../../../../utils/getImageURL';
+import type { ResultItem } from '../../../results/types';
+import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
+import { Grid } from 'react-window';
+import type { GridImperativeAPI, CellComponentProps as ReactWindowCellProps } from 'react-window';
+import { X } from 'lucide-react';
+import { useDebouncedCallback } from '../../../../utils/useDebounceCallback';
 import * as styles from './styles';
 
+// --- PROPS, CONSTANTS, and CELL definition (Unchanged) ---
+// ... (no changes in this section)
 interface FramesPanelProps {
   frames: ResultItem[];
   videoTitle: string;
@@ -26,226 +33,234 @@ interface FramesPanelProps {
   isFetchingPrev: boolean;
 }
 
-const FramesPanel: React.FC<FramesPanelProps> = ({
-  frames,
-  videoTitle,
-  isLoading,
-  onClose,
-  onFrameClick,
-  onSimilaritySearch,
-  activeFrameId,
-  onRightClick,
-  currentUser,
-  sendMessage,
-  onResultDoubleClick,
-  onSubmission,
-  loadNextFrames,
-  loadPreviousFrames,
-  hasMoreNext,
-  hasMorePrev,
-  isFetchingNext,
-  isFetchingPrev,
-}) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+const CARD_WIDTH = 220;
+const CARD_HEIGHT = 140;
+const GAP_X = 12;
+const GAP_Y = 12;
 
-  const scrollStateRef = useRef<{
-    scrollHeight: number;
-    scrollTop: number;
+type CustomCellData = {
+  frames: ResultItem[];
+  activeFrameId: string | number | null;
+  onFrameClick: (item: ResultItem) => void;
+  onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
+  onSimilaritySearch: (imageSrc: string, cardId: string) => void;
+  onSubmission: (item: ResultItem) => void;
+  handleSending: (item: ResultItem) => void;
+  onResultDoubleClick: (item: ResultItem) => void;
+  rowCount: number;
+};
+
+type CellProps = ReactWindowCellProps<CustomCellData>;
+
+const Cell = memo(({ columnIndex, rowIndex, style, ...cellData }: CellProps) => {
+  const { frames, rowCount, activeFrameId, ...handlers } = cellData;
+  const idx = columnIndex * rowCount + rowIndex;
+  if (idx >= frames.length) return null;
+
+  const frame = frames[idx];
+  const isActive = frame.timestamp === activeFrameId?.toString();
+  const itemWithDetails = useMemo(() => ({
+    ...frame,
+    thumbnail: getImageUrl(frame.videoId, frame.thumbnail),
+    title: `${frame.timestamp}`,
+  }), [frame]);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsImageLoaded(false);
+    const img = new Image();
+    img.src = itemWithDetails.thumbnail;
+    img.onload = () => setIsImageLoaded(true);
+  }, [itemWithDetails.thumbnail]);
+
+  const paddedStyle: React.CSSProperties = {
+    ...style,
+    paddingRight: `${GAP_X}px`,
+    paddingBottom: `${GAP_Y}px`,
+    boxSizing: 'border-box',
+    transition: 'opacity 300ms ease-in-out',
+    opacity: isImageLoaded ? 1 : 0,
+    backgroundColor: '#e0e0e0',
+  };
+
+  return (
+    <div style={paddedStyle}>
+      <ResultCard
+        key={frame.id}
+        item={itemWithDetails}
+        loaded={isImageLoaded} 
+        onLoad={() => {}}
+        onClick={handlers.onFrameClick}
+        onContextMenu={handlers.onRightClick}
+        onSimilaritySearch={handlers.onSimilaritySearch}
+        onSubmit={handlers.onSubmission}
+        onSending={handlers.handleSending}
+        onDoubleClick={handlers.onResultDoubleClick}
+        showConfidence
+        showTimestamp
+        isSelected={isActive}
+        priority={isActive}
+      />
+    </div>
+  );
+});
+Cell.displayName = 'FrameCell';
+
+
+const FramesPanel: React.FC<FramesPanelProps> = ({
+  frames, videoTitle, isLoading, onClose, onFrameClick, onSimilaritySearch,
+  activeFrameId, onRightClick, currentUser, sendMessage, onResultDoubleClick,
+  onSubmission, loadNextFrames, loadPreviousFrames, hasMoreNext, hasMorePrev,
+  isFetchingNext, isFetchingPrev,
+}) => {
+  const debouncedLoadNext = useDebouncedCallback(loadNextFrames, 150);
+  const debouncedLoadPrev = useDebouncedCallback(loadPreviousFrames, 150);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<GridImperativeAPI>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  const scrollStateRef = useRef<{ 
     prevFrameCount: number;
+    scrollLeft?: number;
+    scrollWidth?: number;
   } | null>(null);
 
-  // Memoized frame processing to prevent unnecessary recalculations
-  const processedFrames = useMemo(() => {
-    return frames.map(frame => {
-      const isActive = frame.timestamp === activeFrameId?.toString();
-      
-      return {
-        ...frame,
-        thumbnail: getImageUrl(frame.videoId, frame.thumbnail),
-        title: `${frame.timestamp}`,
-        isActive
-      };
-    });
-  }, [frames, activeFrameId]);
-
-  // Memoized handlers to prevent child re-renders
   const handleSending = useCallback((item: ResultItem) => {
-    const message = {
-      type: 'broadcast_image',
-      payload: { ...item, submittedBy: currentUser },
-    };
+    const message = { type: 'broadcast_image', payload: { ...item, submittedBy: currentUser } };
     sendMessage(JSON.stringify(message));
   }, [currentUser, sendMessage]);
+  
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) { setDimensions({ width: entry.contentRect.width, height: entry.contentRect.height }); }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
-  // Memoized empty handler to prevent re-renders
-  const emptyHandler = useCallback(() => {}, []);
+  const { width, height } = dimensions;
+
+  const rowCount = useMemo(() => 
+    height > 0 ? Math.max(1, Math.floor(height / (CARD_HEIGHT + GAP_Y))) : 1, 
+    [height]
+  );
+  const colCount = Math.ceil(frames.length / rowCount);
+  const rowHeight = height > 0 ? Math.floor(height / rowCount) : CARD_HEIGHT + GAP_Y;
+  const columnWidth = CARD_WIDTH + GAP_X;
+
+  // useEffect(() => {
+  //   if (!activeFrameId || !gridRef.current || frames.length === 0) return;
+  //   const activeIndex = frames.findIndex(f => f.timestamp === activeFrameId.toString());
+  //   if (activeIndex !== -1) {
+  //     const columnIndex = Math.floor(activeIndex / rowCount);
+  //     gridRef.current.scrollToCell({ columnIndex, rowIndex: 0, columnAlign: 'center' });
+  //   }
+  // }, [activeFrameId, frames.length, rowCount]);
 
   useLayoutEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer || !scrollStateRef.current) return;
-
-    const { prevFrameCount, scrollHeight: prevScrollHeight, scrollTop: prevScrollTop } = scrollStateRef.current;
-
-    if (frames.length > prevFrameCount) {
-      const newScrollHeight = scrollContainer.scrollHeight;
-      const heightDifference = newScrollHeight - prevScrollHeight;
-      scrollContainer.scrollTop = prevScrollTop + heightDifference;
+    const scrollableElement = gridRef.current?.element;
+    if (!scrollableElement || !scrollStateRef.current || frames.length <= scrollStateRef.current.prevFrameCount) {
+      scrollStateRef.current = null;
+      return;
     }
-
+    const { scrollLeft, scrollWidth } = scrollStateRef.current;
+    const newScrollWidth = scrollableElement.scrollWidth;
+    const widthAdded = newScrollWidth - (scrollWidth || 0);
+    if (widthAdded > 0 && scrollLeft !== undefined) {
+      scrollableElement.scrollLeft = scrollLeft + widthAdded;
+    }
     scrollStateRef.current = null;
   }, [frames.length]);
 
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer || isLoading) return;
+  const onScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollWidth, clientWidth } = event.currentTarget;
+    const scrollThreshold = clientWidth * 0.3;
 
-    const checkAndLoadMore = () => {
-      if (
-        scrollContainer.scrollHeight <= scrollContainer.clientHeight &&
-        hasMoreNext &&
-        !isFetchingNext
-      ) {
-        loadNextFrames();
-      }
-    };
-
-    // Use requestIdleCallback to avoid blocking rendering
-    requestIdleCallback(checkAndLoadMore);
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            if (entry.target === topSentinelRef.current && hasMorePrev && !isFetchingPrev) {
-              scrollStateRef.current = {
-                scrollHeight: scrollContainer.scrollHeight,
-                scrollTop: scrollContainer.scrollTop,
-                prevFrameCount: frames.length,
-              };
-              // Use setTimeout to avoid blocking the intersection callback
-              setTimeout(() => loadPreviousFrames(), 0);
-            }
-            else if (entry.target === bottomSentinelRef.current && hasMoreNext && !isFetchingNext) {
-              setTimeout(() => loadNextFrames(), 0);
-            }
-          }
-        });
-      },
-      {
-        root: scrollContainer,
-        rootMargin: '600px 0px',
-      }
-    );
-
-    if (topSentinelRef.current && hasMorePrev) {
-      observer.observe(topSentinelRef.current);
+    if (hasMoreNext && !isFetchingNext && scrollLeft + clientWidth >= scrollWidth - scrollThreshold) {
+      debouncedLoadNext();
     }
-    if (bottomSentinelRef.current && hasMoreNext) {
-      observer.observe(bottomSentinelRef.current);
+    if (hasMorePrev && !isFetchingPrev && scrollLeft <= scrollThreshold) {
+      if (!scrollStateRef.current) {
+        scrollStateRef.current = { 
+          prevFrameCount: frames.length,
+          scrollLeft: scrollLeft,
+          scrollWidth: scrollWidth
+        };
+        debouncedLoadPrev();
+      }
     }
+  }, [hasMoreNext, hasMorePrev, isFetchingNext, isFetchingPrev, debouncedLoadNext, debouncedLoadPrev, frames.length]);
 
-    return () => observer.disconnect();
-  }, [
-    frames.length,
-    isLoading,
-    hasMoreNext,
-    hasMorePrev,
-    loadNextFrames,
-    loadPreviousFrames,
-    isFetchingNext,
-    isFetchingPrev,
-  ]);
+  // ✅ 1. Add a Wheel event handler to translate vertical scroll to horizontal
+  const handleWheelScroll = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    // Get the scrollable element from the grid's imperative API
+    const scrollableElement = gridRef.current?.element;
 
-  const modalClass = `${styles.modalClass} w-11/12 max-w-7xl h-[85vh] flex flex-col bg-white/90 backdrop-blur-lg`;
+    if (scrollableElement) {
+      // Prevent the default vertical page scroll
+      event.preventDefault();
+
+      // Apply the vertical scroll delta (event.deltaY) to the horizontal scroll position (scrollLeft)
+      // We also add deltaX to naturally support trackpads and mice with tilt wheels.
+      scrollableElement.scrollLeft += event.deltaY + event.deltaX;
+    }
+  }, []); // No dependencies needed as gridRef is a stable ref
+
+  const cellProps = useMemo(() => ({
+    frames, rowCount, activeFrameId, onFrameClick, onRightClick, onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick
+  }), [frames, rowCount, activeFrameId, onFrameClick, onRightClick, onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick]);
 
   return (
     <div className={styles.overlayClass} onClick={onClose}>
-      <div className={modalClass} onClick={(e) => e.stopPropagation()}>
-        {/* Panel Header - Memoized content */}
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-slate-800 truncate pr-4">
-              Frames from: {videoTitle}
-            </h2>
-            {(isFetchingPrev || isFetchingNext) && (
+      <div className={styles.modalClass} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.panelHeaderClass}>
+          <h2 className={styles.panelTitleClass}>{`Frames from: ${videoTitle}`}</h2>
+          {(isFetchingPrev || isFetchingNext) && (
               <div className="flex items-center gap-2 text-sm text-blue-600">
-                <div className="w-4 h-4 border-2 border-blue-600 border-dashed rounded-full animate-spin"></div>
-                <span>Loading frames...</span>
+                <div className={styles.loadingSpinnerClass} style={{width: '1rem', height: '1rem', borderWidth: '2px'}}></div>
+                <span>Loading...</span>
               </div>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className={styles.closeButtonClass}
-            aria-label="Close frames view"
-          >
-            ×
+          )}
+          <button onClick={onClose} className={styles.closeButtonClass} aria-label="Close frames view">
+            <X size={18} />
           </button>
         </div>
 
-        {/* Panel Body */}
-        {isLoading && frames.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-          </div>
-        ) : (
-          <div
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300"
-          >
-            {processedFrames.length > 0 ? (
-              <div className={styles.gridClass}>
-                {hasMorePrev && (
-                  <div
-                    ref={topSentinelRef}
-                    className="w-full h-2 col-span-full"
-                  />
-                )}
-                {processedFrames.map(frame => (
-                  <ResultCard
-                    key={frame.id}
-                    item={frame}
-                    loaded={true}
-                    onLoad={emptyHandler}
-                    onClick={onFrameClick}
-                    onContextMenu={onRightClick}
-                    onSimilaritySearch={onSimilaritySearch}
-                    onSubmit={onSubmission}
-                    onSending={handleSending}
-                    onDoubleClick={onResultDoubleClick}
-                    showConfidence
-                    showTimestamp
-                    isSelected={frame.isActive}
-                    priority={frame.isActive} // Prioritize loading active frame
-                  />
-                ))}
-                {hasMoreNext && (
-                   <div
-                    ref={bottomSentinelRef}
-                    className="w-full h-2 col-span-full"
-                  />
-                )}
-                {!hasMoreNext && processedFrames.length > 10 && (
-                  <div className="col-span-full flex items-center justify-center py-4">
-                    <div className="text-sm text-gray-500 bg-gray-100 px-4 py-2 rounded-full">
-                      All frames loaded ({processedFrames.length} total)
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-center text-slate-500">
-                <p className="font-semibold text-lg">No frames were found for this video.</p>
-              </div>
-            )}
-          </div>
-        )}
+        {/* --- Panel Body --- */}
+        <div
+          ref={containerRef}
+          className={styles.panelBodyClass}
+          // ✅ 2. Attach the onWheel handler to the Grid's container
+          onWheel={handleWheelScroll}
+        >
+          {isLoading && frames.length <= 1 ? (
+            <div className={styles.loadingContainerClass}><div className={styles.loadingSpinnerClass}></div></div>
+          ) : !isLoading && frames.length === 0 ? (
+            <div className={styles.noResultsClass}><p className={styles.noResultsTitleClass}>No frames were found for this video.</p></div>
+          ) : (
+            width > 0 && height > 0 && (
+              <Grid
+                  gridRef={gridRef}
+                  className="no-scrollbar"
+                  onScroll={onScroll}
+                  style={{ width, height }}
+                  columnCount={colCount}
+                  rowCount={rowCount}
+                  columnWidth={columnWidth}
+                  rowHeight={rowHeight}
+                  cellProps={cellProps}
+                  cellComponent={Cell}
+                  overscanCount={5}
+              />
+            )
+          )}
+        </div>
       </div>
     </div>
   );
 };
-
-// Memoize the component to prevent unnecessary re-renders
-export default React.memo(FramesPanel);
+export default memo(FramesPanel);

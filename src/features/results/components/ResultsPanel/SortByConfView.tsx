@@ -177,26 +177,29 @@ const serverStatus = cellProps.submissionStatuses[item.thumbnail];
   };
 
   return (
-    <div style={style}>
-        <div style={paddedStyle}>
-            <ResultCard
-                key={item.id}
-                item={item}
-                loaded={cellProps.loadedImages.has(item.id)}
-                onLoad={cellProps.onLoad}
-                onClick={cellProps.onClick}
-                onCardContextMenu={(e) => cellProps.onContextMenu(item, e)}
-                onSimilaritySearch={cellProps.onSimilaritySearch}
-                onSubmit={cellProps.onSubmit}
-                onSending={cellProps.onSending}
-                imageClassName={imageClass}
-                onDoubleClick={cellProps.onDoubleClick}
-                onDislike={cellProps.onDislike}
-                submissionStatus={status}
-            />
-        </div>
+  <div style={style}>
+    <div style={paddedStyle}>
+      <ResultCard
+        key={item.id}
+        item={item}
+        loaded={cellProps.loadedImages.has(item.id)}
+        onLoad={cellProps.onLoad}
+        onClick={cellProps.onClick}
+        
+        /* ✅ SOLUTION: Pass the stable function reference directly. */
+        /* ResultCard's internal `handleContextMenu` will handle the rest. */
+        onCardContextMenu={(e) => cellProps.onContextMenu(item, e)}
+        onSimilaritySearch={cellProps.onSimilaritySearch}
+        onSubmit={cellProps.onSubmit}
+        onSending={cellProps.onSending}
+        imageClassName={imageClass}
+        onDoubleClick={cellProps.onDoubleClick}
+        onDislike={cellProps.onDislike}
+        submissionStatus={status}
+      />
     </div>
-  );
+  </div>
+);
 }
 
 );

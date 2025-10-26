@@ -22,7 +22,7 @@ export const useKeyframeLoader = () => {
   const [hasMoreNext, setHasMoreNext] = useState(true);
   const [hasMorePrev, setHasMorePrev] = useState(true);
   
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>(null);
   const lastRequestTimeRef = useRef<{ [key: string]: number }>({});
   
   // Cache for processed frames to avoid recomputation
@@ -98,7 +98,6 @@ export const useKeyframeLoader = () => {
       }
 
       const keyframes: Keyframe[] = await response.json();
-      console.log(`Fetched ${keyframes.length} ${direction} frames for ${videoId}`);
       return keyframes.map(createFrameItem);
     } catch (err) {
       console.error(`Error loading ${direction} batch for video ${videoId}:`, err);

@@ -97,10 +97,6 @@ const GroupedByVideoView: React.FC<Props> = ({
                   onSending={handleSending}
                   onDislike={onDislike}
                   onSimilaritySearch={onSimilaritySearch}
-                  // ✅ CHANGE 3: Remove the old 'disabled' prop.
-                  // disabled={...}
-
-                  // ✅ CHANGE 4: Add the new 'submissionStatus' prop to pass the calculated state.
                   submissionStatus={status}
                 />
               );

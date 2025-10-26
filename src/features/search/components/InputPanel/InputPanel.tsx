@@ -77,8 +77,8 @@ const useInputPanel = ({
             const translatedQueries = await Promise.all(translatePromises);
             
             // This state update will now preserve references for unchanged queries
-            setQueries(translatedQueries);
             finalQueriesForApi = translatedQueries;
+            setQueries(translatedQueries);
         }
 
 

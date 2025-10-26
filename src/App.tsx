@@ -105,7 +105,8 @@ const App: React.FC = () => {
     keyframeLoader,
     searchHandlers,
     user,
-    sendMessage
+    sendMessage,
+    resultsRef
   });
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
@@ -123,7 +124,20 @@ const App: React.FC = () => {
   const handleShowShortcuts = useCallback(() => {
     modalState.setShowShortcuts(true);
   }, [modalState.setShowShortcuts]);
+  // ✅ FIX: Create stable callback for submissions
+  const handleResultSubmission = useCallback((item: ResultItem) => {
+    submissionState.handleSubmission(item, user, sendMessage);
+  }, [submissionState, user, sendMessage]);
 
+  // ✅ FIX: Create stable callback for dislikes
+  const handleResultDislike = useCallback((item: ResultItem) => {
+    dislikeState.handleDislike(
+      item, 
+      user, 
+      modalState.isDislikePanelOpen, 
+      modalState.handleToggleDislikePanel
+    );
+  }, [dislikeState, user, modalState.isDislikePanelOpen, modalState.handleToggleDislikePanel]);
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
@@ -220,7 +234,6 @@ const rightPanel = (
     {/* 2. Main content area - NOW A FLEX CONTAINER */}
     {/* ✅ FIX: This container now uses Flexbox to manage its children side-by-side. */}
     <div
-      ref={resultsRef}
       className="flex flex-1 overflow-hidden" // Use flex and hide potential overflow
     >
       {/* ResultsPanel container will grow and shrink */}
@@ -240,15 +253,10 @@ const rightPanel = (
           sendMessage={sendMessage}
           onItemBroadcast={eventHandlers.handleItemBroadcast}
           onResultDoubleClick={modalState.handleOpenDetailModal}
-          onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
-          submissionStatuses={submissionState.submissionStatuses}
-          optimisticSubmissions={submissionState.optimisticSubmissions}
-          onResultDislike={(item) => dislikeState.handleDislike(
-            item, 
-            user, 
-            modalState.isDislikePanelOpen, 
-            modalState.handleToggleDislikePanel
-          )}
+            onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
+  submissionStatuses={submissionState.submissionStatuses}
+  optimisticSubmissions={submissionState.optimisticSubmissions}
+  onResultDislike={handleResultDislike} // ✅ USE STABLE HANDLER
         />
       </div>
 
@@ -266,7 +274,8 @@ const rightPanel = (
     </div>
   </div>
 );
-  const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
+
+const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
     <FramesPanel
       frames={keyframeLoader.carouselFrames}
       videoTitle={appState.currentVideoTitle}
@@ -283,9 +292,10 @@ const rightPanel = (
       currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
       onResultDoubleClick={modalState.handleOpenDetailModal}
-      onSubmission={(item) => submissionState.handleSubmission(item, user, sendMessage)}
-      isFetchingNext={false}
-      isFetchingPrev={false}
+    onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
+        // ✅ FIX: Pass the correct props from the hook
+      isFetchingNext={keyframeLoader.isFetchingNext}
+      isFetchingPrev={keyframeLoader.isFetchingPrev}
     />
   ) : null;
 

@@ -45,7 +45,7 @@ export interface SubmissionResultMessage extends WebSocketMessage {
   type: 'submission_result';
   payload: {
     itemId: string;
-    submission: 'CORRECT' | 'WRONG' | 'DUPLICATE' | 'ERROR';
+  submission: 'CORRECT' | 'WRONG' | 'INDETERMINATE' | 'DUPLICATE' | 'ERROR';
     message?: string;
   };
 }

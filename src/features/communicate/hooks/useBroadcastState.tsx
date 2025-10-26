@@ -92,39 +92,20 @@ const handleRemoveBroadcastMessage = useCallback((messageId: string) => { // Rem
     });
   }, []);
 
-  // Memoize the return object to prevent unnecessary re-renders
-  return useMemo(() => ({
-    // State
+  return {
     broadcastMessages,
     activeUsers,
     vqaQuestions,
     isTrackModeActive,
-
-    // Setters (these are always stable)
     setBroadcastMessages,
     setActiveUsers,
     setVqaQuestions,
     setIsTrackModeActive,
-
-    // Handlers (these are memoized with useCallback)
     handleVqaQuestionChange,
     handleVqaSubmit,
     handleToggleTrackMode,
     handleRemoveBroadcastMessage,
     handleClearBroadcastFeed,
     handleAddBroadcastMessage,
-  }), [
-    // Dependencies - only include values that actually change the behavior
-    broadcastMessages,
-    activeUsers,
-    vqaQuestions,
-    isTrackModeActive,
-    // Note: Handlers are stable due to useCallback, so they don't need to be dependencies
-    handleVqaQuestionChange,
-    handleVqaSubmit,
-    handleToggleTrackMode,
-    handleRemoveBroadcastMessage,
-    handleClearBroadcastFeed,
-    handleAddBroadcastMessage,
-  ]);
+  };
 };

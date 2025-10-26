@@ -214,9 +214,6 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
 
             <div className="flex items-center justify-between">
                 <MemoizedEnhancedModeToggle mode={queryMode} onModeChange={handleModeToggle} />
-                {(query.text || query.origin) && queryMode === 'text' && (
-                    <SmartLanguageToggle query={query} onToggle={() => onLanguageToggle(index)} status={translationStatus} />
-                )}
             </div>
 
             <div className="space-y-4">

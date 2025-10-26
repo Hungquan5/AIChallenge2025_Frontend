@@ -5,5 +5,5 @@ export const getImageUrl = (videoId: string, thumbnail: string): string => {
     return thumbnail;
   }
   // Otherwise, construct the URL for keyframes.
-  return `http://localhost:1406/dataset/full/merge/${videoId}/keyframes/${thumbnail}`;
+  return `http://localhost:1406/dataset/full/merge/${videoId}/keyframes/keyframe_${thumbnail}.webp`;
 };

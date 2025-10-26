@@ -9,11 +9,11 @@ export const gridClass = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid
 export const cardClass = 'bg-white/80 rounded-sm border border-gray-500 overflow-hidden hover:border-yellow-500/50 flex flex-col ';
 export const imageContainerClass = 'relative bg-black/10 aspect-video';
 export const imageClass =
-  'w-full h-full object-cover object-center transition-all duration-500 ease-out ';
+  'w-full h-full object-cover object-center';
 
 export const imageOverlayClass =
   'absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity';
-export const loadingClass = 'absolute inset-0 animate-pulse bg-gray-200';
+export const loadingClass = 'absolute inset-0 bg-gray-200';
 
 export const contentClass = 'p-1 text-xs';
 export const titleClass = 'text-black font-medium truncate';

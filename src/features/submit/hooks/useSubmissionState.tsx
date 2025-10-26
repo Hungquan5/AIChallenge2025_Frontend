@@ -1,7 +1,7 @@
 // src/features/submit/hooks/useSubmissionState.ts
 import { useState, useCallback } from 'react';
 import type { ResultItem } from '../../results/types';
-import type { SubmissionResultPayload, SubmissionResultMessage } from '../../communicate/types';
+import type { SubmissionStatusUpdateMessage, SubmissionResultMessage } from '../../communicate/types';
 import { fullSubmissionFlow } from '../components/SubmitAPI';
 
 interface SubmissionResult {
@@ -42,7 +42,7 @@ export const useSubmissionState = (): UseSubmissionStateReturn => {
     try {
       const result = await fullSubmissionFlow(item);
 
-      const submissionPayload: SubmissionResultPayload = {
+      const submissionPayload: SubmissionResult = {
         itemId: item.thumbnail,
         submission: result.submission,
         description: result.description,

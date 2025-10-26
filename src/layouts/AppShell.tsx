@@ -66,7 +66,7 @@ const AppShell: React.FC<AppShellProps> = ({
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel with Dynamic Width */}
-        <aside className={`${leftPanelWidth} h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative transition-all duration-300 ease-in-out`}>
+        <aside className={`${leftPanelWidth} h-full bg-gradient-to-b from-white/95 to-slate-50/95 backdrop-blur-md border-slate-200/60 shadow-xl relative`}>
           <div className="h-full overflow-y-auto pb-16 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
             {leftPanel}
           </div>
@@ -138,23 +138,16 @@ const AppShell: React.FC<AppShellProps> = ({
             className={`
               pointer-events-auto
               relative px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
-              text-white rounded-t-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5
+              text-white rounded-t-xl shadow-lg hover:shadow-xl  transform hover:-translate-y-0.5
               flex items-center gap-2 border-t border-l border-r border-blue-300/30
               ${isBroadcastOpen ? 'shadow-xl -translate-y-0.5' : 'shadow-lg'}
             `}
           >
             <div className="flex items-center gap-2">
               {/* Connection Status Indicator */}
-              <div className="flex items-center gap-1">
-                {isConnected ? (
-                  <Wifi className="w-4 h-4" />
-                ) : (
-                  <WifiOff className="w-4 h-4 opacity-70" />
-                )}
-              </div>
 
-              <Users className="w-4 h-4" />
-              <span className="font-medium text-sm">Live Feed</span>
+
+                <span className="font-medium text-sm">Live Feed</span>
               
               {/* Message Count Badge */}
               {broadcastMessages.length > 0 && (
@@ -162,18 +155,7 @@ const AppShell: React.FC<AppShellProps> = ({
                   {broadcastMessages.length}
                 </span>
               )}
-              
-              {/* Active Users Count */}
-              {activeUsers > 0 && (
-                <span className="bg-green-400/30 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {activeUsers} online
-                </span>
-              )}
-            </div>
 
-            {/* Arrow Icon */}
-            <div className={`transform transition-transform duration-300 ${isBroadcastOpen ? 'rotate-180' : ''}`}>
-              <ChevronUp className="w-4 h-4" />
             </div>
 
             {/* Pulse animation for new messages */}
@@ -186,7 +168,7 @@ const AppShell: React.FC<AppShellProps> = ({
         {/* Broadcast Panel */}
         <div className={`
           bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md border-t border-gray-200/50 shadow-2xl
-          transition-all duration-500 ease-in-out overflow-hidden
+           overflow-hidden
           ${isBroadcastOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'}
         `}>
           <div className="">

@@ -12,7 +12,7 @@ const PAGE_SIZE = 100;
 interface UseSearchProps {
   appState: any;
   user: any;
-  resultsRef: RefObject<HTMLDivElement>;
+  resultsRef: RefObject<HTMLDivElement|null>;
 }
 
 interface UseSearchReturn {
