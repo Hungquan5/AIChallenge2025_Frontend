@@ -1,5 +1,4 @@
-// src/App.tsx (FIXED)
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import './App.css';
 import { Keyboard } from 'lucide-react';
 // --- Core Components & Layouts ---
@@ -30,6 +29,7 @@ import { useSearch } from './features/search/hooks/useSearch';
 import { useEventHandlers } from './hooks/useEventHandlers';
 import { useWebSocketHandlers } from './features/communicate/hooks/useWebSocketHandlers';
 import type { ResultItem } from './features/results/types';
+import { useObjectFilter } from './features/results/hooks/useObjectFilter';
 // --- Notification System ---
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
 import BubbleChat from './features/chat/components/ChatBubbleComponent';
@@ -50,14 +50,21 @@ const App: React.FC = () => {
   const resultsRef = useRef<HTMLDivElement>(null);
   const bubbleChatRef = useRef<BubbleChatRef>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>('manual');
-
   // Core State Hooks
   const appState = useAppState();
   const modalState = useModalState();
   const broadcastState = useBroadcastState();
   const submissionState = useSubmissionState();
   const dislikeState = useDislikeState();
-
+  const {
+    selectedObjects,
+    handleFilterChange,
+    clearFilter,
+    filterResults,
+    fetchObjectMetadata, // Destructure this directly
+    isLoadingMetadata,
+    globalObjectCounts,
+  } = useObjectFilter(); 
   // Notification System
   const {
     NotificationContainer,
@@ -132,12 +139,13 @@ const App: React.FC = () => {
   // ✅ FIX: Create stable callback for dislikes
   const handleResultDislike = useCallback((item: ResultItem) => {
     dislikeState.handleDislike(
-      item, 
-      user, 
-      modalState.isDislikePanelOpen, 
+      item,
+      user,
+      modalState.isDislikePanelOpen,
       modalState.handleToggleDislikePanel
     );
   }, [dislikeState, user, modalState.isDislikePanelOpen, modalState.handleToggleDislikePanel]);
+  
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
@@ -152,8 +160,20 @@ const App: React.FC = () => {
     modalState.handleToggleDislikePanel,
     searchHandlers.handlePageChange,
   ]);
-  
+
+  // ✅ SOLUTION: Activate the global keyboard shortcuts by calling the hook.
   useShortcuts(shortcutHandlers);
+
+  // Fetch object metadata when results change
+  useEffect(() => {
+    fetchObjectMetadata(appState.results);
+  }, [appState.results, fetchObjectMetadata]); // Now `fetchObjectMetadata` is a stable reference
+
+  // Apply filtering to results
+   const filteredResults = useMemo(
+    () => filterResults(appState.results),
+    [appState.results, selectedObjects, filterResults] // Use filterResults directly
+  );
   const handleRemoveBroadcastMessage = useCallback((messageId: string) => {
     // The original signature in AppShell had an 'index', but the hook doesn't use it.
     // We align with the hook's implementation for correctness.
@@ -167,7 +187,7 @@ const App: React.FC = () => {
   const handleToggleTrackMode = useCallback(() => {
     broadcastState.handleToggleTrackMode();
   }, [broadcastState.handleToggleTrackMode]);
-  
+
   const handleBroadcastResultSubmission = useCallback((item: ResultItem) => {
     // This was previously an inline arrow function, which is a common
     // cause of performance issues with memoized components.
@@ -177,114 +197,116 @@ const App: React.FC = () => {
   // 2. DEFINE UI LOGIC (Can use hooks' return values)
   // =================================================================
   const leftPanel = (
-      <div ref={inputPanelRef} tabIndex={-1} className="h-full">
-          {searchMode === 'manual' ? (
-              <InputPanel 
-                  onSearch={searchHandlers.handleInitiateSearch}
-                  onSingleSearchResult={searchHandlers.handleSingleItemSearch}
-                  isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
-                  isLoading={appState.isLoading}
-                  user={user}
-                  modelSelection={appState.modelSelection}
-                  onSendToBubbleChat={(query) => {
-                      bubbleChatRef.current?.sendMessage(query);
-                  }}
-              />
-          ) : (
-              <Chatbot 
-                  onToolOutputs={eventHandlers.handleAgentToolOutputs}
-                  isLoading={appState.isLoading}
-                  user={user}
-              />
-          )}
-      </div>
+    <div ref={inputPanelRef} tabIndex={-1} className="h-full">
+      {searchMode === 'manual' ? (
+        <InputPanel
+          onSearch={searchHandlers.handleInitiateSearch}
+          onSingleSearchResult={searchHandlers.handleSingleItemSearch}
+          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+          isLoading={appState.isLoading}
+          user={user}
+          modelSelection={appState.modelSelection}
+          onSendToBubbleChat={(query) => {
+            bubbleChatRef.current?.sendMessage(query);
+          }}
+        />
+      ) : (
+        <Chatbot
+          onToolOutputs={eventHandlers.handleAgentToolOutputs}
+          isLoading={appState.isLoading}
+          user={user}
+        />
+      )}
+    </div>
   );
 
-  // src/App.tsx (FIXED rightPanel)
-
-// src/App.tsx (MODIFIED rightPanel)
-
-const rightPanel = (
-  <div className="relative h-full flex flex-col">
-    {/* ✅ MODIFICATION: The container is now a flexbox layout */}
-    <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70 flex justify-between items-center">
-      {/* 1. The now-static TopControlBar */}
-      <TopControlBar
-        viewMode={appState.viewMode}
-        onViewModeChange={handleViewModeChange}
-        onShowShortcuts={handleShowShortcuts}
-        isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
-        onAutoTranslateChange={handleAutoTranslateChange}
-        modelSelection={appState.modelSelection}
-        onModelSelectionChange={handleModelSelectionChange}
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
-      />
-      
-      {/* 2. The new dynamic PaginationContainer, centered */}
-      <div className="flex-grow flex justify-center">
-        <PaginationContainer
-          currentPage={appState.currentPage}
-          onPageChange={searchHandlers.handlePageChange}
-          hasNextPage={appState.hasNextPage}
-          totalResults={appState.results.length}
-        />
-      </div>
-    </div>
-    {/* 2. Main content area - NOW A FLEX CONTAINER */}
-    {/* ✅ FIX: This container now uses Flexbox to manage its children side-by-side. */}
-    <div
-      className="flex flex-1 overflow-hidden" // Use flex and hide potential overflow
-    >
-      {/* ResultsPanel container will grow and shrink */}
-      {/* ✅ FIX: This div is now a flex item that grows to fill available space. */}
-      <div
-        className="flex-1 overflow-y-auto"
-        style={{ scrollbarGutter: 'stable' }}
-      >
-        <ResultsPanel
+  const rightPanel = (
+    <div className="relative h-full flex flex-col">
+      {/* ✅ MODIFICATION: The container is now a flexbox layout */}
+      <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70 flex justify-between items-center">
+        {/* 1. The now-static TopControlBar */}
+        <TopControlBar
           viewMode={appState.viewMode}
-          results={appState.results}
-          groupedResults={appState.groupedResults}
+          onViewModeChange={handleViewModeChange}
+          onShowShortcuts={handleShowShortcuts}
+          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+          onAutoTranslateChange={handleAutoTranslateChange}
+          modelSelection={appState.modelSelection}
+          onModelSelectionChange={handleModelSelectionChange}
+          searchMode={searchMode}
+          onSearchModeChange={setSearchMode}
+                    results={appState.results} // Pass full results for stats
+          selectedObjects={selectedObjects} // Use the destructured state
+          onObjectFilterChange={handleFilterChange} // Use the destructured handler
+          globalObjectCounts={globalObjectCounts} // Use the destructured state
+          isLoadingObjectMetadata={isLoadingMetadata} // Use the destructured state
+        />
+
+        {/* 2. The new dynamic PaginationContainer, centered */}
+        <div className="flex-grow flex justify-center">
+          <PaginationContainer
+            currentPage={appState.currentPage}
+            onPageChange={searchHandlers.handlePageChange}
+            hasNextPage={appState.hasNextPage}
+            totalResults={filteredResults.length} // Reflect total filtered results
+          />
+        </div>
+      </div>
+      {/* 2. Main content area - NOW A FLEX CONTAINER */}
+      {/* ✅ FIX: This container now uses Flexbox to manage its children side-by-side. */}
+      <div
+        className="flex flex-1 overflow-hidden" // Use flex and hide potential overflow
+      >
+        {/* ResultsPanel container will grow and shrink */}
+        {/* ✅ FIX: This div is now a flex item that grows to fill available space. */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ scrollbarGutter: 'stable' }}
+        >
+          <ResultsPanel
+            viewMode={appState.viewMode}
+            results={filteredResults} // <--- CHANGED: Pass filteredResults here
+            groupedResults={appState.groupedResults} // Keep this for grouped view logic if needed
+            onResultClick={eventHandlers.handleMasterResultClick}
+            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+            onResultRightClick={eventHandlers.handleResultRightClick}
+            currentUser={user?.username ?? ''}
+            sendMessage={sendMessage}
+            onItemBroadcast={eventHandlers.handleItemBroadcast}
+            onResultDoubleClick={modalState.handleOpenDetailModal}
+            onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
+            submissionStatuses={submissionState.submissionStatuses}
+            optimisticSubmissions={submissionState.optimisticSubmissions}
+            onResultDislike={handleResultDislike} // ✅ USE STABLE HANDLER
+            onToggleViewMode={appState.toggleViewMode}
+          />
+        </div>
+
+        {/* DislikePanel is now a direct flex child. */}
+        {/* ✅ FIX: No more absolute positioning. It's now part of the flex layout and will "push" the ResultsPanel. */}
+        <DislikePanel
+          isOpen={modalState.isDislikePanelOpen}
+          items={dislikeState.dislikedItems}
+          onClose={modalState.handleToggleDislikePanel}
+          onClear={() => dislikeState.handleClearDislikes(user)}
+          onUndislike={(item) => dislikeState.handleUndislike(item, user)}
           onResultClick={eventHandlers.handleMasterResultClick}
           onSimilaritySearch={searchHandlers.handleSimilaritySearch}
-          onResultRightClick={eventHandlers.handleResultRightClick}
-          currentUser={user?.username ?? ''}
-          sendMessage={sendMessage}
-          onItemBroadcast={eventHandlers.handleItemBroadcast}
-          onResultDoubleClick={modalState.handleOpenDetailModal}
-            onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
-  submissionStatuses={submissionState.submissionStatuses}
-  optimisticSubmissions={submissionState.optimisticSubmissions}
-  onResultDislike={handleResultDislike} // ✅ USE STABLE HANDLER
         />
       </div>
-
-      {/* DislikePanel is now a direct flex child. */}
-      {/* ✅ FIX: No more absolute positioning. It's now part of the flex layout and will "push" the ResultsPanel. */}
-      <DislikePanel
-        isOpen={modalState.isDislikePanelOpen}
-        items={dislikeState.dislikedItems}
-        onClose={modalState.handleToggleDislikePanel}
-        onClear={() => dislikeState.handleClearDislikes(user)}
-        onUndislike={(item) => dislikeState.handleUndislike(item, user)}
-        onResultClick={eventHandlers.handleMasterResultClick}
-        onSimilaritySearch={searchHandlers.handleSimilaritySearch}
-      />
     </div>
-  </div>
-);
+  );
 
-const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
+  const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
     <FramesPanel
       frames={keyframeLoader.carouselFrames}
       videoTitle={appState.currentVideoTitle}
       isLoading={keyframeLoader.isLoading}
       activeFrameId={keyframeLoader.activeFrameId}
       loadNextFrames={keyframeLoader.loadNextFrames}
+      loadPreviousFrames={keyframeLoader.loadPreviousFrames}
       hasMoreNext={keyframeLoader.hasMoreNext}
       hasMorePrev={keyframeLoader.hasMorePrev}
-      loadPreviousFrames={keyframeLoader.loadPreviousFrames}
       onClose={keyframeLoader.handleCarouselClose}
       onFrameClick={eventHandlers.handleFrameClickInPanel}
       onRightClick={eventHandlers.handleFrameRightClickInPanel}
@@ -292,15 +314,15 @@ const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
       currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
       onResultDoubleClick={modalState.handleOpenDetailModal}
-    onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
-        // ✅ FIX: Pass the correct props from the hook
+      onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
+      // ✅ FIX: Pass the correct props from the hook
       isFetchingNext={keyframeLoader.isFetchingNext}
       isFetchingPrev={keyframeLoader.isFetchingPrev}
     />
   ) : null;
 
-  const videoPanelInstance = modalState.videoPanelState.isOpen && 
-    modalState.videoPanelState.videoId && 
+  const videoPanelInstance = modalState.videoPanelState.isOpen &&
+    modalState.videoPanelState.videoId &&
     modalState.videoPanelState.timestamp ? (
     <VideoPanel
       videoId={modalState.videoPanelState.videoId}
@@ -318,7 +340,7 @@ const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
       onClose={modalState.handleCloseDetailModal}
     />
   ) : null;
-  
+
   // =================================================================
   // 3. ✅ FIX: Moved the early return for authentication HERE.
   //    This is now AFTER all hooks have been called.
@@ -326,7 +348,7 @@ const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
   if (!user) {
     return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
   }
-  
+
   // =================================================================
   // 4. FINAL RENDER (when user exists)
   // =================================================================
@@ -358,7 +380,7 @@ const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
         onBroadcastResultSubmission={handleBroadcastResultSubmission}
       />
 
-      <NotificationContainer 
+      <NotificationContainer
         onOpenVideo={(videoId, timestamp) => modalState.handleOpenVideoPanel(videoId, timestamp)}
       />
 
@@ -395,4 +417,4 @@ const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
   );
 };
 
-export default App;
+export default React.memo(App);

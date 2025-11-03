@@ -17,6 +17,7 @@ export interface Query {
   obj: string[];
   lang: 'eng' | 'ori';
   imageFile?: File | null;
+  
 }
 
 export interface GroupedResult {

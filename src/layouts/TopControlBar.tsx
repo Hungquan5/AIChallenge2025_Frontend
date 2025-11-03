@@ -2,19 +2,19 @@
 
 import React, { useState } from 'react';
 import { ListChecks, Library, Keyboard, Languages, Settings, ChevronDown, MessageSquare, Search } from 'lucide-react';
-import type { ViewMode } from '../features/results/types';
+import type { ViewMode, ResultItem } from '../features/results/types';
 import type { ModelSelection } from '../features/search/types';
 import ModelSelectionPanel from '../features/search/components/ModelSelection/ModelSelection';
-import PaginationContainer from '../features/results/components/ResultsPanel/PaginationContainer';
-// ✅ ADD: SearchMode type
+import ObjectFilterDropdown from '../features/results/components/ResultsPanel/ObjectFilterDropdown'; // Import the new dropdown component
+
 export type SearchMode = 'manual' | 'chatbot';
+
 interface Props {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onShowShortcuts: () => void;
   isAutoTranslateEnabled: boolean;
   onAutoTranslateChange: (enabled: boolean) => void;
-  
   
   // Model selection props
   modelSelection: ModelSelection;
@@ -23,6 +23,15 @@ interface Props {
   // Search mode props
   searchMode: SearchMode;
   onSearchModeChange: (mode: SearchMode) => void;
+
+  // Object Filter Props
+  results: ResultItem[]; // The full list of results to derive object metadata from
+  selectedObjects: Set<string>;
+  onObjectFilterChange: (newSelectedObjects: Set<string>) => void;
+  globalObjectCounts: { [key: string]: number };
+  isLoadingObjectMetadata: boolean;
+
+
 }
 
 const TopControlBar: React.FC<Props> = ({
@@ -35,15 +44,23 @@ const TopControlBar: React.FC<Props> = ({
   onModelSelectionChange,
   searchMode,
   onSearchModeChange,
+  // Destructure Object Filter Props
+  results,
+  selectedObjects,
+  onObjectFilterChange,
+  globalObjectCounts,
+  isLoadingObjectMetadata,
+
 }) => {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  // Removed isFilterDropdownOpen as it's now managed internally by ObjectFilterDropdown
 
   const enabledModelsCount = Object.values(modelSelection).filter(Boolean).length;
 
   return (
-    <div className="flex flex-1 justify-between items-center">
+    <div className="flex flex-1 justify-between items-center py-2 px-4 border-b border-slate-200/70 bg-white/60 backdrop-blur-sm">
       <div className="flex items-center gap-4">
-        {/* ✅ NEW: Search Mode Toggle - First Position */}
+        {/* Search Mode Toggle */}
         <div className="flex items-center gap-2 bg-slate-100/80 rounded-xl">
           <button
             onClick={() => onSearchModeChange('manual')}
@@ -57,7 +74,7 @@ const TopControlBar: React.FC<Props> = ({
           </button>
           <button
             onClick={() => onSearchModeChange('chatbot')}
-            className={`flex items-center gap-2 px-3  text-sm font-semibold rounded-lg transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg transition-all duration-300 ${
               searchMode === 'chatbot'
                 ? 'bg-white text-blue-600 shadow-md'
                 : 'bg-transparent text-slate-600 hover:bg-white/70'
@@ -98,6 +115,7 @@ const TopControlBar: React.FC<Props> = ({
             className="flex items-center gap-2 px-3 py-1.5  text-sm font-semibold text-slate-600 bg-slate-100/80 rounded-lg hover:bg-white/90 hover:shadow-md transition-all"
           >
             <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline-block">Models ({enabledModelsCount})</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
@@ -113,6 +131,17 @@ const TopControlBar: React.FC<Props> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* ✅ NEW: Object Filter Dropdown (using the dedicated component) */}
+        <div className="relative border-l border-slate-300/60 pl-4">
+            <ObjectFilterDropdown
+              results={results} // Pass this as it's part of the prop interface
+              selectedObjects={selectedObjects}
+              onFilterChange={onObjectFilterChange}
+              globalObjectCounts={globalObjectCounts}
+              isLoading={isLoadingObjectMetadata}
+            />
         </div>
 
         {/* Auto-Translate toggle */}
@@ -135,14 +164,14 @@ const TopControlBar: React.FC<Props> = ({
       </div>  
 
 
-
-      {/* Click outside handler to close dropdown */}
+      {/* Click outside handler for Model dropdown */}
       {isModelDropdownOpen && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setIsModelDropdownOpen(false)}
         />
       )}
+      {/* ObjectFilterDropdown now manages its own click outside, so its backdrop is internal */}
     </div>
   );
 };

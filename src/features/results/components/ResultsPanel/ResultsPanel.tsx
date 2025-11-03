@@ -19,13 +19,12 @@ interface ResultsPanelProps {
   sendMessage: (message: string) => void;
   onItemBroadcast?: (item: ResultItem) => void;
   onSubmission: (item: ResultItem) => void;
-  
-  // ✅ FIX: Use the more specific type for the submission statuses object.
   submissionStatuses: { [key: string]: SubmissionStatus };
-  
   optimisticSubmissions: Set<string>;
   onResultDoubleClick: (item: ResultItem) => void;
   onResultDislike: (item: ResultItem) => void;
+  // ✅ SOLUTION: Add a callback to handle view mode toggling via shortcut.
+  onToggleViewMode?: () => void;
 }
 
 const ResultsPanel: React.FC<ResultsPanelProps> = ({
@@ -40,14 +39,11 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
   onSubmission,
   submissionStatuses,
   optimisticSubmissions,
-  onResultDislike
+  onResultDislike,
+  onToggleViewMode,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // No need for this local state as it's handled in App.tsx or parent
-  // const [modalData, setModalData] = useState<ResultItem | null>(null);
 
-  // Keyboard shortcut logic (no changes)
   const focusNextResult = () => {
     const container = containerRef.current;
     if (!container) return;
@@ -73,11 +69,10 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
       (items[currentIndex - 1] as HTMLElement).focus();
     }
   };
-  
-  useShortcuts({ NEXT_RESULT: focusNextResult, PREV_RESULT: focusPrevResult });
+ 
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" ref={containerRef}>
       {viewMode === 'sortByConfidence' ? (
         <SortedByConfidenceView
           results={results}
@@ -88,7 +83,6 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick}
           onSubmission={onSubmission}
-          // --- This prop now matches the expected type ---
           submissionStatuses={submissionStatuses}
           optimisticSubmissions={optimisticSubmissions}
           onDislike={onResultDislike}
@@ -103,7 +97,6 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
           sendMessage={sendMessage}
           onResultDoubleClick={onResultDoubleClick}
           onSubmission={onSubmission}
-           // --- This prop now matches the expected type ---
           submissionStatuses={submissionStatuses}
           optimisticSubmissions={optimisticSubmissions}
           onDislike={onResultDislike}

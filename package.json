@@ -16,6 +16,7 @@
     "@types/react-window": "^1.8.8",
     "hls.js": "^1.6.11",
     "lucide-react": "^0.525.0",
+    "media-chrome": "^4.15.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-loading-skeleton": "^3.5.0",

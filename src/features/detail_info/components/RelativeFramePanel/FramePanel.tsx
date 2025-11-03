@@ -1,17 +1,15 @@
-// src/features/detail_info/components/RelativeFramePanel/FramePanel.tsx
-
-import React, { useRef, useEffect, useLayoutEffect, useMemo, useCallback, memo, useState } from 'react';
+import React, { useRef, useLayoutEffect, useMemo, useCallback, memo, useState } from 'react';
 import { getImageUrl } from '../../../../utils/getImageURL';
 import type { ResultItem } from '../../../results/types';
 import ResultCard from '../../../results/components/ResultsPanel/ResultCard';
 import { Grid } from 'react-window';
-import type { GridImperativeAPI, CellComponentProps as ReactWindowCellProps } from 'react-window';
+// ✅ FIX: The correct type to import for the `cellComponent` pattern
+import type { GridImperativeAPI, CellComponentProps } from 'react-window';
 import { X } from 'lucide-react';
 import { useDebouncedCallback } from '../../../../utils/useDebounceCallback';
 import * as styles from './styles';
 
-// --- PROPS, CONSTANTS, and CELL definition (Unchanged) ---
-// ... (no changes in this section)
+// --- PROPS INTERFACE (Unchanged) ---
 interface FramesPanelProps {
   frames: ResultItem[];
   videoTitle: string;
@@ -38,75 +36,86 @@ const CARD_HEIGHT = 140;
 const GAP_X = 12;
 const GAP_Y = 12;
 
-type CustomCellData = {
+// --- CELL PROPS & COMPONENT ---
+// These are the props that will be passed via `cellProps`
+type CustomCellProps = {
   frames: ResultItem[];
+  rowCount: number;
   activeFrameId: string | number | null;
+  loadedImages: Set<string | number>;
+  onLoad: (id: string | number) => void;
   onFrameClick: (item: ResultItem) => void;
   onRightClick: (item: ResultItem, event: React.MouseEvent) => void;
   onSimilaritySearch: (imageSrc: string, cardId: string) => void;
   onSubmission: (item: ResultItem) => void;
   handleSending: (item: ResultItem) => void;
   onResultDoubleClick: (item: ResultItem) => void;
-  rowCount: number;
 };
 
-type CellProps = ReactWindowCellProps<CustomCellData>;
+// ✅ FIX: The Cell now correctly uses CellComponentProps.
+// It destructures props directly, NOT from a `data` object. This resolves the first error.
+const Cell = memo(
+  ({
+    columnIndex,
+    rowIndex,
+    style,
+    ...cellData // The rest of the props from `cellProps` are spread here
+  }: CellComponentProps<CustomCellProps>) => {
+    const {
+      frames,
+      rowCount,
+      activeFrameId,
+      loadedImages,
+      onLoad,
+      ...handlers
+    } = cellData;
 
-const Cell = memo(({ columnIndex, rowIndex, style, ...cellData }: CellProps) => {
-  const { frames, rowCount, activeFrameId, ...handlers } = cellData;
-  const idx = columnIndex * rowCount + rowIndex;
-  if (idx >= frames.length) return null;
+    const idx = columnIndex * rowCount + rowIndex;
+    if (idx >= frames.length) return null;
 
-  const frame = frames[idx];
-  const isActive = frame.timestamp === activeFrameId?.toString();
-  const itemWithDetails = useMemo(() => ({
-    ...frame,
-    thumbnail: getImageUrl(frame.videoId, frame.thumbnail),
-    title: `${frame.timestamp}`,
-  }), [frame]);
-  const [isImageLoaded, setIsImageLoaded] = useState(false);
+    const frame = frames[idx];
+    const isActive = frame.timestamp === activeFrameId?.toString();
+    const itemWithDetails = useMemo(() => ({
+      ...frame,
+      thumbnail: getImageUrl(frame.videoId, frame.timestamp),
+      title: `${frame.thumbnail}`,
+    }), [frame]);
+    
+    const isLoaded = loadedImages.has(itemWithDetails.id);
 
-  useEffect(() => {
-    setIsImageLoaded(false);
-    const img = new Image();
-    img.src = itemWithDetails.thumbnail;
-    img.onload = () => setIsImageLoaded(true);
-  }, [itemWithDetails.thumbnail]);
+    const paddedStyle: React.CSSProperties = {
+      ...style,
+      paddingRight: `${GAP_X}px`,
+      paddingBottom: `${GAP_Y}px`,
+      boxSizing: 'border-box',
+    };
 
-  const paddedStyle: React.CSSProperties = {
-    ...style,
-    paddingRight: `${GAP_X}px`,
-    paddingBottom: `${GAP_Y}px`,
-    boxSizing: 'border-box',
-    transition: 'opacity 300ms ease-in-out',
-    opacity: isImageLoaded ? 1 : 0,
-    backgroundColor: '#e0e0e0',
-  };
-
-  return (
-    <div style={paddedStyle}>
-      <ResultCard
-        key={frame.id}
-        item={itemWithDetails}
-        loaded={isImageLoaded} 
-        onLoad={() => {}}
-        onClick={handlers.onFrameClick}
-        onContextMenu={handlers.onRightClick}
-        onSimilaritySearch={handlers.onSimilaritySearch}
-        onSubmit={handlers.onSubmission}
-        onSending={handlers.handleSending}
-        onDoubleClick={handlers.onResultDoubleClick}
-        showConfidence
-        showTimestamp
-        isSelected={isActive}
-        priority={isActive}
-      />
-    </div>
-  );
-});
+    return (
+      <div style={paddedStyle}>
+        <ResultCard
+          key={itemWithDetails.id}
+          item={itemWithDetails}
+          loaded={isLoaded}
+          onLoad={() => onLoad(itemWithDetails.id)}
+          onClick={handlers.onFrameClick}
+          onCardContextMenu={(event) => handlers.onRightClick(itemWithDetails, event)}
+          onSimilaritySearch={handlers.onSimilaritySearch}
+          onSubmit={handlers.onSubmission}
+          onSending={handlers.handleSending}
+          onDoubleClick={handlers.onResultDoubleClick}
+          showConfidence
+          showTimestamp
+          isSelected={isActive}
+          priority={isActive}
+        />
+      </div>
+    );
+  }
+);
 Cell.displayName = 'FrameCell';
 
 
+// --- MAIN PANEL COMPONENT ---
 const FramesPanel: React.FC<FramesPanelProps> = ({
   frames, videoTitle, isLoading, onClose, onFrameClick, onSimilaritySearch,
   activeFrameId, onRightClick, currentUser, sendMessage, onResultDoubleClick,
@@ -119,12 +128,22 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<GridImperativeAPI>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [loadedImages, setLoadedImages] = useState<Set<string | number>>(new Set());
 
   const scrollStateRef = useRef<{ 
     prevFrameCount: number;
     scrollLeft?: number;
     scrollWidth?: number;
   } | null>(null);
+
+  const handleImageLoad = useCallback((id: string | number) => {
+    setLoadedImages((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
 
   const handleSending = useCallback((item: ResultItem) => {
     const message = { type: 'broadcast_image', payload: { ...item, submittedBy: currentUser } };
@@ -152,15 +171,6 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
   const rowHeight = height > 0 ? Math.floor(height / rowCount) : CARD_HEIGHT + GAP_Y;
   const columnWidth = CARD_WIDTH + GAP_X;
 
-  // useEffect(() => {
-  //   if (!activeFrameId || !gridRef.current || frames.length === 0) return;
-  //   const activeIndex = frames.findIndex(f => f.timestamp === activeFrameId.toString());
-  //   if (activeIndex !== -1) {
-  //     const columnIndex = Math.floor(activeIndex / rowCount);
-  //     gridRef.current.scrollToCell({ columnIndex, rowIndex: 0, columnAlign: 'center' });
-  //   }
-  // }, [activeFrameId, frames.length, rowCount]);
-
   useLayoutEffect(() => {
     const scrollableElement = gridRef.current?.element;
     if (!scrollableElement || !scrollStateRef.current || frames.length <= scrollStateRef.current.prevFrameCount) {
@@ -176,6 +186,8 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
     scrollStateRef.current = null;
   }, [frames.length]);
 
+  // ✅ FIX: The `onScroll` handler now uses the correct React.UIEvent type.
+  // This resolves the second error.
   const onScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const { scrollLeft, scrollWidth, clientWidth } = event.currentTarget;
     const scrollThreshold = clientWidth * 0.3;
@@ -194,25 +206,21 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
       }
     }
   }, [hasMoreNext, hasMorePrev, isFetchingNext, isFetchingPrev, debouncedLoadNext, debouncedLoadPrev, frames.length]);
-
-  // ✅ 1. Add a Wheel event handler to translate vertical scroll to horizontal
+  
   const handleWheelScroll = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    // Get the scrollable element from the grid's imperative API
     const scrollableElement = gridRef.current?.element;
-
     if (scrollableElement) {
-      // Prevent the default vertical page scroll
       event.preventDefault();
-
-      // Apply the vertical scroll delta (event.deltaY) to the horizontal scroll position (scrollLeft)
-      // We also add deltaX to naturally support trackpads and mice with tilt wheels.
       scrollableElement.scrollLeft += event.deltaY + event.deltaX;
     }
-  }, []); // No dependencies needed as gridRef is a stable ref
+  }, []);
 
-  const cellProps = useMemo(() => ({
-    frames, rowCount, activeFrameId, onFrameClick, onRightClick, onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick
-  }), [frames, rowCount, activeFrameId, onFrameClick, onRightClick, onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick]);
+  // This object is passed to `cellProps`
+  const cellProps: CustomCellProps = useMemo(() => ({
+    frames, rowCount, activeFrameId, loadedImages, 
+    onLoad: handleImageLoad, onFrameClick, onRightClick, 
+    onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick
+  }), [frames, rowCount, activeFrameId, loadedImages, handleImageLoad, onFrameClick, onRightClick, onSimilaritySearch, onSubmission, handleSending, onResultDoubleClick]);
 
   return (
     <div className={styles.overlayClass} onClick={onClose}>
@@ -230,11 +238,9 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
           </button>
         </div>
 
-        {/* --- Panel Body --- */}
         <div
           ref={containerRef}
           className={styles.panelBodyClass}
-          // ✅ 2. Attach the onWheel handler to the Grid's container
           onWheel={handleWheelScroll}
         >
           {isLoading && frames.length <= 1 ? (
@@ -246,14 +252,15 @@ const FramesPanel: React.FC<FramesPanelProps> = ({
               <Grid
                   gridRef={gridRef}
                   className="no-scrollbar"
-                  onScroll={onScroll}
+                  onScroll={onScroll} // Correctly typed handler
                   style={{ width, height }}
                   columnCount={colCount}
                   rowCount={rowCount}
                   columnWidth={columnWidth}
                   rowHeight={rowHeight}
-                  cellProps={cellProps}
+                  // ✅ FIX: Using the `cellComponent` and `cellProps` API, which works with React.memo
                   cellComponent={Cell}
+                  cellProps={cellProps}
                   overscanCount={5}
               />
             )

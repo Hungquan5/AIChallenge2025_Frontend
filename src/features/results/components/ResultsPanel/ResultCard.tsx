@@ -61,7 +61,6 @@ const ResultCard: React.FC<ResultCardProps> = ({
   submissionStatus
 }) => {
   const { id, thumbnail, title, confidence, timestamp } = item;
-
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   

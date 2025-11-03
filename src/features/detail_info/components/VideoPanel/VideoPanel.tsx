@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import type { ResultItem } from '../../../results/types';
+import {
+  MediaController,
+  MediaControlBar,
+  MediaTimeRange,
+  MediaTimeDisplay,
+  MediaVolumeRange,
+  MediaPlayButton,
+  MediaMuteButton,
+} from 'media-chrome/react';
 
 // Import your existing assets
 import frameRates from '../../../../assets/video_fps.json';
@@ -29,67 +38,6 @@ const EVENT_TYPES = [
   { id: 'event5', name: 'Event 5', color: 'bg-purple-500' },
 ];
 
-// Preview frame cache management
-class PreviewFrameCache {
-  private cache = new Map<string, string>();
-  private loadingPromises = new Map<string, Promise<string>>();
-  private maxCacheSize = 100;
-
-  async getFrame(videoId: string, frameId: number): Promise<string> {
-    const key = `${videoId}-${frameId}`;
-    
-    if (this.cache.has(key)) {
-      return this.cache.get(key)!;
-    }
-
-    if (this.loadingPromises.has(key)) {
-      return this.loadingPromises.get(key)!;
-    }  
-
-    const loadPromise = this.loadFrame(videoId, frameId);
-    this.loadingPromises.set(key, loadPromise);
-
-    try {
-      const result = await loadPromise;
-      this.cache.set(key, result);
-      
-      if (this.cache.size > this.maxCacheSize) {
-        const firstKey = this.cache.keys().next().value;
-        if (firstKey) {
-          this.cache.delete(firstKey);          
-        }
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Failed to load frame:', error);
-      return '';
-    } finally {
-      this.loadingPromises.delete(key);
-    }
-  }
-
-  private async loadFrame(videoId: string, frameId: number): Promise<string> {
-    const response = await fetch(`http://localhost:9991/keyframes/nearest?video_id=${videoId}&frame_index=${frameId}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch keyframe');
-    }
-    const keyframe = await response.json();
-    return keyframe.filename || '';
-  }
-
-  preloadFrames(videoId: string, centerFrameId: number, range: number = 10) {
-    for (let i = -range; i <= range; i++) {
-      const frameId = Math.max(0, centerFrameId + i);
-      this.getFrame(videoId, frameId).catch(() => {});
-    }
-  }
-
-  clear() {
-    this.cache.clear();
-    this.loadingPromises.clear();
-  }
-}
 
 interface VideoPanelProps {
   videoId: string;
@@ -109,27 +57,17 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   sendMessage = () => {}
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const mediaControllerRef = useRef<HTMLElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const previewCacheRef = useRef(new PreviewFrameCache());
+  const scrubbingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [showControls, setShowControls] = useState(true);
-  const [scrollSensitivity, setScrollSensitivity] = useState(0.1);
-  const [previewFrames, setPreviewFrames] = useState<Array<{time: number, frameId: number, thumbnail: string, loading: boolean}>>([]);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [eventFrames, setEventFrames] = useState<{[key: string]: ResultItem[]}>({
-    event1: [],
-    event2: [],
-    event3: [],
-    event4: [],
-    event5: []
+    event1: [], event2: [], event3: [], event4: [], event5: []
   });
 
   const startTimeInSeconds = useMemo(() => frameIdToSeconds(timestamp, videoId), [timestamp, videoId]);
@@ -140,200 +78,121 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     return `http://localhost:1406/video/${videoId}/${mediaPlaylistName}`;
   }, [videoId]);
 
-  // Debounced preview update
-  const updatePreviewsDebounced = useRef<NodeJS.Timeout | null>(null);
-
-  const updatePreviews = useCallback(async (centerTime: number) => {
-    const centerFrameId = Math.floor(centerTime * frameRate);
-    const newPreviews = [];
-
-    for (let offset = -3; offset <= 3; offset++) {
-      const time = Math.max(0, Math.min(duration || 0, centerTime + offset));
-      const frameId = Math.floor(time * frameRate);
-      
-      newPreviews.push({
-        time,
-        frameId,
-        thumbnail: '',
-        loading: true
-      });
-    }
-
-    setPreviewFrames(newPreviews);
-
-    const loadPromises = newPreviews.map(async (preview, index) => {
-      try {
-        const thumbnail = await previewCacheRef.current.getFrame(videoId, preview.frameId);
-        return { index, thumbnail, loading: false };
-      } catch (error) {
-        return { index, thumbnail: '', loading: false };
-      }
-    });
-
-    loadPromises.forEach(async (promise) => {
-      const result = await promise;
-      setPreviewFrames(prev => prev.map((item, i) => 
-        i === result.index 
-          ? { ...item, thumbnail: result.thumbnail, loading: result.loading }
-          : item
-      ));
-    });
-
-    previewCacheRef.current.preloadFrames(videoId, centerFrameId, 15);
-  }, [videoId, duration, frameRate]);
-
-  // Handle scroll for seeking
-  const handleScroll = useCallback((event: WheelEvent) => {
-    if (!videoRef.current || !videoContainerRef.current?.contains(event.target as Node)) return;
-    if (!videoLoaded) return;
-    
-    event.preventDefault();
-    
-    const scrollDelta = event.deltaY > 0 ? scrollSensitivity : -scrollSensitivity;
-    const newTime = Math.max(0, Math.min(duration, videoRef.current.currentTime + scrollDelta));
-    
-    videoRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-    
-    if (updatePreviewsDebounced.current) {
-      clearTimeout(updatePreviewsDebounced.current);
-    }
-    
-    updatePreviewsDebounced.current = setTimeout(() => {
-      updatePreviews(newTime);
-    }, 100);
-  }, [scrollSensitivity, duration, videoLoaded, updatePreviews]);
-
-  // Keyboard shortcuts
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (!videoRef.current || !videoLoaded) return;
+    if (event.target instanceof HTMLInputElement) return;
 
     switch (event.code) {
       case 'Space':
         event.preventDefault();
-        if (isPlaying) {
-          videoRef.current.pause();
-        } else {
-          videoRef.current.play();
-        }
+        videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
         break;
       case 'ArrowLeft':
         event.preventDefault();
-        const newTimeLeft = Math.max(0, videoRef.current.currentTime - 1);
-        videoRef.current.currentTime = newTimeLeft;
-        updatePreviews(newTimeLeft);
+        videoRef.current.currentTime -= 1;
         break;
       case 'ArrowRight':
         event.preventDefault();
-        const newTimeRight = Math.min(duration, videoRef.current.currentTime + 1);
-        videoRef.current.currentTime = newTimeRight;
-        updatePreviews(newTimeRight);
+        videoRef.current.currentTime += 1;
         break;
       case 'Escape':
         event.preventDefault();
         onClose();
         break;
     }
-  }, [isPlaying, duration, onClose, videoLoaded, updatePreviews]);
+  }, [onClose, videoLoaded]);
 
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('wheel', handleScroll, { passive: false });
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('wheel', handleScroll);
-      
-      if (updatePreviewsDebounced.current) {
-        clearTimeout(updatePreviewsDebounced.current);
-      }
-    };
-  }, [handleKeyDown, handleScroll]);
+  // Simplified scrolling logic
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (!videoRef.current || !videoLoaded) return;
+    event.preventDefault();
 
-  // Video initialization
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
+    const video = videoRef.current;
+    if (!video.paused) {
+      video.pause();
     }
 
-    previewCacheRef.current.clear();
+    if (scrubbingTimeoutRef.current) {
+      clearTimeout(scrubbingTimeoutRef.current);
+    }
+    setIsScrubbing(true);
+
+    const scrollSensitivity = 0.1; // Adjust this value to control seeking speed
+    const timeIncrement = event.deltaY > 0 ? -scrollSensitivity : scrollSensitivity;
+    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + timeIncrement));
+
+    scrubbingTimeoutRef.current = setTimeout(() => {
+      setIsScrubbing(false);
+    }, 200); // Hide "Scrubbing" indicator after 200ms of inactivity
+
+  }, [videoLoaded]);
+  
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  useEffect(() => {
+    const mediaEl = mediaControllerRef.current;
+    if (videoLoaded && mediaEl) {
+      mediaEl.addEventListener('wheel', handleWheel, { passive: false });
+      return () => mediaEl.removeEventListener('wheel', handleWheel);
+    }
+  }, [videoLoaded, handleWheel]);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+    }
+
     setVideoLoaded(false);
     setVideoError(null);
-    setPreviewFrames([]);
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleTimeUpdate = () => {
-      const time = videoElement.currentTime;
-      setCurrentTime(time);
-    };
-    const handleLoadedMetadata = () => {
-      setDuration(videoElement.duration);
-      setVideoLoaded(true);
-      updatePreviews(startTimeInSeconds);
-    };
-    const handleError = () => {
-      setVideoError('Failed to load video');
+    const onError = () => {
+      setVideoError('Failed to load video. Please check the source.');
       setVideoLoaded(false);
     };
 
-    videoElement.addEventListener('play', handlePlay);
-    videoElement.addEventListener('pause', handlePause);
-    videoElement.addEventListener('timeupdate', handleTimeUpdate);
-    videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
-    videoElement.addEventListener('error', handleError);
+    videoEl.addEventListener('error', onError);
 
     if (Hls.isSupported()) {
-      hlsRef.current = new Hls({
-        enableWorker: false,
-        maxLoadingDelay: 4,
-        maxBufferLength: 30,
-        maxBufferSize: 60 * 1000 * 1000,
+      const hls = new Hls();
+      hlsRef.current = hls;
+      hls.loadSource(videoUrl);
+      hls.attachMedia(videoEl);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoEl.currentTime = startTimeInSeconds;
+        videoEl.play().catch(console.error);
+        setVideoLoaded(true);
       });
-
-      hlsRef.current.loadSource(videoUrl);
-      hlsRef.current.attachMedia(videoElement);
-      
-      hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
-        videoElement.currentTime = startTimeInSeconds;
-        videoElement.play().catch(console.error);
-      });
-
-      hlsRef.current.on(Hls.Events.ERROR, (event, data) => {
-        console.error('HLS Error:', data);
+      hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
+          console.error('HLS Error:', data);
           setVideoError(`HLS Error: ${data.details}`);
-          setVideoLoaded(false);
         }
       });
-    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-      videoElement.src = videoUrl;
-      videoElement.addEventListener('loadedmetadata', () => {
-        videoElement.currentTime = startTimeInSeconds;
-        videoElement.play().catch(console.error);
+    } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      videoEl.src = videoUrl;
+      videoEl.addEventListener('loadedmetadata', () => {
+        videoEl.currentTime = startTimeInSeconds;
+        videoEl.play().catch(console.error);
+        setVideoLoaded(true);
       });
     } else {
-      setVideoError('Video format not supported');
+      setVideoError('HLS is not supported in your browser.');
     }
 
     return () => {
-      videoElement.removeEventListener('play', handlePlay);
-      videoElement.removeEventListener('pause', handlePause);
-      videoElement.removeEventListener('timeupdate', handleTimeUpdate);
-      videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      videoElement.removeEventListener('error', handleError);
-      
+      videoEl.removeEventListener('error', onError);
       if (hlsRef.current) {
         hlsRef.current.destroy();
-        hlsRef.current = null;
       }
     };
-  }, [videoUrl, startTimeInSeconds, updatePreviews]);
+  }, [videoUrl, startTimeInSeconds]);
 
+  // Rest of your handlers (handleBroadcastCurrentFrame, handleBroadcastVideo, etc.) remain unchanged
   const handleBroadcastCurrentFrame = async () => {
     if (videoRef.current && videoLoaded) {
       const currentTime = videoRef.current.currentTime;
@@ -366,20 +225,21 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
   const handleBroadcastVideo = () => {
     if (!videoRef.current || !videoLoaded) return;
-
+    const currentTime = videoRef.current.currentTime;
+    
     const message = {
       type: 'broadcast_video',
       payload: {
         videoId,
         timestamp: currentTime,
         submittedBy: currentUser,
-        message: `${currentUser} is sharing video: ${videoId} at ${formatTime(currentTime)}`
+        message: `${currentUser} is sharing video: ${videoId} at ${new Date(currentTime * 1000).toISOString().substr(14, 5)}`
       }
     };
 
     sendMessage(JSON.stringify(message));
   };
-
+  
   const handleAddToEvent = async () => {
     if (!selectedEvent || !videoRef.current || !videoLoaded) return;
 
@@ -450,7 +310,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     sendMessage(JSON.stringify(message));
     
-    // Clear the event after submission
     setEventFrames(prev => ({
       ...prev,
       [selectedEvent]: []
@@ -459,332 +318,176 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     alert(`Submitted ${frames.length} frames from ${selectedEvent} to DRES`);
   };
 
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (videoRef.current && videoLoaded) {
-      const newTime = (parseFloat(event.target.value) / 100) * duration;
-      videoRef.current.currentTime = newTime;
-      
-      if (updatePreviewsDebounced.current) {
-        clearTimeout(updatePreviewsDebounced.current);
-      }
-      
-      updatePreviewsDebounced.current = setTimeout(() => {
-        updatePreviews(newTime);
-      }, 200);
-    }
-  };
-
-  const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (videoRef.current) {
-      const newVolume = parseFloat(event.target.value) / 100;
-      videoRef.current.volume = newVolume;
-      setVolume(newVolume);
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (videoRef.current && videoLoaded) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play().catch(console.error);
-      }
-    }
-  };
-
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-1">
-      <div className="relative w-full h-full max-w-3xl bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-lg p-4">
+      <div className="relative w-full h-full max-w-4xl bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-gray-700/50">
+        
         {/* Main Video Panel */}
         <div className="flex-1 flex flex-col min-h-0">
+          
           {/* Header */}
-          <div className="flex items-center justify-between p-1 md:p-1 bg-gray-800 border-b border-gray-700">
+          <div className="flex items-center justify-between p-3 bg-gray-900/50 border-b border-gray-700/50 shadow-md">
             <div className="flex items-center space-x-2">
               <div className="flex space-x-1.5">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
               </div>
-              <span className="text-gray-300 font-medium text-sm md:text-base truncate">{videoId}</span>
-              {!videoLoaded && !videoError && (
-                <span className="ml-2 text-yellow-400 text-xs md:text-sm">Loading...</span>
-              )}
-              {videoError && (
-                <span className="ml-2 text-red-400 text-xs md:text-sm">{videoError}</span>
+              <span className="text-gray-200 font-semibold text-base truncate">{videoId}</span>
+              {isScrubbing && (
+                <span className="ml-2 text-xs font-semibold text-blue-400 bg-blue-900/50 px-2 py-0.5 rounded-full">Scrubbing</span>
               )}
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowEventPanel(!showEventPanel)}
-                className="px-3 py-1.5 md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(167,139,250,0.6)] text-sm font-semibold"
               >
                 {showEventPanel ? 'Hide Events' : 'Show Events'}
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors duration-200"
                 aria-label="Close video"
               >
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
           </div>
-
+            
           {/* Video Container */}
-          <div 
-            ref={videoContainerRef}
-            className="relative bg-black flex-1 w-full h-auto aspect-video"
-            onMouseEnter={() => setShowControls(true)}
-            onMouseLeave={() => setShowControls(false)}
+          <MediaController 
+            ref={mediaControllerRef}
+            className="relative bg-black flex-1 w-full aspect-video overflow-hidden"
           >
             <video
               ref={videoRef}
-              className="w-full h-full object-contain"
+              slot="media"
+              className="w-full h-full object-contain transition-opacity duration-300"
               playsInline
               crossOrigin="anonymous"
-              onClick={togglePlayPause}
-              style={{ display: videoError ? 'none' : 'block' }}
+              style={{ opacity: videoLoaded ? 1 : 0 }}
             />
-
-            {/* Error Display */}
-            {videoError && (
-              <div className="absolute inset-0 flex items-center justify-center text-red-400 p-1">
-                <div className="text-center">
-                  <svg className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  </svg>
-                  <p className="text-base md:text-lg font-medium">{videoError}</p>
-                  <p className="text-xs md:text-sm text-gray-500 mt-2">Please check the video source</p>
-                </div>
-              </div>
-            )}
-
-            {/* Loading Indicator */}
-            {!videoLoaded && !videoError && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <div className="animate-spin w-10 h-10 md:w-12 md:h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                  <p className="text-sm md:text-base">Loading video...</p>
-                </div>
-              </div>
-            )}
-
-            {/* Custom Controls Overlay */}
-            {videoLoaded && (
-              <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
-                showControls ? 'opacity-100' : 'opacity-0'
-              }`}>
-                <button
-                  onClick={togglePlayPause}
-                  className="p-3 md:p-1 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
-                >
-                  {isPlaying ? (
-                    <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            
+            {/* Loading and Error States */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {!videoLoaded && !videoError && (
+                 <div className="flex flex-col items-center text-white">
+                    <svg className="w-12 h-12 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                  ) : (
-                    <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.68L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
-                    </svg>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Scroll Indicator */}
-            {videoLoaded && (
-              <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-black/70 text-white px-2 py-1 rounded-lg text-xs md:text-sm">
-                Scroll to seek ±{scrollSensitivity}s
-              </div>
-            )}
-          </div>
-
-          {/* Control Panel */}
-          <div className="p-1 md:p-1 bg-gray-800 space-y-3">
-            {/* Timeline */}
-            <div className="flex items-center space-x-2 md:space-x-4">
-              <span className="text-xs md:text-sm text-gray-300 font-mono">{formatTime(currentTime)}</span>
-              <div className="flex-1">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={duration ? (currentTime / duration) * 100 : 0}
-                  onChange={handleSeek}
-                  disabled={!videoLoaded}
-                  className="w-full h-1.5 md:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:opacity-50"
-                />
-              </div>
-              <span className="text-xs md:text-sm text-gray-300 font-mono">{formatTime(duration)}</span>
+                    <p className="mt-2 animate-pulse">Loading Video...</p>
+                 </div>
+              )}
+              {videoError && (
+                 <div className="flex flex-col items-center text-red-400 p-4 bg-red-900/20 rounded-lg">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p className="mt-2 font-semibold">{videoError}</p>
+                 </div>
+              )}
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center space-x-2 md:space-x-4">
-                {/* Play/Pause */}
-                <button
-                  onClick={togglePlayPause}
-                  disabled={!videoLoaded}
-                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPlaying ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.68L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/>
-                    </svg>
-                  )}
-                </button>
+            <MediaControlBar className="transition-opacity duration-200">
+              <MediaPlayButton className="transform hover:scale-110 transition-transform"></MediaPlayButton>
+              <MediaTimeDisplay></MediaTimeDisplay>
+              <MediaTimeRange></MediaTimeRange>
+              <MediaTimeDisplay showDuration></MediaTimeDisplay>
+              <MediaMuteButton className="transform hover:scale-110 transition-transform"></MediaMuteButton>
+              <MediaVolumeRange></MediaVolumeRange>
+            </MediaControlBar>
+          </MediaController>
 
-                {/* Volume Control */}
-                <div className="flex items-center space-x-1.5 md:space-x-2">
-                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                  </svg>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={volume * 100}
-                    onChange={handleVolumeChange}
-                    className="w-16 md:w-20 h-1 bg-gray-600 rounded appearance-none cursor-pointer"
-                  />
-                </div>
+          {/* Action Buttons Panel */}
+          <div className="p-3 bg-gray-900/50 border-t border-gray-700/50">
+            <div className="flex items-center justify-center space-x-4">
+              <button
+                onClick={handleBroadcastVideo}
+                disabled={!videoLoaded}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(249,115,22,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center space-x-2 text-sm"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                <span className="hidden sm:inline">Share Video</span>
+              </button>
 
-                {/* Scroll Sensitivity Control */}
-                <div className="hidden md:flex items-center space-x-2">
-                  <span className="text-sm text-gray-400">Scroll:</span>
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="1"
-                    step="0.05"
-                    value={scrollSensitivity}
-                    onChange={(e) => setScrollSensitivity(parseFloat(e.target.value))}
-                    className="w-16 h-1 bg-gray-600 rounded appearance-none cursor-pointer"
-                  />
-                  <span className="text-xs text-gray-400 w-12">{scrollSensitivity.toFixed(2)}s</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleBroadcastVideo}
-                  disabled={!videoLoaded}
-                  className="px-3 py-1.5 md:px-4 md:py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5 text-sm"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-                  </svg>
-                  <span className="hidden sm:inline">Share Video</span>
-                </button>
-
-                <button
-                  onClick={handleBroadcastCurrentFrame}
-                  disabled={!videoLoaded}
-                  className="px-3 py-1.5 md:px-4 md:py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5 text-sm"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                  <span className="hidden sm:inline">Broadcast Frame</span>
-                </button>
-              </div>
+              <button
+                onClick={handleBroadcastCurrentFrame}
+                disabled={!videoLoaded}
+                className="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center space-x-2 text-sm"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span className="hidden sm:inline">Broadcast Frame</span>
+              </button>
             </div>
           </div>
         </div>
 
         {/* Event Panel */}
         {showEventPanel && (
-          <div className="w-full lg:w-80 bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col">
-            <div className="p-1 border-b border-gray-700">
-              <h3 className="text-white font-semibold mb-4">Event Panel</h3>
-              
-              {/* Event Selection */}
+          <div className="w-full lg:w-96 bg-gray-800/80 backdrop-blur-sm border-t lg:border-t-0 lg:border-l border-gray-700/50 flex flex-col">
+            <div className="p-4 border-b border-gray-700/50">
+              <h3 className="text-white font-bold text-lg mb-4">Event Panel</h3>
+              <div className="relative mb-4">
+                  <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 rounded-r-full"></div>
+                  <p className="pl-4 text-gray-300 text-sm">Select an event to add frames.</p>
+              </div>
               <div className="space-y-2 mb-4">
                 {EVENT_TYPES.map((event) => (
                   <button
                     key={event.id}
                     onClick={() => setSelectedEvent(event.id)}
-                    className={`w-full p-3 rounded-lg border-2 transition-colors flex items-center justify-between ${
+                    className={`w-full p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-between shadow-lg ${
                       selectedEvent === event.id 
-                        ? 'border-white bg-gray-700' 
-                        : 'border-gray-600 hover:border-gray-500'
+                        ? 'border-blue-400 bg-gray-700 shadow-blue-500/20' 
+                        : 'border-gray-600/50 hover:border-gray-500 hover:bg-gray-700/50'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${event.color}`}></div>
-                      <span className="text-white text-sm font-medium">{event.name}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full ${event.color}`}></div>
+                      <span className="text-white font-semibold">{event.name}</span>
                     </div>
-                    <span className="text-gray-400 text-xs">
-                      {eventFrames[event.id].length} frames
+                    <span className="text-gray-400 text-sm font-mono bg-gray-900/50 px-2 py-0.5 rounded">
+                      {eventFrames[event.id].length}
                     </span>
                   </button>
                 ))}
               </div>
 
-              {/* Add Frame Button */}
               <button
                 onClick={handleAddToEvent}
                 disabled={!selectedEvent || !videoLoaded}
-                className="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="w-full p-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(59,130,246,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-                </svg>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
                 <span>Add Current Frame</span>
               </button>
 
-              {/* Submit to DRES Button */}
               <button
                 onClick={handleSubmitToDres}
-                disabled={!selectedEvent}
-                className="w-full mt-2 p-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                disabled={!selectedEvent || (eventFrames[selectedEvent]?.length === 0)}
+                className="w-full mt-3 p-3 bg-gradient-to-r from-red-600 to-pink-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(220,38,38,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                 <span>Submit to DRES</span>
               </button>
             </div>
-
-            {/* Event Frames List */}
-            <div className="flex-1 overflow-y-auto">
+            
+            <div className="flex-1 overflow-y-auto p-2">
               {selectedEvent && (
-                <div className="p-1">
-                  <h4 className="text-gray-300 font-medium mb-3">
-                    {EVENT_TYPES.find(e => e.id === selectedEvent)?.name} Frames
+                <div className="p-2">
+                  <h4 className="text-gray-200 font-semibold mb-3">
+                    Frames for {EVENT_TYPES.find(e => e.id === selectedEvent)?.name}
                   </h4>
                   
                   <div className="space-y-2">
                     {eventFrames[selectedEvent].map((frame, index) => (
-                      <div
-                        key={frame.id}
-                        className="bg-gray-700 rounded-lg p-1 flex items-center space-x-3"
-                      >
-                        <img
-                          src={`http://localhost:1406/keyframes/${frame.thumbnail}`}
-                          alt={`Frame ${frame.timestamp}`}
-                          className="w-12 h-8 object-cover rounded"
-                        />
+                      <div key={frame.id} className="bg-gray-700/50 rounded-lg p-2 flex items-center space-x-3 transition-transform duration-200 hover:scale-102">
+                        <img src={`http://localhost:1406/dataset/full/merge/${frame.videoId}/keyframes/${frame.thumbnail}`} alt={`Frame ${frame.timestamp}`} className="w-16 h-10 object-cover rounded shadow-md"/>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-medium truncate">
-                            Frame {frame.timestamp}
-                          </p>
-                          <p className="text-gray-400 text-xs">
-                            Video: {frame.videoId}
-                          </p>
+                          <p className="text-white text-sm font-semibold truncate">Frame {frame.timestamp}</p>
+                          <p className="text-gray-400 text-xs truncate">Video: {frame.videoId}</p>
                         </div>
                         <button
                           onClick={() => {
@@ -793,19 +496,17 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                               [selectedEvent]: prev[selectedEvent].filter((_, i) => i !== index)
                             }));
                           }}
-                          className="text-red-400 hover:text-red-300 p-1"
+                          className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-red-500/20 transition-colors"
                         >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                          </svg>
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                         </button>
                       </div>
                     ))}
                     
                     {eventFrames[selectedEvent].length === 0 && (
-                      <p className="text-gray-500 text-sm text-center py-8">
-                        No frames added to this event yet
-                      </p>
+                      <div className="text-gray-500 text-sm text-center py-10 border-2 border-dashed border-gray-700 rounded-lg">
+                        <p>No frames added yet.</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -816,55 +517,25 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       </div>
 
       <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #1f2937;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-          margin-top: -6px; /* Adjust for vertical alignment */
+        media-controller {
+          --media-primary-color: #3b82f6;
+          --media-secondary-color: #ffffff;
+          --media-control-background: rgba(20, 20, 20, 0.7);
+          --media-control-bar-background: transparent;
+          --media-control-hover-background: rgba(40, 40, 40, 0.8);
         }
-        
-        @media (min-width: 768px) {
-            .slider::-webkit-slider-thumb {
-                width: 20px;
-                height: 20px;
-                margin-top: -8px; /* Adjust for vertical alignment */
-            }
+        media-control-bar {
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
         }
-
-        .slider::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 2px solid #1f2937;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        media-time-range {
+          --media-range-track-background: #4a5568;
         }
-
-        @media (min-width: 768px) {
-            .slider::-moz-range-thumb {
-                width: 20px;
-                height: 20px;
-            }
-        }
-
-        .slider:disabled::-webkit-slider-thumb {
-          background: #6b7280;
-          cursor: not-allowed;
-        }
-
-        .slider:disabled::-moz-range-thumb {
-          background: #6b7280;
-          cursor: not-allowed;
+        media-volume-range {
+          width: 80px;
         }
       `}</style>
     </div>
   );
 };
 
-export default VideoPanel;
+export default React.memo(VideoPanel);

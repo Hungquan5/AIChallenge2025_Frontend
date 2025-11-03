@@ -74,7 +74,6 @@ export const useKeyframeLoader = () => {
     const lastRequest = lastRequestTimeRef.current[requestKey] || 0;
     
     if (now - lastRequest < 500) {
-      console.log(`Debouncing ${direction} request for ${videoId}`);
       return [];
     }
     
@@ -91,7 +90,6 @@ export const useKeyframeLoader = () => {
       
       if (!response.ok) {
         if (response.status === 404) {
-          console.log(`No more ${direction} frames for ${videoId}`);
           return [];
         }
         throw new Error(`HTTP error ${response.status}`);

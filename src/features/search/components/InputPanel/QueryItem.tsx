@@ -9,7 +9,7 @@ import {
     FileText, Image, ScanText, Mic, Target, Filter, Camera, UploadCloud,
     Trash2, Globe, Languages, Loader2, XCircle
 } from 'lucide-react';
-
+import { urlToFile } from '../../../../utils/urlToFiles';
 import {
     featureToggleButtonClass, featureToggleActiveClass, featureToggleInactiveClass,
     imageModeActiveColor, inputClass, languageToggleClass,
@@ -66,8 +66,131 @@ const EnhancedFeatureToggles = ({ showOCR, showASR, showOBJ, onToggle, query }) 
 };
 const MemoizedEnhancedFeatureToggles = React.memo(EnhancedFeatureToggles);
 
+const EnhancedUploadArea = ({
+  onImageUpload,
+  imageFile,
+  index,
+}: {
+  onImageUpload: (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | null } }) => void;
+  imageFile: File | null;
+  index: number;
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const objectUrlRef = useRef<string | null>(null);
+  const [previewSrc, setPreviewSrc] = React.useState<string>("");
 
-const EnhancedUploadArea = ({ onImageUpload, imageFile, index }: { onImageUpload: (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | null } }) => void; imageFile: File | null; index: number; }) => { const [isDragging, setIsDragging] = useState(false); const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); setIsDragging(true); }; const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); setIsDragging(false); }; const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => { e.preventDefault(); setIsDragging(false); const files = e.dataTransfer.files; if (files.length > 0 && files[0].type.startsWith('image/')) { onImageUpload({ target: { files: Array.from(files) } }); } }; return ( <label htmlFor={`file-upload-${index}`} className={`${uploadAreaClass} ${isDragging ? 'border-purple-500/80 bg-purple-50/80 scale-[1.03]' : ''} relative group`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} > {imageFile ? ( <> <img src={URL.createObjectURL(imageFile)} alt="Uploaded preview" className={uploadedImageClass} /> <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl flex items-center justify-center"> <button onClick={(e) => { e.preventDefault(); onImageUpload({ target: { files: null } }) }} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-lg"> <Trash2 className="w-4 h-4" /> Remove </button> </div> </> ) : ( <div className="flex flex-col items-center pointer-events-none text-slate-500"> {isDragging ? <UploadCloud className="w-10 h-10 mb-2" /> : <Camera className="w-10 h-10 mb-2" />} <span className="text-sm font-semibold">{isDragging ? 'Drop image to upload' : 'Click, or Drag & Drop'}</span> </div> )} <input id={`file-upload-${index}`} type="file" accept="image/*" onChange={onImageUpload} className="hidden" /> </label> ); };
+  // ✅ Safe in Strict Mode: create once per file, revoke in cleanup
+  React.useEffect(() => {
+    if (!imageFile) { setPreviewSrc(""); return; }
+    const url = URL.createObjectURL(imageFile);
+    setPreviewSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
+
+  useEffect(() => {
+    return () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); };
+  }, []);
+
+  const importFromUrl = useCallback(async (raw: string) => {
+    const url = raw?.trim();
+    if (!url) return;
+    try {
+      const file = await urlToFile(url);
+      onImageUpload({ target: { files: [file] } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      alert(`Could not import image from URL: ${msg}`);
+    }
+  }, [onImageUpload]);
+
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault(); setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault(); setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault(); setIsDragging(false);
+
+    // 1) File(s)
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0 && files[0].type?.startsWith?.('image/')) {
+      onImageUpload({ target: { files: [files[0]] } });
+      return;
+    }
+    // 2) URL (text/uri-list or text/plain)
+    const uri = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (uri) importFromUrl(uri);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLLabelElement>) => {
+    // Prefer pasted image file
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (const it of items) {
+        if (it.kind === 'file') {
+          const f = it.getAsFile();
+          if (f && f.type.startsWith('image/')) {
+            onImageUpload({ target: { files: [f] } });
+            return;
+          }
+        }
+      }
+    }
+    // Fallback: pasted URL/text
+    const text = e.clipboardData?.getData('text/plain');
+    if (text) importFromUrl(text);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    onImageUpload({ target: { files: f ? [f] : null } });
+  };
+
+  const handleClear = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    onImageUpload({ target: { files: null } });
+  };
+
+  return (
+    <label
+      htmlFor={`file-upload-${index}`}
+      className={`${uploadAreaClass} ${isDragging ? 'border-purple-500/80 bg-purple-50/80 scale-[1.03]' : ''} relative group`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
+      title="Click to upload, or drag & drop / paste image or URL"
+    >
+      {imageFile ? (
+        <>
+          <img src={previewSrc} alt="Uploaded preview" className={uploadedImageClass} />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl flex items-center justify-center">
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-lg"
+            >
+              <Trash2 className="w-4 h-4" /> Remove
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center pointer-events-none text-slate-500">
+          {isDragging ? <UploadCloud className="w-10 h-10 mb-2" /> : <Camera className="w-10 h-10 mb-2" />}
+          <span className="text-sm font-semibold">Click / Drag & Drop / Paste</span>
+        </div>
+      )}
+      <input
+        id={`file-upload-${index}`}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+    </label>
+  );
+};
 const MemoizedEnhancedUploadArea = React.memo(EnhancedUploadArea);
 
 const SmartLanguageToggle = ({ query, onToggle, status }: { query: Query; onToggle: () => void; status: 'idle' | 'pending' | 'error'; }) => {
@@ -167,7 +290,7 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
                     onUpdate(index, { origin: localText, text: '' });
                 }
             }
-        }, 300); // 300ms delay
+        }, 100); // 300ms delay
 
         return () => {
             if (debounceTimeoutRef.current) {
@@ -187,6 +310,8 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
         else if (isShortcut(e, SHORTCUTS.PREV_CELL)) { e.preventDefault(); onPrev?.(index); }
     };
 
+
+
     const handleModeToggle = useCallback((newMode: 'text' | 'image') => {
         setQueryMode(newMode);
         if (newMode === 'text') onUpdate(index, { imageFile: null });
@@ -199,10 +324,14 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
         if (feature === 'obj') setShowOBJ(p => !p);
     }, []);
     
-    const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | null } }) => {
-        const file = e.target.files?.[0];
-        onUpdate(index, { imageFile: file || null, text: '', origin: '' });
-    }, [index, onUpdate]);
+    // QueryItem.tsx (unchanged handler)
+const handleImageUpload = useCallback(
+  (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | null } }) => {
+    const file = e.target.files?.[0] || null;
+    onUpdate(index, { imageFile: file, text: '', origin: '' });
+  },
+  [index, onUpdate]
+);
 
     // --- Effects for focus requests ---
     useEffect(() => { if (focusRequest?.index === index) { const { field } = focusRequest; const focusMap = { ocr: () => { setShowOCR(true); setTimeout(() => ocrInputRef.current?.focus(), 0); }, asr: () => { setShowASR(true); setTimeout(() => asrInputRef.current?.focus(), 0); }, obj: () => { setShowOBJ(true); setTimeout(() => objInputRef.current?.focus(), 0); }, }; focusMap[field]?.(); onFocusRequestConsumed(); } }, [focusRequest, index, onFocusRequestConsumed]);
@@ -220,7 +349,11 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
                 {queryMode === 'text' ? (
                     <textarea ref={textareaRef} value={localText} onChange={handleTextChange} onKeyDown={handleKeyDown} placeholder="Enter your query..." className={inputClass} rows={4} onFocus={() => onFocus?.(index)} />
                 ) : (
-                    <MemoizedEnhancedUploadArea onImageUpload={handleImageUpload} imageFile={query.imageFile || null} index={index} />
+                    <MemoizedEnhancedUploadArea
+  onImageUpload={handleImageUpload}   // ✅ prop name matches component
+  imageFile={query.imageFile || null}
+  index={index}
+/>
                 )}
             </div>
 
