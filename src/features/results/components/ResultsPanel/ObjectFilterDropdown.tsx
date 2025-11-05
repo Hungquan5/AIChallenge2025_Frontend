@@ -1,6 +1,6 @@
 // src/features/results/components/ResultsPanel/ObjectFilterDropdown.tsx (MODIFIED - Minimal changes, mostly for clarity)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState,  useCallback } from 'react';
 import { Filter, ChevronDown, X, Loader2 } from 'lucide-react';
 import type { ResultItem } from '../../types';
 
@@ -15,7 +15,6 @@ interface ObjectFilterDropdownProps {
 }
 
 const ObjectFilterDropdown: React.FC<ObjectFilterDropdownProps> = ({
-  results, // Not used directly in this component's logic for filtering/displaying objects
   selectedObjects,
   onFilterChange,
   globalObjectCounts, // 🆕 Used directly here

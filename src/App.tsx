@@ -1,6 +1,5 @@
-import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import './App.css';
-import { Keyboard } from 'lucide-react';
 // --- Core Components & Layouts ---
 import AppShell from './layouts/AppShell';
 import TopControlBar from './layouts/TopControlBar';
@@ -14,6 +13,8 @@ import FrameDetailModal from './features/detail_info/components/FrameDetailModal
 import SubmissionStatusPanel from './features/submit/components/SubmissionStatusPanel/SubmisionStatusPanel';
 import DislikePanel from './features/dislike/components/DislikePanel';
 import PaginationContainer from './features/results/components/ResultsPanel/PaginationContainer';
+import ObjectFilterDropdown from './features/results/components/ResultsPanel/ObjectFilterDropdown';
+
 // --- Custom Hooks ---
 import { useAppState } from './hooks/useAppState';
 import { useModalState } from './hooks/useModalState';
@@ -33,12 +34,9 @@ import { useObjectFilter } from './features/results/hooks/useObjectFilter';
 // --- Notification System ---
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
 import BubbleChat from './features/chat/components/ChatBubbleComponent';
-import type { BubbleChatRef } from './features/chat/components/ChatBubbleComponent';
 // --- Other Components ---
 import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
-import ShortcutsHelp from './components/ShortcutsHelp';
 import { useShortcuts } from './utils/shortcuts';
-import { X } from 'lucide-react';
 import type { ViewMode } from './features/results/types';
 import type { ModelSelection } from './features/search/types';
 
@@ -48,7 +46,6 @@ const App: React.FC = () => {
   // =================================================================
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const bubbleChatRef = useRef<BubbleChatRef>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>('manual');
   // Core State Hooks
   const appState = useAppState();
@@ -59,17 +56,16 @@ const App: React.FC = () => {
   const {
     selectedObjects,
     handleFilterChange,
-    clearFilter,
     filterResults,
     fetchObjectMetadata, // Destructure this directly
     isLoadingMetadata,
     globalObjectCounts,
+
   } = useObjectFilter(); 
   // Notification System
   const {
     NotificationContainer,
     showVideoNotification,
-    showEventFrameNotification,
     showDresSubmissionNotification,
   } = useNotificationManager();
 
@@ -83,7 +79,8 @@ const App: React.FC = () => {
   const searchHandlers = useSearch({
     appState,
     user,
-    resultsRef
+    resultsRef,
+    fetchObjectMetadata
   });
 
   // WebSocket Handlers
@@ -92,12 +89,11 @@ const App: React.FC = () => {
     submissionState,
     modalState,
     onShowVideoNotification: showVideoNotification,
-    onEventFrameAdded: showEventFrameNotification,
     onDresSubmission: showDresSubmissionNotification,
   });
 
   // WebSocket Connection
-  const { isConnected, sendMessage, reconnect } = useWebSocket({
+  const { isConnected, sendMessage, lastMessage } = useWebSocket({
     username: user?.username || '',
     onMessage: webSocketHandlers.handleWebSocketMessage,
   });
@@ -164,10 +160,7 @@ const App: React.FC = () => {
   // ✅ SOLUTION: Activate the global keyboard shortcuts by calling the hook.
   useShortcuts(shortcutHandlers);
 
-  // Fetch object metadata when results change
-  useEffect(() => {
-    fetchObjectMetadata(appState.results);
-  }, [appState.results, fetchObjectMetadata]); // Now `fetchObjectMetadata` is a stable reference
+
 
   // Apply filtering to results
    const filteredResults = useMemo(
@@ -193,32 +186,46 @@ const App: React.FC = () => {
     // cause of performance issues with memoized components.
     submissionState.handleSubmission(item, user, sendMessage);
   }, [submissionState, user, sendMessage]); // Dependencies that the function relies on
+  const handleSimilaritySearchAdapter = useCallback((imageSrc: string, cardId: string) => {
+    console.log(`Adapter triggered for similarity search on card: ${cardId}`);
+    // We ignore the cardId here and just call the clean handler from useSearch.
+    searchHandlers.handleSimilaritySearch(imageSrc);
+  }, [searchHandlers.handleSimilaritySearch]); // Dependency is the stable handler from the hook
   // =================================================================
   // 2. DEFINE UI LOGIC (Can use hooks' return values)
   // =================================================================
-  const leftPanel = (
-    <div ref={inputPanelRef} tabIndex={-1} className="h-full">
-      {searchMode === 'manual' ? (
-        <InputPanel
-          onSearch={searchHandlers.handleInitiateSearch}
-          onSingleSearchResult={searchHandlers.handleSingleItemSearch}
-          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
-          isLoading={appState.isLoading}
-          user={user}
-          modelSelection={appState.modelSelection}
-          onSendToBubbleChat={(query) => {
-            bubbleChatRef.current?.sendMessage(query);
-          }}
-        />
-      ) : (
-        <Chatbot
-          onToolOutputs={eventHandlers.handleAgentToolOutputs}
-          isLoading={appState.isLoading}
-          user={user}
-        />
-      )}
-    </div>
-  );
+  // 4. Memoize panel components
+
+
+
+
+const leftPanel = useMemo(() => (
+  <div ref={inputPanelRef} tabIndex={-1} className="h-full">
+    {searchMode === 'manual' ? (
+      <InputPanel
+        onSearch={searchHandlers.handleInitiateSearch}
+        onSingleSearchResult={searchHandlers.handleSingleItemSearch}
+        isAutoTranslateEnabled={appState.isAutoTranslateEnabled}  
+        isLoading={appState.isLoading}
+        user={user}
+        modelSelection={appState.modelSelection}
+      />
+    ) : (
+      <Chatbot
+        isLoading={appState.isLoading}
+      />
+    )}
+  </div>
+), [
+  searchMode,
+  searchHandlers.handleInitiateSearch,
+  searchHandlers.handleSingleItemSearch,
+  appState.isAutoTranslateEnabled,
+  appState.isLoading,
+  appState.modelSelection,
+  user,
+  eventHandlers.handleAgentToolOutputs
+]);
 
   const rightPanel = (
     <div className="relative h-full flex flex-col">
@@ -235,11 +242,15 @@ const App: React.FC = () => {
           onModelSelectionChange={handleModelSelectionChange}
           searchMode={searchMode}
           onSearchModeChange={setSearchMode}
-                    results={appState.results} // Pass full results for stats
-          selectedObjects={selectedObjects} // Use the destructured state
-          onObjectFilterChange={handleFilterChange} // Use the destructured handler
-          globalObjectCounts={globalObjectCounts} // Use the destructured state
-          isLoadingObjectMetadata={isLoadingMetadata} // Use the destructured state
+                  objectFilterSlot={
+            <ObjectFilterDropdown
+              results={appState.results} // Pass results directly here
+              selectedObjects={selectedObjects}
+              onFilterChange={handleFilterChange}
+              globalObjectCounts={globalObjectCounts}
+              isLoading={isLoadingMetadata}
+            />
+            }
         />
 
         {/* 2. The new dynamic PaginationContainer, centered */}
@@ -266,13 +277,11 @@ const App: React.FC = () => {
           <ResultsPanel
             viewMode={appState.viewMode}
             results={filteredResults} // <--- CHANGED: Pass filteredResults here
-            groupedResults={appState.groupedResults} // Keep this for grouped view logic if needed
             onResultClick={eventHandlers.handleMasterResultClick}
-            onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+            onSimilaritySearch={handleSimilaritySearchAdapter}
             onResultRightClick={eventHandlers.handleResultRightClick}
             currentUser={user?.username ?? ''}
             sendMessage={sendMessage}
-            onItemBroadcast={eventHandlers.handleItemBroadcast}
             onResultDoubleClick={modalState.handleOpenDetailModal}
             onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
             submissionStatuses={submissionState.submissionStatuses}
@@ -291,7 +300,7 @@ const App: React.FC = () => {
           onClear={() => dislikeState.handleClearDislikes(user)}
           onUndislike={(item) => dislikeState.handleUndislike(item, user)}
           onResultClick={eventHandlers.handleMasterResultClick}
-          onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+            onSimilaritySearch={handleSimilaritySearchAdapter}
         />
       </div>
     </div>
@@ -310,7 +319,7 @@ const App: React.FC = () => {
       onClose={keyframeLoader.handleCarouselClose}
       onFrameClick={eventHandlers.handleFrameClickInPanel}
       onRightClick={eventHandlers.handleFrameRightClickInPanel}
-      onSimilaritySearch={searchHandlers.handleSimilaritySearch}
+            onSimilaritySearch={handleSimilaritySearchAdapter}
       currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
       onResultDoubleClick={modalState.handleOpenDetailModal}
@@ -331,6 +340,8 @@ const App: React.FC = () => {
       onBroadcast={eventHandlers.handleItemBroadcast}
       currentUser={user?.username ?? ''}
       sendMessage={sendMessage}
+      // ✅ FIX 2: Pass the `lastMessage` prop down to the VideoPanel.
+      lastMessage={lastMessage}
     />
   ) : null;
 
@@ -394,23 +405,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {modalState.showShortcuts && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="relative bg-white rounded-lg shadow-xl">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 p-2"
-              onClick={() => modalState.setShowShortcuts(false)}
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <ShortcutsHelp />
-          </div>
-        </div>
-      )}
+
       <BubbleChat
-        ref={bubbleChatRef}
-        onToolOutputs={eventHandlers.handleAgentToolOutputs}
-        user={user}
         isVisible={searchMode === 'manual'}
       />
     </>

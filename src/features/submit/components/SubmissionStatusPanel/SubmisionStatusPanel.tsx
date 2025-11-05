@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
 
 // Define the structure of a submission result

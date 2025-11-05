@@ -4,15 +4,15 @@ import type { RefObject } from 'react';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { isShortcut, SHORTCUTS } from '../../../../utils/shortcuts';
 import type { Query } from '../../types';
-import type { UserStatusMessage } from '../../../communicate/types';
+import type { User } from '../../../communicate/types';
 import {
     FileText, Image, ScanText, Mic, Target, Filter, Camera, UploadCloud,
-    Trash2, Globe, Languages, Loader2, XCircle
+    Trash2
 } from 'lucide-react';
 import { urlToFile } from '../../../../utils/urlToFiles';
 import {
     featureToggleButtonClass, featureToggleActiveClass, featureToggleInactiveClass,
-    imageModeActiveColor, inputClass, languageToggleClass,
+    imageModeActiveColor, inputClass, 
     modeToggleActiveClass, modeToggleButtonClass, modeToggleInactiveClass,
     ocrActiveColor, ocrInputClass, asrActiveColor, asrInputClass, objActiveColor, objInputClass,
     queryItemContainerClass, textModeActiveColor, uploadAreaClass, uploadedImageClass,
@@ -41,8 +41,21 @@ const EnhancedModeToggle = ({ mode, onModeChange }: { mode: 'text' | 'image', on
     </div>
 );
 const MemoizedEnhancedModeToggle = React.memo(EnhancedModeToggle);
-
-const EnhancedFeatureToggles = ({ showOCR, showASR, showOBJ, onToggle, query }) => {
+// Add this type:
+type EnhancedFeatureTogglesProps = {
+  showOCR: boolean;
+  showASR: boolean;
+  showOBJ: boolean;
+  onToggle: (feature: "ocr" | "asr" | "obj") => void;
+  query: Query;
+};
+const EnhancedFeatureToggles = ({
+  showOCR,
+  showASR,
+  showOBJ,
+  onToggle,
+  query,
+}: EnhancedFeatureTogglesProps) => {
     const featureCount = [showOCR && query.ocr, showASR && query.asr, showOBJ && query.obj?.length].filter(Boolean).length;
     const handleToggleOCR = useCallback(() => onToggle('ocr'), [onToggle]);
     const handleToggleASR = useCallback(() => onToggle('asr'), [onToggle]);
@@ -193,16 +206,6 @@ const EnhancedUploadArea = ({
 };
 const MemoizedEnhancedUploadArea = React.memo(EnhancedUploadArea);
 
-const SmartLanguageToggle = ({ query, onToggle, status }: { query: Query; onToggle: () => void; status: 'idle' | 'pending' | 'error'; }) => {
-    const getButtonContent = () => {
-        switch (status) {
-            case 'pending': return <><Loader2 className="w-5 h-5 animate-spin" /><span className="text-xs">Translating...</span></>;
-            case 'error': return <><XCircle className="w-5 h-5 text-red-500" /><span className="text-xs text-red-500">Failed</span></>;
-            default: return query.lang === 'eng' ? <><Globe className="w-5 h-5" /><span className="text-xs">English</span></> : <><Languages className="w-5 h-5" /><span className="text-xs">Original</span></>;
-        }
-    };
-    return (<button onClick={onToggle} disabled={status === 'pending'} className={`${languageToggleClass} ${status === 'pending' ? 'opacity-75 cursor-wait' : ''} flex items-center gap-2 justify-center w-[110px]`}>{getButtonContent()}</button>);
-};
 
 // ============================================================================
 // === 2. PROPS INTERFACE =====================================================
@@ -229,7 +232,7 @@ interface QueryItemProps {
     onFocusRequestConsumed: () => void;
     modeChangeRequest: { index: number; mode: Mode } | null;
     onModeChangeRequestConsumed: () => void;
-    user: UserStatusMessage | null;
+    user: User | null;
     translationStatus: 'idle' | 'pending' | 'error';
 }
 
@@ -241,7 +244,7 @@ const QueryItem: React.FC<QueryItemProps> = (props) => {
     const {
         index, query, onUpdate, onFocus, onInsertAfter, onNext, onPrev,
         focusRequest, onFocusRequestConsumed, modeChangeRequest, onModeChangeRequestConsumed,
-        isSearching, translationStatus, onLanguageToggle
+        isSearching, 
     } = props;
 
     // --- Refs ---

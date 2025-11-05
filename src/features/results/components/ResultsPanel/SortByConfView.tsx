@@ -1,20 +1,19 @@
 // src/features/results/components/SortedByConfidenceView.tsx
 import React, { useState, useCallback, useMemo, memo, useRef, useLayoutEffect } from 'react';
 import type { ResultItem } from '../../types';
+import type { SubmissionStatus } from '../../../communicate/types';
+
 import {
-gridClass,
 noResultsClass,
 noResultsHintClass,
 noResultsTitleClass,
 imageClass,
 } from './styles';
 import ResultCard from './ResultCard';
-// AutoSizer is no longer needed
-// import AutoSizer from 'react-virtualized-auto-sizer';
 import { Grid } from 'react-window';
 import type { CellComponentProps } from 'react-window';
 
-// --- PROPS and CONSTANTS remain the same ---
+// --- Prop Definitions ---
 interface Props {
 results: ResultItem[];
 onResultClick: (item: ResultItem) => void;
@@ -25,8 +24,9 @@ onSubmission: (item: ResultItem) => void;
 onDislike: (item: ResultItem) => void;
 currentUser: string;
 sendMessage: (message: string) => void;
-submissionStatuses: { [key: string]: 'PENDING' | 'WRONG' };
-optimisticSubmissions: Set<string>;
+  submissionStatuses: { [key: string]: SubmissionStatus };
+// ✅ CHANGED: Update the prop type to reflect the new Map structure.
+optimisticSubmissions: Map<string, string>;
 }
 const CARD_WIDTH = 260;
 const CARD_HEIGHT = 152;
@@ -43,8 +43,9 @@ onSubmit: (item: ResultItem) => void;
 onSending: (item: ResultItem) => void;
 onDoubleClick: (item: ResultItem) => void;
 onDislike: (item: ResultItem) => void;
-submissionStatuses: { [key: string]: 'PENDING' | 'WRONG' };
-optimisticSubmissions: Set<string>;
+  submissionStatuses: { [key: string]: SubmissionStatus };
+// ✅ CHANGED: Update the internal prop type as well.
+optimisticSubmissions: Map<string, string>;
 colCount: number;
 };
 
@@ -63,8 +64,8 @@ onDislike,
 }) => {
 // --- State and Handlers remain the same ---
 const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-const gapXRef = useRef(GAP_X);
-const gapYRef = useRef(GAP_Y);
+const containerRef = useRef<HTMLDivElement>(null);
+const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
 const sorted = useMemo(
   () => [...results].sort((a, b) => b.confidence - a.confidence),
@@ -86,15 +87,9 @@ const handleSending = useCallback(
   [currentUser, sendMessage]
 );
 
-// --- NEW: Manual measurement logic to replace AutoSizer ---
-const containerRef = useRef<HTMLDivElement>(null);
-const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-
 useLayoutEffect(() => {
-  // This effect observes the container div and updates dimensions when it changes size.
   const container = containerRef.current;
   if (!container) return;
-
   const observer = new ResizeObserver(entries => {
     const entry = entries[0];
     if (entry) {
@@ -104,12 +99,9 @@ useLayoutEffect(() => {
       });
     }
   });
-
   observer.observe(container);
-
-  // Cleanup function to stop observing when the component unmounts.
   return () => observer.disconnect();
-}, []); // Empty dependency array means this runs once on mount.
+}, []);
 
 
 if (results.length === 0) {
@@ -121,33 +113,17 @@ if (results.length === 0) {
   );
 }
 
-
-
-// --- RENDER LOGIC: Uses our manually measured dimensions ---
-
-// ...snip...
-
-// ✅ CHANGED: Reworked dimension calculations to incorporate padding into the cell size.
-
 const { width, height } = dimensions;
-
-// How many columns can we fit, including the right-side padding for each card?
 const colCount =
 width > 0
 ? Math.max(1, Math.floor(width / (CARD_WIDTH + GAP_X)))
 : 1;
-
 const rowCount = Math.ceil(sorted.length / colCount);
-
-// The full width of a grid cell is the available space divided by column count.
 const columnWidth =
 width > 0 ? Math.floor(width / colCount) : CARD_WIDTH + GAP_X;
-
-// The full height of a grid cell includes the card's height plus the top padding.
 const rowHeight = CARD_HEIGHT + GAP_Y;
 
 
-// ✅ REFACTORED: The Cell component now uses a simpler padding-based approach.
 const Cell = memo(
 ({
 columnIndex,
@@ -159,22 +135,29 @@ const idx = rowIndex * cellProps.colCount + columnIndex;
 if (idx >= cellProps.sorted.length) return null;
 const item = cellProps.sorted[idx];
 
-const serverStatus = cellProps.submissionStatuses[item.thumbnail];
-  const isOptimisticallyPending = cellProps.optimisticSubmissions.has(item.thumbnail);
-  const status = serverStatus
-    ? serverStatus
-    : isOptimisticallyPending
-    ? 'PENDING'
-    : undefined;
+// ✅ FIX 4/4: Update the logic to correctly derive status and user from multiple sources
+    const serverSubmission = cellProps.submissionStatuses[item.thumbnail];
+    const isOptimisticallyPending = cellProps.optimisticSubmissions.has(item.thumbnail);
 
-  // This wrapper will fill the grid cell, and we apply padding inside it.
-  const paddedStyle: React.CSSProperties = {
-    height: '100%',
-    width: '100%',
-    paddingBottom: `${GAP_Y}px`,
-    paddingRight: `${GAP_X}px`,
-    boxSizing: 'border-box', // Ensures padding is contained within the element's dimensions
-  };
+    const status = serverSubmission
+      ? serverSubmission.status // 1. Get status from the server state object
+      : isOptimisticallyPending
+      ? 'PENDING' // 2. Or, if it's optimistically pending
+      : undefined;
+
+    const submittedBy = serverSubmission
+      ? serverSubmission.submittedBy // 1. Get user from the server state object
+      : isOptimisticallyPending
+      ? cellProps.optimisticSubmissions.get(item.thumbnail) // 2. Or, get user from the optimistic map
+      : undefined;
+
+    const paddedStyle: React.CSSProperties = {
+      height: '100%',
+      width: '100%',
+      paddingBottom: `${GAP_Y}px`,
+      paddingRight: `${GAP_X}px`,
+      boxSizing: 'border-box',
+    };
 
   return (
   <div style={style}>
@@ -185,9 +168,6 @@ const serverStatus = cellProps.submissionStatuses[item.thumbnail];
         loaded={cellProps.loadedImages.has(item.id)}
         onLoad={cellProps.onLoad}
         onClick={cellProps.onClick}
-        
-        /* ✅ SOLUTION: Pass the stable function reference directly. */
-        /* ResultCard's internal `handleContextMenu` will handle the rest. */
         onCardContextMenu={(e) => cellProps.onContextMenu(item, e)}
         onSimilaritySearch={cellProps.onSimilaritySearch}
         onSubmit={cellProps.onSubmit}
@@ -196,6 +176,8 @@ const serverStatus = cellProps.submissionStatuses[item.thumbnail];
         onDoubleClick={cellProps.onDoubleClick}
         onDislike={cellProps.onDislike}
         submissionStatus={status}
+        // ✅ ADDED: Pass the submitter's name down to the card.
+        submittedBy={submittedBy}
       />
     </div>
   </div>
@@ -210,7 +192,7 @@ sorted,
 loadedImages,
 onLoad: handleImageLoad,
 onClick: onResultClick,
-onContextMenu: onRightClick, // (item, event)
+onContextMenu: onRightClick,
 onSimilaritySearch,
 onSubmit: onSubmission,
 onSending: handleSending,
@@ -225,11 +207,10 @@ return (
 <div ref={containerRef} className="flex-grow min-h-0 w-full h-full">
 {width > 0 && height > 0 && (
 <Grid
-className="no-scrollbar" 
+className="no-scrollbar"
 style={{width, height}}
 columnCount={colCount}
 rowCount={rowCount}
-// ✅ CHANGED: Pass the new calculated cell dimensions to the grid.
 columnWidth={columnWidth}
 rowHeight={rowHeight}
 cellComponent={Cell}

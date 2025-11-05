@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, User, Bot, Loader2, X, Image as ImageIcon, Link as LinkIcon, Video } from 'lucide-react';
-import { sendAgentMessage,extractVideoIds } from '../../../utils/AgentUtils'; // Giả sử bạn có hàm này
+import { MessageSquare, Send, Bot, Loader2, X, Image as ImageIcon, Link as LinkIcon, Video } from 'lucide-react';
 import { getImageUrl } from '../../../utils/getImageURL';
+import type { User } from '../../communicate/types';
 // UPDATED: Cấu trúc dữ liệu của một tool output
 export interface AgentToolOutput {
   tool: string;
@@ -27,7 +27,7 @@ interface Message {
 interface ChatbotProps {
   onToolOutputs?: (outputs: AgentToolOutput) => void;
   isLoading?: boolean;
-  user?: { username: string };
+  user?: User | null ;
 }
 
 // ==================================================================
@@ -180,7 +180,6 @@ const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
       
       {isUser && (
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center">
-          <User className="w-5 h-5 text-white" />
         </div>
       )}
     </div>
@@ -192,7 +191,6 @@ const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
 // ==================================================================
 const Chatbot: React.FC<ChatbotProps> = ({ 
   onToolOutputs,
-  isLoading = false, 
   user 
 }) => {
   const [messages, setMessages] = useState<Message[]>([

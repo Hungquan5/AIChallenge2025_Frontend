@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
+// CHANGE: Import WebSocketMessage type
 import type { ResultItem } from '../../../results/types';
+import type { WebSocketMessage } from '../../../communicate/types';
 import {
   MediaController,
   MediaControlBar,
@@ -10,8 +12,6 @@ import {
   MediaPlayButton,
   MediaMuteButton,
 } from 'media-chrome/react';
-
-// Import your existing assets
 import frameRates from '../../../../assets/video_fps.json';
 
 type FrameRates = {
@@ -29,7 +29,6 @@ const frameIdToSeconds = (frameId: string, videoId: string): number => {
   return frameNumber / frameRate;
 };
 
-// Event types for the event panel
 const EVENT_TYPES = [
   { id: 'event1', name: 'Event 1', color: 'bg-red-500' },
   { id: 'event2', name: 'Event 2', color: 'bg-blue-500' },
@@ -38,7 +37,6 @@ const EVENT_TYPES = [
   { id: 'event5', name: 'Event 5', color: 'bg-purple-500' },
 ];
 
-
 interface VideoPanelProps {
   videoId: string;
   timestamp: string;
@@ -46,29 +44,46 @@ interface VideoPanelProps {
   onBroadcast: (item: any) => void;
   currentUser: string;
   sendMessage?: (message: string) => void;
+  // ADD: Prop to receive the latest message from the WebSocket
+  lastMessage: WebSocketMessage | null;
 }
 
-const VideoPanel: React.FC<VideoPanelProps> = ({ 
-  videoId, 
-  timestamp, 
-  onClose, 
-  onBroadcast, 
+const VideoPanel: React.FC<VideoPanelProps> = ({
+  videoId,
+  timestamp,
+  onClose,
+  onBroadcast,
   currentUser,
-  sendMessage = () => {}
+  sendMessage = () => {},
+  // ADD: Destructure the new prop
+  lastMessage,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaControllerRef = useRef<HTMLElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const scrubbingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+  const scrubbingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
-  const [eventFrames, setEventFrames] = useState<{[key: string]: ResultItem[]}>({
-    event1: [], event2: [], event3: [], event4: [], event5: []
+  const [eventFrames, setEventFrames] = useState<{ [key: string]: ResultItem[] }>({
+    event1: [], event2: [], event3: [], event4: [], event5: [],
   });
+
+  // ADD: Effect to handle incoming synchronized event lists from other users
+  useEffect(() => {
+    // Ensure the message is the correct type and for the current video
+    if (
+      lastMessage?.type === 'event_list_updated' &&
+      lastMessage.payload?.videoId === videoId
+    ) {
+      console.log(`Syncing event list for video ${videoId}`, lastMessage.payload.eventFrames);
+      // Overwrite local state with the authoritative state from the broadcast
+      setEventFrames(lastMessage.payload.eventFrames);
+    }
+  }, [lastMessage, videoId]);
+
 
   const startTimeInSeconds = useMemo(() => frameIdToSeconds(timestamp, videoId), [timestamp, videoId]);
   const frameRate = useMemo(() => videoFrameRates[`${videoId}.mp4`] || 25.0, [videoId]);
@@ -248,13 +263,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     try {
       const response = await fetch(`http://localhost:9991/keyframes/nearest?video_id=${videoId}&frame_index=${frameId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch nearest keyframe');
-      }
+      if (!response.ok) throw new Error('Failed to fetch nearest keyframe');
       const keyframe = await response.json();
 
       const newFrame: ResultItem = {
-        id: `${keyframe.video_id}-${frameId}`,
+        id: `${keyframe.video_id}-${frameId}-${Date.now()}`, // Add timestamp for uniqueness
         videoId: keyframe.video_id,
         timestamp: frameId.toString(),
         thumbnail: keyframe.filename,
@@ -264,19 +277,23 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         submittedBy: currentUser,
       };
 
-      setEventFrames(prev => ({
-        ...prev,
-        [selectedEvent]: [...prev[selectedEvent], newFrame]
-      }));
+      // 1. Calculate the new state
+      const newEventFrames = {
+        ...eventFrames,
+        [selectedEvent]: [...eventFrames[selectedEvent], newFrame],
+      };
 
-      // Broadcast event update
+      // 2. Update local UI immediately
+      setEventFrames(newEventFrames);
+
+      // 3. Broadcast the complete, updated list to sync all clients
       const message = {
-        type: 'event_frame_added',
+        type: 'event_list_updated',
         payload: {
-          eventId: selectedEvent,
-          frame: newFrame,
-          submittedBy: currentUser
-        }
+          videoId: videoId,
+          eventFrames: newEventFrames,
+          submittedBy: currentUser,
+        },
       };
 
       sendMessage(JSON.stringify(message));
@@ -286,37 +303,77 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   };
 
+  // CHANGE: This function also broadcasts the entire list state
   const handleSubmitToDres = () => {
     if (!selectedEvent) {
       alert('Please select an event first');
       return;
     }
-
     const frames = eventFrames[selectedEvent];
     if (frames.length === 0) {
       alert('No frames added to this event');
       return;
     }
 
-    const message = {
+    // 1. Send the submission message as before
+    const submissionMessage = {
       type: 'dres_submission',
       payload: {
         eventId: selectedEvent,
         frames: frames,
         submittedBy: currentUser,
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     };
+    sendMessage(JSON.stringify(submissionMessage));
 
-    sendMessage(JSON.stringify(message));
+    // 2. Calculate the new state (with cleared frames for the event)
+    const clearedEventFrames = {
+        ...eventFrames,
+        [selectedEvent]: [],
+    };
     
-    setEventFrames(prev => ({
-      ...prev,
-      [selectedEvent]: []
-    }));
+    // 3. Update local UI
+    setEventFrames(clearedEventFrames);
+
+    // 4. Broadcast the new cleared state to sync other clients
+    const syncMessage = {
+        type: 'event_list_updated',
+        payload: {
+            videoId: videoId,
+            eventFrames: clearedEventFrames,
+            submittedBy: currentUser
+        }
+    };
+    sendMessage(JSON.stringify(syncMessage));
 
     alert(`Submitted ${frames.length} frames from ${selectedEvent} to DRES`);
   };
+
+  // // ADD: A dedicated handler for removing a frame that also broadcasts the update
+  // const handleRemoveFrame = (eventKey: string, frameIndex: number) => {
+  //   // 1. Calculate the new state
+  //   const updatedFrames = eventFrames[eventKey].filter((_, i) => i !== frameIndex);
+  //   const newEventFrames = {
+  //       ...eventFrames,
+  //       [eventKey]: updatedFrames,
+  //   };
+
+  //   // 2. Update local UI
+  //   setEventFrames(newEventFrames);
+
+  //   // 3. Broadcast the change
+  //   const message = {
+  //       type: 'event_list_updated',
+  //       payload: {
+  //           videoId: videoId,
+  //           eventFrames: newEventFrames,
+  //           submittedBy: currentUser,
+  //       }
+  //   };
+  //   sendMessage(JSON.stringify(message));
+  // };
+
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-lg p-4">
@@ -359,7 +416,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             
           {/* Video Container */}
           <MediaController 
-            ref={mediaControllerRef}
             className="relative bg-black flex-1 w-full aspect-video overflow-hidden"
           >
             <video
@@ -516,7 +572,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         media-controller {
           --media-primary-color: #3b82f6;
           --media-secondary-color: #ffffff;

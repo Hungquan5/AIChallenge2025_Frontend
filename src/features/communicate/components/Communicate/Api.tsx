@@ -1,6 +1,9 @@
-import type { ApiResponse, SessionResponse,UserStatusResponse } from "../../types";
+// services/api.ts - Corrected import path
 
-// services/api.ts
+// ✅ FIX: Import the types from their actual location.
+// The path may need slight adjustment based on your folder structure.
+import type { ApiResponse, SessionResponse,UserStatusResponse } from "../../types"
+
 const API_BASE_URL =  'http://localhost:9991';
 
 class ApiService {
@@ -25,7 +28,9 @@ class ApiService {
 
       if (!response.ok) {
         const errorData = await response.json();
-        return { error: errorData };
+        // The error object might not have 'detail', so we check for it.
+        const detail = errorData.detail || 'An error occurred';
+        return { error: { detail } };
       }
 
       const data = await response.json();
@@ -41,22 +46,18 @@ class ApiService {
 
 
   async connectUser(username: string): Promise<ApiResponse<SessionResponse>> {
-    // FIX: Point to the new HTTP endpoint for creating a session
     return this.makeRequest<SessionResponse>(`/user/connect/${username}`, {
       method: 'POST',
     });
   }
 
   async disconnectUser(username: string): Promise<ApiResponse<SessionResponse>> {
-    // FIX: Point to the new HTTP endpoint for deleting a session
     return this.makeRequest<SessionResponse>(`/user/disconnect/${username}`, {
       method: 'DELETE',
     });
   }
 
-  // Note: A GET /user/status/{username} endpoint would also be needed if you keep this function
   async getUserStatus(username: string): Promise<ApiResponse<UserStatusResponse>> {
-    // This would require a corresponding GET endpoint on the backend as well
     return this.makeRequest<UserStatusResponse>(`/user/status/${username}`);
   }
 }

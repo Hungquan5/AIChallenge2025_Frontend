@@ -1,64 +1,61 @@
-  // src/features/search/components/InputPanel/QueryList.tsx
+import React, { useRef, useState, useEffect, useCallback} from 'react';
+import type { RefObject, SetStateAction } from 'react';
+import type { Query, ResultItem, ApiQuery, ModelSelection } from '../../types';
+import type { User } from '../../../communicate/types';
+import QueryItem from './QueryItem';
+import { useShortcuts } from '../../../../utils/shortcuts';
+import { translateText, searchBySingleQuery } from '../SearchRequest/searchApi';
+import { fileToBase64 } from '../../../../utils/fileConverter';
 
-  import React, { useRef, useState, useEffect, useCallback} from 'react';
-  import type { RefObject, SetStateAction } from 'react';
-  import { containerClass } from './styles';
-  import type { Query, ResultItem, ApiQuery, ModelSelection } from '../../types';
-  import type { User } from '../../../communicate/types';
-  import QueryItem from './QueryItem';
-  import { useShortcuts } from '../../../../utils/shortcuts';
-  import { translateText, searchBySingleQuery } from '../SearchRequest/searchApi';
-  import { fileToBase64 } from '../../../../utils/fileConverter';
+// ============================================================================
+// === 1. PROPS INTERFACE & TYPES (Unchanged) =================================
+// ============================================================================
 
-  // ============================================================================
-  // === 1. PROPS INTERFACE & TYPES (Unchanged) =================================
-  // ============================================================================
-
-  interface QueryListProps {
+interface QueryListProps {
   queries: Query[];
   onQueriesChange: React.Dispatch<SetStateAction<Query[]>>;
   maxQueries?: number;
   firstInputRef?: RefObject<HTMLTextAreaElement>;
-  onSingleSearchResult: (results: ResultItem[]) => void;
+  // ✅ MODIFIED: The callback now includes the query that was used for the search.
+  onSingleSearchResult: (results: ResultItem[], query: ApiQuery) => void;
   isAutoTranslateEnabled: boolean;
-  user: User | null;
+  user: User    | null;
   modelSelection: ModelSelection;
+}
 
-  }
-
-  type FocusField = 'ocr' | 'asr' | 'obj';
-  type Mode = 'text' | 'image';
-  type TranslationStatus = 'idle' | 'pending' | 'error';
+type FocusField = 'ocr' | 'asr' | 'obj';
+type Mode = 'text' | 'image';
+type TranslationStatus = 'idle' | 'pending' | 'error';
 
 
-  // ============================================================================
-  // === 2. CUSTOM HOOK useQueryListManager (CORRECTED) =========================
-  // ============================================================================
-  const useQueryListManager = ({ queries, onQueriesChange, isAutoTranslateEnabled, maxQueries, user, onSingleSearchResult, modelSelection }: QueryListProps) => { // ✅ Destructure modelSelection
+// ============================================================================
+// === 2. CUSTOM HOOK useQueryListManager (CORRECTED) =========================
+// ============================================================================
+const useQueryListManager = ({ queries, onQueriesChange, maxQueries, user, onSingleSearchResult, modelSelection }: QueryListProps) => { // ✅ Destructure modelSelection
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ index: number; field: FocusField } | null>(null);
   const [modeChangeRequest, setModeChangeRequest] = useState<{ index: number; mode: Mode } | null>(null);
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
   const [translationStatuses, setTranslationStatuses] = useState<Record<number, TranslationStatus>>({});
-const queriesRef = useRef(queries);
+  const queriesRef = useRef(queries);
     useEffect(() => {
         queriesRef.current = queries;
     }, [queries]);
 
   const debounceTimeoutRef = useRef<number | null>(null);
   const translationAbortControllerRef = useRef<AbortController | null>(null);
-const updateQuery = useCallback((index: number, updated: Partial<Query>) => {
+  const updateQuery = useCallback((index: number, updated: Partial<Query>) => {
         onQueriesChange(prevQueries =>
             prevQueries.map((q, i) => (i === index ? { ...q, ...updated } : q))
         );
     }, [onQueriesChange]);
- const handleLanguageToggle = useCallback((index: number) => {
+  const handleLanguageToggle = useCallback((index: number) => {
         const current = queries[index];
         const newLang: 'ori' | 'eng' = current.lang === 'eng' ? 'ori' : 'eng';
         const updatedQuery = newLang === 'ori' ? { lang: newLang, text: '' } : { lang: newLang };
         updateQuery(index, updatedQuery);
     }, [queries, updateQuery]);
-const insertQueryAfter = useCallback((index: number) => {
+  const insertQueryAfter = useCallback((index: number) => {
         if (maxQueries && queries.length >= maxQueries) return;
         const newQuery: Query = { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null };
         const updated = [...queries.slice(0, index + 1), newQuery, ...queries.slice(index + 1)];
@@ -72,28 +69,39 @@ const insertQueryAfter = useCallback((index: number) => {
         translationAbortControllerRef.current?.abort();
         onQueriesChange(prevQueries => prevQueries.filter((_, i) => i !== index));
     }, [queries.length, onQueriesChange]);
+  
+  // ✅ MODIFIED: This function now passes the `apiQuery` back up on success.
   const handleItemSearch = useCallback(async (index: number) => {
-        if (user === null || searchingIndex !== null) return;
+    if (user === null || searchingIndex !== null) return;
+    
+    setSearchingIndex(index);
+    let apiQuery: ApiQuery | null = null; // Hold the query to pass up
+    try {
+        const query = queriesRef.current[index];
+        const { asr, ocr, origin, obj, lang, imageFile, text } = query;
         
-        setSearchingIndex(index);
-        try {
-            // Use the ref to get the current query data without making the callback unstable
-            const query = queriesRef.current[index];
-            const { asr, ocr, origin, obj, lang, imageFile, text } = query;
-            const apiQuery: ApiQuery = { asr, ocr, origin, obj, lang, text, image: '' };
-            if (imageFile) {
-                apiQuery.image = await fileToBase64(imageFile);
-                apiQuery.text = '';
-            }
-            const results = await searchBySingleQuery(apiQuery, user.username, 1, 100, modelSelection);
-            onSingleSearchResult(results);
-        } catch (error) {
-            console.error(`Single item search failed for index ${index}:`, error);
-            alert(`Search for this item failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        } finally {
-            setSearchingIndex(null);
+        // Build the query object
+        apiQuery = { asr, ocr, origin, obj, lang, text, image: '' };
+        if (imageFile) {
+            apiQuery.image = await fileToBase64(imageFile);
+            apiQuery.text = '';
         }
-    }, [user, onSingleSearchResult, searchingIndex, modelSelection]); // ✅ 'queries' is removed!
+        
+        // A new single search always starts at page 1
+        const results = await searchBySingleQuery(apiQuery, user.username, 1, 100, modelSelection);
+        
+        // Pass both results and the query that was used
+        onSingleSearchResult(results, apiQuery);
+
+    } catch (error) {
+        console.error(`Single item search failed for index ${index}:`, error);
+        alert(`Search for this item failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // If the API call fails, we can still pass null or handle it differently
+        // For now, we just won't call the success handler.
+    } finally {
+        setSearchingIndex(null);
+    }
+  }, [user, onSingleSearchResult, searchingIndex, modelSelection]);
 
 
   useEffect(() => {
@@ -197,76 +205,75 @@ const insertQueryAfter = useCallback((index: number) => {
   };
   };
 
-  // ============================================================================
-  // === 3. QueryList COMPONENT (CORRECTED) =====================================
-  // ============================================================================
-
-  const QueryList: React.FC<QueryListProps> = (props) => {
-  const { queries, firstInputRef, user } = props;
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const {
-  setFocusedIndex,
-  focusRequest, setFocusRequest,
-  modeChangeRequest, setModeChangeRequest,
-  searchingIndex,
-  translationStatuses,
-  handleItemSearch,
-  updateQuery,
-  insertQueryAfter,
-  removeQuery,
-  handleLanguageToggle
-  } = useQueryListManager(props);
-
-const handleInsertAfterAndFocus = useCallback((index: number) => {
-        insertQueryAfter(index);
-        setTimeout(() => {
-            const textareas = containerRef.current?.querySelectorAll('textarea');
-            textareas?.[index + 1]?.focus();
-        }, 0);
-    }, [insertQueryAfter]);
-    // ✅ FIX: Create two specific, stable handlers for onNext and onPrev
-    const handleNavigateNext = useCallback((currentIndex: number) => {
-        const textareas = containerRef.current?.querySelectorAll('textarea');
-        if (!textareas || textareas.length === 0) return;
-        const targetIndex = (currentIndex + 1) % textareas.length;
-        textareas[targetIndex]?.focus();
-    }, []); // Empty dependency array is fine as it only uses the ref
-
-    const handleNavigatePrev = useCallback((currentIndex: number) => {
-        const textareas = containerRef.current?.querySelectorAll('textarea');
-        if (!textareas || textareas.length === 0) return;
-        const targetIndex = currentIndex === 0 ? textareas.length - 1 : currentIndex - 1;
-        textareas[targetIndex]?.focus();
-    }, []); // Empty dependency array is fine
-  return (
-        <div ref={containerRef} className="space-y-4">
-            {queries.map((query, index) => (
-                <QueryItem
-                    key={index}
-                    index={index}
-                    query={query}
-                    user={props.user}
-                    onFocus={setFocusedIndex} // setFocusedIndex from useState is already stable
-                    onUpdate={updateQuery} // ✅ FIX: Now passing the stable function
-                    onInsertAfter={handleInsertAfterAndFocus} // ✅ FIX: Now passing a stable function
-                    onRemove={removeQuery} // ✅ FIX: Now passing the stable function
-                    disableRemove={queries.length === 1}
-                    onItemSearch={handleItemSearch}
-                    isSearching={searchingIndex === index}
-                    onNext={handleNavigateNext} // ✅ FIX: Now passing a stable function
-                    onPrev={handleNavigatePrev} // ✅ FIX: Now passing a stable function
-                    inputRef={index === 0 ? firstInputRef : undefined}
-                    focusRequest={focusRequest}
-                    onFocusRequestConsumed={() => setFocusRequest(null)}
-                    modeChangeRequest={modeChangeRequest}
-                    onModeChangeRequestConsumed={() => setModeChangeRequest(null)}
-                    translationStatus={translationStatuses[index] || 'idle'}
-                    onLanguageToggle={handleLanguageToggle} // ✅ FIX: Now passing the stable function
-                />
-            ))}
-        </div>
-    );
-  };
-
-  export default QueryList;
+// ============================================================================
+// === 3. QueryList COMPONENT (Unchanged) =====================================
+// ============================================================================
+const QueryList: React.FC<QueryListProps> = (props) => {
+    const { queries, firstInputRef } = props;
+    const containerRef = useRef<HTMLDivElement>(null);
+  
+    const {
+    setFocusedIndex,
+    focusRequest, setFocusRequest,
+    modeChangeRequest, setModeChangeRequest,
+    searchingIndex,
+    translationStatuses,
+    handleItemSearch,
+    updateQuery,
+    insertQueryAfter,
+    removeQuery,
+    handleLanguageToggle
+    } = useQueryListManager(props);
+  
+  const handleInsertAfterAndFocus = useCallback((index: number) => {
+          insertQueryAfter(index);
+          setTimeout(() => {
+              const textareas = containerRef.current?.querySelectorAll('textarea');
+              textareas?.[index + 1]?.focus();
+          }, 0);
+      }, [insertQueryAfter]);
+      // ✅ FIX: Create two specific, stable handlers for onNext and onPrev
+      const handleNavigateNext = useCallback((currentIndex: number) => {
+          const textareas = containerRef.current?.querySelectorAll('textarea');
+          if (!textareas || textareas.length === 0) return;
+          const targetIndex = (currentIndex + 1) % textareas.length;
+          textareas[targetIndex]?.focus();
+      }, []); // Empty dependency array is fine as it only uses the ref
+  
+      const handleNavigatePrev = useCallback((currentIndex: number) => {
+          const textareas = containerRef.current?.querySelectorAll('textarea');
+          if (!textareas || textareas.length === 0) return;
+          const targetIndex = currentIndex === 0 ? textareas.length - 1 : currentIndex - 1;
+          textareas[targetIndex]?.focus();
+      }, []); // Empty dependency array is fine
+    return (
+          <div ref={containerRef} className="space-y-4">
+              {queries.map((query, index) => (
+                  <QueryItem
+                      key={index}
+                      index={index}
+                      query={query}
+                      user={props.user}
+                      onFocus={setFocusedIndex} // setFocusedIndex from useState is already stable
+                      onUpdate={updateQuery} // ✅ FIX: Now passing the stable function
+                      onInsertAfter={handleInsertAfterAndFocus} // ✅ FIX: Now passing a stable function
+                      onRemove={removeQuery} // ✅ FIX: Now passing the stable function
+                      disableRemove={queries.length === 1}
+                      onItemSearch={handleItemSearch}
+                      isSearching={searchingIndex === index}
+                      onNext={handleNavigateNext} // ✅ FIX: Now passing a stable function
+                      onPrev={handleNavigatePrev} // ✅ FIX: Now passing a stable function
+                      inputRef={index === 0 ? firstInputRef : undefined}
+                      focusRequest={focusRequest}
+                      onFocusRequestConsumed={() => setFocusRequest(null)}
+                      modeChangeRequest={modeChangeRequest}
+                      onModeChangeRequestConsumed={() => setModeChangeRequest(null)}
+                      translationStatus={translationStatuses[index] || 'idle'}
+                      onLanguageToggle={handleLanguageToggle} // ✅ FIX: Now passing the stable function
+                  />
+              ))}
+          </div>
+      );
+    };
+  
+    export default QueryList;

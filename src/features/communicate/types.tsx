@@ -50,13 +50,21 @@ export interface SubmissionResultMessage extends WebSocketMessage {
   };
 }
 
+
+// ✅ 1. DEFINE the new, richer status object
+export interface SubmissionStatus {
+  status: 'PENDING' | 'WRONG';
+  submittedBy: string;
+}
+
+// ✅ 2. UPDATE the message payload to use the new type
 export interface SubmissionStatusUpdateMessage extends WebSocketMessage {
   type: 'submission_status_update';
   payload: {
-    [imageKey: string]: 'PENDING' | 'WRONG';
+    // The value for each imageKey is now an object of type SubmissionStatus
+    [imageKey: string]: SubmissionStatus;
   };
 }
-
 export interface UserStatusMessage extends WebSocketMessage {
   type: 'user_status';
   payload: {
@@ -70,7 +78,31 @@ export interface RemoveBroadcastMessage extends WebSocketMessage {
   username: string;
   timestamp: number;
 }
+// --- NEW: API Response Types ---
+// A generic wrapper for all API responses
+export interface ApiResponse<T> {
+  data?: T;
+  error?: {
+    detail: string; // Assuming the error object always has a 'detail' string
+    [key: string]: any;
+  };
+}
 
+// Specific response for a session creation/deletion
+export interface SessionResponse {
+  message: string;
+  user_id: string; // Or username, depending on your backend
+}
+
+// Specific response for a user status check
+export interface UserStatusResponse {
+  user: string;
+  status: 'online' | 'offline';
+}
+// --- END: NEW API Response Types ---
+export interface User{
+  username:string
+}
 // Union type for all message types
 export type AllWebSocketMessages = 
   | BroadcastImageMessage

@@ -35,9 +35,7 @@ export const useEventHandlers = ({
   modalState,
   broadcastState,
   submissionState,
-  dislikeState,
   keyframeLoader,
-  searchHandlers,
   user,
   sendMessage,
   resultsRef, // ✅ FIX: Destructure the prop
@@ -78,7 +76,7 @@ export const useEventHandlers = ({
     const message = { type: 'broadcast_image', payload: payloadWithSenderInfo };
     sendMessage(JSON.stringify(message));
     broadcastState.handleAddBroadcastMessage(message.payload);
-  }, [user?.username, sendMessage, broadcastState]);
+  }, [user, sendMessage, broadcastState, submissionState]); // ✅ Add user and submissionState to dependencies
 
   const handleRemoveBroadcastMessage = useCallback((messageId: string, index: number) => {
     broadcastState.handleRemoveBroadcastMessage(messageId, index);
@@ -86,7 +84,7 @@ export const useEventHandlers = ({
     sendMessage(JSON.stringify(message));
   }, [user?.username, sendMessage, broadcastState]);
 
-  const handleBroadcastFeedRightClick = useCallback((item: ResultItem, event: React.MouseEvent) => {
+  const handleBroadcastFeedRightClick = useCallback((item: ResultItem, ) => {
     if (item.videoId && item.timestamp) {
       modalState.handleOpenVideoPanel(item.videoId, item.timestamp);
     }

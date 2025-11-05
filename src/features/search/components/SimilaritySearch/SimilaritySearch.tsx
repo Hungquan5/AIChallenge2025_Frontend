@@ -47,7 +47,6 @@ export const searchBySimilarImage = async (
   modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<ResultItem[]> => {
   try {
-    console.log(`Starting similarity search for image: ${imageSrc}, page: ${page}`);
     
     const imageBase64 = await imageUrlToBase64(imageSrc);
     
@@ -62,8 +61,8 @@ export const searchBySimilarImage = async (
     };
 
     const endpoint = searchMode === 'chain' 
-      ? '/embeddings/chain_search' 
-      : '/embeddings/search';
+      ? '/embeddings/stage' 
+      : '/embeddings/stage';
 
     const url = new URL(`${API_BASE_URL}${endpoint}`);
     url.searchParams.append('page', page.toString());
@@ -73,7 +72,6 @@ export const searchBySimilarImage = async (
     url.searchParams.append('use_siglip2', modelSelection.use_siglip2.toString());
     url.searchParams.append('use_beit3', modelSelection.use_beit3.toString());
 
-    console.log('Sending similarity search request with models:', modelSelection);
     
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -123,7 +121,6 @@ export const performSimilaritySearch = async (
   modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<void> => {
   try {
-    console.log(`Performing similarity search for card ${cardId} with image: ${imageSrc}`);
     
     onLoading?.(true);
     
@@ -131,7 +128,6 @@ export const performSimilaritySearch = async (
     
     onResults(results);
     
-    console.log(`Similarity search completed for card ${cardId}. Found ${results.length} similar images.`);
   } catch (error) {
     const searchError = error instanceof Error ? error : new Error('Unknown similarity search error');
     console.error(`Similarity search failed for card ${cardId}:`, searchError);

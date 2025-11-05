@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QueryList from './QueryList';
-import { searchButtonClass, containerClass } from './styles';
+import {  containerClass } from './styles';
 import type { ResultItem, Query, SearchMode, ApiQuery, HistoryItem} from '../../types';
 // import type { User } from '../../../communicate/types';
-import type { UserStatusMessage as User } from '../../../communicate/types';
+import type { User } from '../../../communicate/types';
 import { useShortcuts } from '../../../../utils/shortcuts';
 import { fileToBase64 } from '../../../../utils/fileConverter';
 import { translateText, getHistory } from '../SearchRequest/searchApi';
 import HistoryPanel from '../../../history/components/HistoryPanel';
-import { Search, Zap, Loader2 } from 'lucide-react';
 import type { ModelSelection } from '../../types';
 // ============================================================================
 // === 1. PROPS INTERFACE (No changes needed) =================================
@@ -20,7 +19,7 @@ interface InputPanelProps {
   onSearch: (queries: ApiQuery[], mode: SearchMode, modelSelection: ModelSelection) => void;
   isAutoTranslateEnabled: boolean;
   isLoading: boolean;
-  onSingleSearchResult: (results: ResultItem[]) => void;
+  onSingleSearchResult: (results: ResultItem[], query: ApiQuery) => void;
   user: User | null;
   modelSelection: ModelSelection;
   onSendToBubbleChat?: (query: string) => void; // NEW: Add this prop
@@ -38,7 +37,6 @@ const useInputPanel = ({
   isAutoTranslateEnabled, 
   user, 
   modelSelection,
-  onSendToBubbleChat // NEW: Add this parameter
 }: InputPanelProps) => {
   const [queries, setQueries] = useState<Query[]>([
     { text: '', asr: '', ocr: '', origin: '', obj: [], lang: 'ori', imageFile: null },
@@ -222,16 +220,13 @@ const useInputPanel = ({
 // ============================================================================
 
 const InputPanel = (props: InputPanelProps) => {
-  const { isAutoTranslateEnabled, isLoading, onSingleSearchResult, user,modelSelection } = props;
 
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
-  const chainSearchButtonRef = useRef<HTMLButtonElement>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
-    queries, setQueries, loading,
+    queries, setQueries, 
     historyItems, isHistoryPanelVisible,
-    handleSearch,
     handleHistorySelection, handleCloseHistoryPanel,
     registerShortcuts,
   } = useInputPanel(props);
@@ -251,31 +246,8 @@ const InputPanel = (props: InputPanelProps) => {
 
   registerShortcuts(focusFirstTextarea);
 
-  // --- Sub-Components (for clean rendering) ---
+  // --- Sub-Components (for c
 
-  const SearchButton = () => (
-    <button 
-      ref={searchButtonRef} 
-      onClick={() => handleSearch('normal')} 
-      className={`${searchButtonClass} w-full`} 
-      disabled={isLoading || loading}
-      title="Run all queries in parallel (Normal Search)" // --- TOOLTIP ADDED
-    >
-      {isLoading || loading ? <Loader2 className="animate-spin" /> : <Search />}
-    </button>
-  );
-
-  const ChainSearchButton = () => (
-    <button 
-      ref={chainSearchButtonRef} 
-      onClick={() => handleSearch('chain')} 
-      className={`${searchButtonClass} w-full`} 
-      disabled={isLoading || loading}
-      title="Use results from one query to refine the next (Chain Search)" // --- TOOLTIP ADDED
-    >
-      {isLoading || loading ? <Loader2 className="animate-spin" /> : <Zap />}
-    </button>
-  );
 
   return (
         <div className="flex flex-col h-full">

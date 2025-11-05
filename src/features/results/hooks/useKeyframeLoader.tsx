@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef} from 'react';
 import type { ResultItem } from '../types';
 
 // Backend Keyframe structure
@@ -8,7 +8,7 @@ interface Keyframe {
   filename: string;
 }
 
-const FETCH_ALL_BATCH_SIZE = 20;
+const FETCH_ALL_BATCH_SIZE = 10;
 
 export const useKeyframeLoader = () => {
   const [carouselFrames, setCarouselFrames] = useState<ResultItem[] | null>(null);
@@ -22,7 +22,7 @@ export const useKeyframeLoader = () => {
   const [hasMoreNext, setHasMoreNext] = useState(true);
   const [hasMorePrev, setHasMorePrev] = useState(true);
   
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestTimeRef = useRef<{ [key: string]: number }>({});
   
   // Cache for processed frames to avoid recomputation

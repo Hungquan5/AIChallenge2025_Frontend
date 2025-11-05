@@ -1,6 +1,8 @@
-import type { ResultItem,GroupedResult } from "../features/results/types";
+import type { ResultItem } from "../features/results/types";
+// ✅ 1. IMPORT THE CORRECT TYPE: This is the object structure our app state now uses.
+import type { GroupedResultsObject } from "../hooks/useAppState";
 
-// Create a set of mock results with varied confidence and video IDs
+// This list of mock results is perfect and does not need to be changed.
 export const mockResults: ResultItem[] = [
   {
     id: 'mock-1',
@@ -76,26 +78,25 @@ export const mockResults: ResultItem[] = [
   },
 ];
 
-// Automatically create the grouped version of the mock results
-export const mockGroupedResults: GroupedResult[] = mockResults.reduce(
+// ✅ 2. THE FIX: Create the grouped version as an OBJECT, not an array.
+export const mockGroupedResults: GroupedResultsObject = mockResults.reduce(
   (acc, item) => {
-    // Find if a group for this video already exists
-    let group = acc.find(g => g.videoId === item.videoId);
+    const { videoId } = item;
     
-    if (group) {
-      // If it exists, add the item to it and sort by timestamp
-      group.items.push(item);
-      group.items.sort((a, b) => parseInt(a.timestamp, 10) - parseInt(b.timestamp, 10));
-    } else {
-      // If not, create a new group and add it to the accumulator
-      acc.push({
-        videoId: item.videoId,
-        videoTitle: `Frames from ${item.videoId}`, // A descriptive title for the group
-        items: [item],
-      });
+    // If a group for this video doesn't exist yet, create an empty array for it.
+    if (!acc[videoId]) {
+      acc[videoId] = [];
     }
+    
+    // Add the current item to its group.
+    acc[videoId].push(item);
     
     return acc;
   },
-  [] as GroupedResult[]
+  {} as GroupedResultsObject // Start with an empty object as the accumulator.
 );
+
+// (Optional but recommended) Sort the items within each group by timestamp, just like before.
+Object.values(mockGroupedResults).forEach(items => {
+  items.sort((a, b) => parseInt(a.timestamp, 10) - parseInt(b.timestamp, 10));
+});

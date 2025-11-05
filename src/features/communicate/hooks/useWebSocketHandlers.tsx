@@ -1,15 +1,15 @@
 // src/features/communicate/hooks/useWebSocketHandlers.ts - Updated
 import { useCallback } from 'react';
-import type { WebSocketMessage, AllWebSocketMessages } from '../types';
+import type { WebSocketMessage,  } from '../types';
 import type { ResultItem } from '../../results/types';
-
 interface UseWebSocketHandlersProps {
   broadcastState: any;
   submissionState: any;
-  modalState: any; // Added for video sharing
+  modalState: any;
   onShowVideoNotification?: (notification: any) => void;
-  onEventFrameAdded?: (eventId: string, frame: ResultItem, submittedBy: string) => void;
   onDresSubmission?: (submission: any) => void;
+  // ✅ ADD: Define the new callback prop for the central handler.
+  onEventListUpdated?: (videoId: string, eventFrames: { [key: string]: ResultItem[] }) => void;
 }
 
 interface UseWebSocketHandlersReturn {
@@ -21,8 +21,9 @@ export const useWebSocketHandlers = ({
   submissionState,
   modalState,
   onShowVideoNotification,
-  onEventFrameAdded,
+  // onEventFrameAdded, // REMOVED
   onDresSubmission,
+  onEventListUpdated, // ADDED
 }: UseWebSocketHandlersProps): UseWebSocketHandlersReturn => {
 
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -56,17 +57,13 @@ export const useWebSocketHandlers = ({
         }
         break;
 
-      case 'event_frame_added':
-        if (message.payload && onEventFrameAdded) {
-          // Notify other users that a frame was added to an event
-          onEventFrameAdded(
-            message.payload.eventId,
-            message.payload.frame,
-            message.payload.submittedBy
-          );
+
+      case 'event_list_updated':
+        if (message.payload && onEventListUpdated) {
+          // This allows parent components to react if needed
+          onEventListUpdated(message.payload.videoId, message.payload.eventFrames);
         }
         break;
-
       case 'dres_submission':
         if (message.payload && onDresSubmission) {
           // Handle DRES submission notification
@@ -112,8 +109,8 @@ export const useWebSocketHandlers = ({
     submissionState,
     modalState,
     onShowVideoNotification,
-    onEventFrameAdded,
     onDresSubmission,
+    onEventListUpdated
   ]);
 
   return {

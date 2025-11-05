@@ -105,7 +105,7 @@ const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
               };
 
               // Handler for similarity search that extracts imageUrl and cardId from the item
-              const handleSimilaritySearch = (imageSrc: string, cardId: string) => {
+              const handleSimilaritySearch = () => {
                 onSimilaritySearch(imageUrl, msg.id);
               };
 

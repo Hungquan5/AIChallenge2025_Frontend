@@ -31,8 +31,8 @@ interface FramesPanelProps {
   isFetchingPrev: boolean;
 }
 
-const CARD_WIDTH = 220;
-const CARD_HEIGHT = 140;
+const CARD_WIDTH = 260;
+const CARD_HEIGHT = 120;
 const GAP_X = 12;
 const GAP_Y = 12;
 

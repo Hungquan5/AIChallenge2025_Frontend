@@ -1,7 +1,7 @@
 // src/layouts/AppShell.tsx (Updated with dynamic left panel width)
 import React, { useState } from 'react';
 import type { ResultItem } from '../features/search/types';
-import { ChevronUp, Users, Wifi, WifiOff, Trash2, FileText, GitMerge } from 'lucide-react';
+import {  Trash2, FileText, GitMerge } from 'lucide-react';
 import BroadcastFeed  from '../features/communicate/components/Communicate/BroadcastFeed';
 
 interface AppShellProps {
@@ -34,7 +34,6 @@ const AppShell: React.FC<AppShellProps> = ({
   rightPanel,   
   carouselOverlay,
   broadcastMessages = [],
-  isConnected = false,
   activeUsers = 0,
   onRemoveBroadcastMessage,
   videoModal,

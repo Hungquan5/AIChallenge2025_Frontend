@@ -1,5 +1,5 @@
 // src/features/communicate/hooks/useBroadcastState.ts
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback,  } from 'react';
 import type { ResultItem } from '../../results/types';
 
 interface UseBroadcastStateReturn {

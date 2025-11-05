@@ -9,22 +9,22 @@ type FrameRates = {
 // Cast the imported JSON data to our defined type
 const videoFrameRates: FrameRates = frameRates;
 
-const loginToDres = async (username: string = 'quannh', password: string='123456') => {
-  const response = await fetch('http://192.168.28.151:5000/api/v2/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password }),
-  });
+// const loginToDres = async (username: string = 'quannh', password: string='123456') => {
+//   const response = await fetch('http://192.168.28.151:5000/api/v2/login', {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify({ username, password }),
+//   });
 
-  if (!response.ok) {
-    throw new Error(`Login failed: ${response.statusText}`);
-  }
+//   if (!response.ok) {
+//     throw new Error(`Login failed: ${response.statusText}`);
+//   }
 
-  const data = await response.json();
-  return data.sessionId;
-};
+//   const data = await response.json();
+//   return data.sessionId;
+// };
 
 const getEvaluationId = async (sessionId: string) => {
   const response = await fetch(`http://192.168.20.156:5601/api/v2/client/evaluation/list?session=${sessionId}`, {
@@ -91,7 +91,7 @@ const submitToDres = async (
 };
 
 const fullSubmissionFlow = async (result: ResultItem) => {
-  const sessionId = "7E5UQ1jjfWfCl95t_dhrXHXuzvJeiZau";
+  const sessionId = "CxHydJwrIOknebxPtuojzog2l82qg6fM";
   const evaluationId = await getEvaluationId(sessionId);
   return await submitToDres(result, sessionId, evaluationId);
 };

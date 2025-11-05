@@ -1,11 +1,10 @@
 // src/layouts/TopControlBar.tsx
 
 import React, { useState } from 'react';
-import { ListChecks, Library, Keyboard, Languages, Settings, ChevronDown, MessageSquare, Search } from 'lucide-react';
-import type { ViewMode, ResultItem } from '../features/results/types';
+import { ListChecks, Library,  Languages, Settings, ChevronDown, MessageSquare, Search } from 'lucide-react';
+import type { ViewMode, } from '../features/results/types';
 import type { ModelSelection } from '../features/search/types';
 import ModelSelectionPanel from '../features/search/components/ModelSelection/ModelSelection';
-import ObjectFilterDropdown from '../features/results/components/ResultsPanel/ObjectFilterDropdown'; // Import the new dropdown component
 
 export type SearchMode = 'manual' | 'chatbot';
 
@@ -24,20 +23,14 @@ interface Props {
   searchMode: SearchMode;
   onSearchModeChange: (mode: SearchMode) => void;
 
-  // Object Filter Props
-  results: ResultItem[]; // The full list of results to derive object metadata from
-  selectedObjects: Set<string>;
-  onObjectFilterChange: (newSelectedObjects: Set<string>) => void;
-  globalObjectCounts: { [key: string]: number };
-  isLoadingObjectMetadata: boolean;
 
+  objectFilterSlot: React.ReactNode;
 
 }
 
 const TopControlBar: React.FC<Props> = ({
   viewMode,
   onViewModeChange,
-  onShowShortcuts,
   isAutoTranslateEnabled,
   onAutoTranslateChange,
   modelSelection,
@@ -45,11 +38,7 @@ const TopControlBar: React.FC<Props> = ({
   searchMode,
   onSearchModeChange,
   // Destructure Object Filter Props
-  results,
-  selectedObjects,
-  onObjectFilterChange,
-  globalObjectCounts,
-  isLoadingObjectMetadata,
+  objectFilterSlot,
 
 }) => {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -135,13 +124,7 @@ const TopControlBar: React.FC<Props> = ({
 
         {/* ✅ NEW: Object Filter Dropdown (using the dedicated component) */}
         <div className="relative border-l border-slate-300/60 pl-4">
-            <ObjectFilterDropdown
-              results={results} // Pass this as it's part of the prop interface
-              selectedObjects={selectedObjects}
-              onFilterChange={onObjectFilterChange}
-              globalObjectCounts={globalObjectCounts}
-              isLoading={isLoadingObjectMetadata}
-            />
+          {objectFilterSlot}
         </div>
 
         {/* Auto-Translate toggle */}

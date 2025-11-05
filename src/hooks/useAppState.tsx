@@ -1,76 +1,71 @@
 // src/hooks/useAppState.ts
-import { useState, useCallback } from 'react';
-import type { ResultItem, GroupedResult, ViewMode } from '../features/results/types';
-import type { ApiQuery, SearchMode } from '../features/search/types';
-import { mockResults, mockGroupedResults } from '../utils/mockData';
-import type { ModelSelection } from '../features/search/types';
+import { useState, useCallback, useTransition } from 'react';
+import type { ResultItem, ViewMode } from '../features/results/types';
+import type {  ModelSelection } from '../features/search/types';
+import { mockResults } from '../utils/mockData';
+import { mockGroupedResults } from '../utils/mockData';
+// ✅ DEFINE: This is the efficient object structure for grouped results.
+// It's much faster to create and look up than an array of groups.
+export type GroupedResultsObject = { [videoId: string]: ResultItem[] };
+
 interface UseAppStateReturn {
-  // State
+  // --- State ---
   results: ResultItem[];
-  groupedResults: GroupedResult[];
+  groupedResults: GroupedResultsObject; // It now returns the object structure
   viewMode: ViewMode;
   currentPage: number;
   hasNextPage: boolean;
   isLoading: boolean;
-  lastQueries: ApiQuery[];
-  lastSearchMode: SearchMode;
   isAutoTranslateEnabled: boolean;
   currentVideoTitle: string;
-  // ✅ ADD: Model selection state
-  lastModelSelection: ModelSelection;
   modelSelection: ModelSelection;
 
-  // Setters
-  setResults: React.Dispatch<React.SetStateAction<ResultItem[]>>;
-  setGroupedResults: React.Dispatch<React.SetStateAction<GroupedResult[]>>;
+  // --- Setters (Limited for safety) ---
   setViewMode: React.Dispatch<React.SetStateAction<ViewMode>>;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   setHasNextPage: React.Dispatch<React.SetStateAction<boolean>>;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  setLastQueries: React.Dispatch<React.SetStateAction<ApiQuery[]>>;
-  setLastSearchMode: React.Dispatch<React.SetStateAction<SearchMode>>;
   setIsAutoTranslateEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setCurrentVideoTitle: React.Dispatch<React.SetStateAction<string>>;
-  // ✅ ADD: Model selection setters
-  setLastModelSelection: React.Dispatch<React.SetStateAction<ModelSelection>>;
   setModelSelection: React.Dispatch<React.SetStateAction<ModelSelection>>;
 
-  // Helper methods
+  // --- Helper Methods ---
   toggleViewMode: () => void;
   toggleAutoTranslate: () => void;
-  updateResultsWithGrouped: (newResults: ResultItem[]) => void;
+  // ✅ THE ONLY WAY to update results now. This is the core of the fix.
+  setNewResults: (newResults: ResultItem[]) => void;
 }
 
 export const useAppState = (): UseAppStateReturn => {
+  // --- State Definitions ---
+  
   // Search Results & View State
+  // ✅ Your initial state will now match the mock data structure perfectly.
   const [results, setResults] = useState<ResultItem[]>(mockResults);
-  const [groupedResults, setGroupedResults] = useState<GroupedResult[]>(mockGroupedResults);
+  const [groupedResults, setGroupedResults] = useState<GroupedResultsObject>(mockGroupedResults);
+  
   const [viewMode, setViewMode] = useState<ViewMode>('sortByConfidence');
-  // Update src/hooks/useAppState.ts (add these to your existing hook)
-// In your useAppState hook, add:
-const [lastModelSelection, setLastModelSelection] = useState<ModelSelection>({
-  use_clip: true,
-  use_siglip2: true, 
-  use_beit3: true
-});
-
-const [modelSelection, setModelSelection] = useState<ModelSelection>({
-  use_clip: true,
-  use_siglip2: true,
-  use_beit3: true,
-});
-  // Pagination & Search Context State
+  
+  // Model Selection State
+  const [modelSelection, setModelSelection] = useState<ModelSelection>({
+    use_clip: true,
+    use_siglip2: true,
+    use_beit3: true,
+  });
+    // ✅ NEW: Introduce a transition for non-urgent updates.
+  // isPending will be true while the background calculation is running.
+  const [isProcessing, startTransition] = useTransition();
+  // Pagination & Loading State
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [lastQueries, setLastQueries] = useState<ApiQuery[]>([]);
-  const [lastSearchMode, setLastSearchMode] = useState<SearchMode>('normal');
-  
+
   // UI State
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
   const [currentVideoTitle, setCurrentVideoTitle] = useState('');
 
-  // Helper methods
+  // --- Helper Methods ---
+
   const toggleViewMode = useCallback(() => {
     setViewMode(prev => prev === 'sortByConfidence' ? 'groupByVideo' : 'sortByConfidence');
   }, []);
@@ -79,59 +74,58 @@ const [modelSelection, setModelSelection] = useState<ModelSelection>({
     setIsAutoTranslateEnabled(prev => !prev);
   }, []);
 
-  const updateResultsWithGrouped = useCallback((newResults: ResultItem[]) => {
+  // ✅ THE FIX: This is now the single, reliable function for updating results.
+  // It guarantees that the grouped data is always in sync with the flat list.
+  // ✅ THE FIX: This function now splits its work into urgent and non-urgent parts.
+  const setNewResults = useCallback((newResults: ResultItem[]) => {
+    // 1. URGENT: Update the primary flat list immediately.
+    // This will cause the component to re-render instantly with the new results.
     setResults(newResults);
     
-    // Group results
-    const grouped = newResults.reduce((acc, item) => {
-      const group = acc.find(g => g.videoId === item.videoId);
-      if (group) {
-        group.items.push(item);
-      } else {
-        acc.push({ 
-          videoId: item.videoId, 
-          videoTitle: item.title, 
-          items: [item] 
-        });
-      }
-      return acc;
-    }, [] as GroupedResult[]);
-    
-    setGroupedResults(grouped);
-  }, []);
-
+    // 2. NON-URGENT (Transition): Defer the expensive grouping calculation.
+    startTransition(() => {
+      // This code will run without blocking the UI.
+      // The UI will remain responsive while this is calculated.
+      const grouped = newResults.reduce((acc, item) => {
+        const { videoId } = item;
+        if (!acc[videoId]) {
+          acc[videoId] = [];
+        }
+        acc[videoId].push(item);
+        return acc;
+      }, {} as GroupedResultsObject);
+      
+      // Update the grouped results state once the calculation is done.
+      setGroupedResults(grouped);
+    });
+  }, []); // The function itself is stable.
   return {
-    // State
+    // --- State ---
     results,
     groupedResults,
     viewMode,
     currentPage,
     hasNextPage,
-    isLoading,
-    lastQueries,
-    lastSearchMode,
+    isLoading: isLoading || isProcessing, 
     isAutoTranslateEnabled,
     currentVideoTitle,
-lastModelSelection,
-setLastModelSelection,
-modelSelection,
-setModelSelection,
+    modelSelection,
 
-    // Setters
-    setResults,
-    setGroupedResults,
+    // --- Safe Setters ---
     setViewMode,
     setCurrentPage,
     setHasNextPage,
     setIsLoading,
-    setLastQueries,
-    setLastSearchMode,
     setIsAutoTranslateEnabled,
     setCurrentVideoTitle,
+    setModelSelection,
 
-    // Helper methods
+    // --- Helper Methods ---
     toggleViewMode,
     toggleAutoTranslate,
-    updateResultsWithGrouped,
+    setNewResults, // ✅ We export our new, safe function.
+    
+    // ❌ We no longer export the raw `setResults` or `setGroupedResults`.
+    // This prevents other parts of the app from calling them and causing a de-sync.
   };
 };

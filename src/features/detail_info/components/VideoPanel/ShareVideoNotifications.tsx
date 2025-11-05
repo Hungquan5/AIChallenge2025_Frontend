@@ -120,7 +120,7 @@ const SharedVideoNotification: React.FC<SharedVideoNotificationProps> = ({
         ></div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes progress {
           from { width: 100%; }
           to { width: 0%; }
