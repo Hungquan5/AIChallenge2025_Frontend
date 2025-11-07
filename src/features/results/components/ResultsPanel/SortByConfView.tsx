@@ -1,5 +1,5 @@
 // src/features/results/components/SortedByConfidenceView.tsx
-import React, { useState, useCallback, useMemo, memo, useRef, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useMemo, memo, useRef, useLayoutEffect, useEffect } from 'react';
 import type { ResultItem } from '../../types';
 import type { SubmissionStatus } from '../../../communicate/types';
 
@@ -11,7 +11,7 @@ imageClass,
 } from './styles';
 import ResultCard from './ResultCard';
 import { Grid } from 'react-window';
-import type { CellComponentProps } from 'react-window';
+import type { CellComponentProps,GridImperativeAPI } from 'react-window';
 
 // --- Prop Definitions ---
 interface Props {
@@ -66,7 +66,7 @@ onDislike,
 const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 const containerRef = useRef<HTMLDivElement>(null);
 const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-
+  const [grid, setGrid] = useState<GridImperativeAPI | null>(null);
 const sorted = useMemo(
   () => [...results].sort((a, b) => b.confidence - a.confidence),
   [results]
@@ -102,8 +102,12 @@ useLayoutEffect(() => {
   observer.observe(container);
   return () => observer.disconnect();
 }, []);
-
-
+  // ✅ THE FIX: Use the correct API method `scrollToRow`
+  useEffect(() => {
+    if (grid) {
+      grid.scrollToRow({ index: 0, behavior: 'auto' });
+    }
+  }, [results, grid]); // Add `grid` to the dependency array
 if (results.length === 0) {
   return (
     <div className={noResultsClass}>
@@ -207,6 +211,7 @@ return (
 <div ref={containerRef} className="flex-grow min-h-0 w-full h-full">
 {width > 0 && height > 0 && (
 <Grid
+gridRef={setGrid}
 className="no-scrollbar"
 style={{width, height}}
 columnCount={colCount}

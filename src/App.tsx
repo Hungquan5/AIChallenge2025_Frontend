@@ -35,11 +35,11 @@ import { useObjectFilter } from './features/results/hooks/useObjectFilter';
 import { useNotificationManager } from './features/notifications/NotificationsManagers';
 import BubbleChat from './features/chat/components/ChatBubbleComponent';
 // --- Other Components ---
-import { UsernamePrompt } from './features/communicate/components/User/UsernamePrompt';
+import { ConnectionPrompt } from './features/communicate/components/User/ConnectionPrompt';
 import { useShortcuts } from './utils/shortcuts';
 import type { ViewMode } from './features/results/types';
 import type { ModelSelection } from './features/search/types';
-
+import { dresService } from './utils/DresService';
 const App: React.FC = () => {
   // =================================================================
   // 1. ALL HOOKS ARE CALLED UNCONDITIONALLY AT THE TOP
@@ -141,7 +141,18 @@ const App: React.FC = () => {
       modalState.handleToggleDislikePanel
     );
   }, [dislikeState, user, modalState.isDislikePanelOpen, modalState.handleToggleDislikePanel]);
-  
+    // ✅ 3. Create the master connection handler
+  // ✅ 1. Update the connection handler to accept all three parameters
+  const handleConnect = useCallback(async (username: string, dresSessionId: string, dresBaseUrl: string) => {
+    // Step A: Configure the dresService with DRES-specific credentials
+    dresService.setConfig(dresBaseUrl, dresSessionId);
+    
+    // Step B: Create the application session using the username.
+    // This will communicate with your backend (localhost:9991).
+    await createSession(username);
+    
+  }, [createSession]);
+
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
     FOCUS_SEARCH: () => inputPanelRef.current?.focus(),
@@ -356,11 +367,12 @@ const leftPanel = useMemo(() => (
   // 3. ✅ FIX: Moved the early return for authentication HERE.
   //    This is now AFTER all hooks have been called.
   // =================================================================
-  if (!user) {
-    return <UsernamePrompt onConnect={createSession} isLoading={isSessionLoading} />;
-  }
 
-  // =================================================================
+  // ✅ 2. Early return with the updated ConnectionPrompt
+  if (!user) {
+    // The onConnect prop now correctly matches the new signature of handleConnect
+    return <ConnectionPrompt onConnect={handleConnect} isLoading={isSessionLoading} />;
+  }
   // 4. FINAL RENDER (when user exists)
   // =================================================================
   return (

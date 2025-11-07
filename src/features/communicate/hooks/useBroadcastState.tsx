@@ -1,7 +1,7 @@
 // src/features/communicate/hooks/useBroadcastState.ts
 import { useState, useCallback,  } from 'react';
 import type { ResultItem } from '../../results/types';
-
+import { fullSubmissionFlow } from '../../submit/components/SubmitAPI';
 interface UseBroadcastStateReturn {
   // State
   broadcastMessages: ResultItem[];
@@ -38,24 +38,36 @@ export const useBroadcastState = (): UseBroadcastStateReturn => {
     }));
   }, []); // No dependencies needed as it only uses the setter
 
-  const handleVqaSubmit = useCallback((item: ResultItem, question: string) => {
+
+
+
+  const handleVqaSubmit = useCallback(async (item: ResultItem, question: string) => {
     if (!question.trim()) {
       console.warn('VQA question is empty.');
       return;
     }
-    
+
     console.log('Submitting VQA:', {
       videoId: item.videoId,
-      frameId: item.timestamp,
+      timestamp: item.timestamp,
       question: question.trim(),
     });
-    
+
+    try {
+      // Call the submission flow with the question
+      await fullSubmissionFlow(item, question.trim());
+      console.log('VQA submission to DRES successful.');
+    } catch (error) {
+      console.error('VQA submission to DRES failed:', error);
+      // Optionally, provide user feedback about the failed submission
+    }
+
     // Clear the input field after submission
     setVqaQuestions(prev => ({
       ...prev,
       [item.id]: '',
     }));
-  }, []); // No dependencies needed
+  }, []);
 
   // Track Mode Handler
   const handleToggleTrackMode = useCallback(() => {

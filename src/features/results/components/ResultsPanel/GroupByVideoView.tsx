@@ -1,6 +1,6 @@
 // src/features/results/components/GroupedByVideoView.tsx
 
-import React, { useState, useCallback, useMemo, useRef, useLayoutEffect, memo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useLayoutEffect, memo, useEffect } from 'react';
 import type { GroupedResult, ResultItem } from '../../types';
 import {
   groupTitleClass,
@@ -14,6 +14,7 @@ import ResultCard from './ResultCard';
 
 // Using the List component as you intended
 import { List } from 'react-window';
+import type { ListImperativeAPI } from 'react-window';
 
 import type { SubmissionStatus } from '../../../communicate/types';
 
@@ -130,6 +131,7 @@ const GroupedByVideoView: React.FC<Props> = (props) => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   const { groupedResults, currentUser, sendMessage } = props;
+  const [list, setList] = useState<ListImperativeAPI | null>(null);
 
   const handleImageLoad = useCallback((id: string) => {
     setLoadedImages(prev => {
@@ -155,7 +157,12 @@ const GroupedByVideoView: React.FC<Props> = (props) => {
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
-
+  // ✅ SOLUTION: Add an effect that triggers whenever the groupedResults change
+  useEffect(() => {
+    if (list) {
+      list.scrollToRow({ index: 0, behavior: 'auto' });
+    }
+  }, [groupedResults, list]); // Add `list` to the dependency array
   const flatData = useMemo(() => {
     const cardsPerRow = dimensions.width > 0 ? Math.max(1, Math.floor(dimensions.width / (CARD_WIDTH + GAP_X))) : 1;
     const data: any[] = [];
@@ -201,6 +208,7 @@ const GroupedByVideoView: React.FC<Props> = (props) => {
     <div ref={containerRef} className="w-full h-full">
       {dimensions.width > 0 && dimensions.height > 0 && (
 <List
+listRef={setList}
 className="no-scrollbar"
 style={{}}
 rowCount={flatData.length}

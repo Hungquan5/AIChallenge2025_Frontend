@@ -41,9 +41,11 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ✅ MODIFIED: The logic inside this useMemo hook is updated for the new sorting requirement.
   const groupedResultsAsArray = useMemo((): GroupedResult[] => {
     if (results.length === 0) return [];
     
+    // 1. Group results by videoId (same as before)
     const grouped: { [videoId: string]: ResultItem[] } = {};
     results.forEach(item => {
       if (!grouped[item.videoId]) {
@@ -52,15 +54,22 @@ const ResultsPanel: React.FC<ResultsPanelProps> = ({
       grouped[item.videoId].push(item);
     });
     
-    return Object.values(grouped)
-      .sort((a, b) => b.length - a.length)
-      .map(items => ({
-        videoId: items[0].videoId,
-        videoTitle: `Frames from ${items[0].videoId}`,
-        items: items,
-      }));
-  }, [results]);
+    // 2. Create an intermediate array where each group is paired with its highest confidence score
+    const groupsWithMaxConfidence = Object.values(grouped).map(items => {
+      const maxConfidence = Math.max(...items.map(item => item.confidence || 0));
+      return { items, maxConfidence };
+    });
 
+    // 3. Sort the groups in descending order based on their max confidence score
+    groupsWithMaxConfidence.sort((a, b) => b.maxConfidence - a.maxConfidence);
+
+    // 4. Map the now-sorted groups to the final structure required by the view
+    return groupsWithMaxConfidence.map(({ items }) => ({
+      videoId: items[0].videoId,
+      videoTitle: `Frames from ${items[0].videoId}`,
+      items: items,
+    }));
+  }, [results]);
   const sortedView = useMemo(() => (
     <SortedByConfidenceView
       results={results}

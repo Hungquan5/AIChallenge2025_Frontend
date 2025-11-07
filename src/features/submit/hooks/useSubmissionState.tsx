@@ -35,7 +35,7 @@ export const useSubmissionState = (): UseSubmissionStateReturn => {
   // ✅ FIX 4/5: Update the state's type definition here to store the richer object
   const [submissionStatuses, setSubmissionStatuses] = useState<{ [key: string]: SubmissionStatus }>({});
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
-
+  
   // ✅ ADDED: New callback to just set the pending state locally and instantly.
   const handleOptimisticPending = useCallback((item: ResultItem, user: any) => {
     // This provides immediate UI feedback for any action that results in a pending submission.
