@@ -1,5 +1,5 @@
 // src/layouts/AppShell.tsx (Updated with dynamic left panel width)
-import React, { useState } from 'react';
+import React from 'react'; // Removed useState
 import type { ResultItem } from '../features/search/types';
 import {  Trash2, FileText, GitMerge } from 'lucide-react';
 import BroadcastFeed  from '../features/communicate/components/Communicate/BroadcastFeed';
@@ -22,11 +22,16 @@ interface AppShellProps {
   onBroadcastResultDoubleClick: (item: ResultItem) => void;
   onExportBroadcastFeed: () => void;
   vqaQuestions: { [key: string]: string };
-  onVqaQuestionChange: (itemId: string, question: string) => void;
+  onVqaQuestionChange: (itemId: string, question:string) => void;
   isTrackModeActive: boolean;
   onToggleTrackMode: () => void;
-  // ✅ NEW: Add prop to determine if chatbot is active
   isChatbotMode?: boolean;
+
+  // --- MODIFICATIONS START ---
+  // 1. Add props to receive the open state and the toggle handler
+  isBroadcastOpen: boolean;
+  onToggleBroadcastFeed: () => void;
+  // --- MODIFICATIONS END ---
 }
 
 const AppShell: React.FC<AppShellProps> = ({ 
@@ -49,15 +54,20 @@ const AppShell: React.FC<AppShellProps> = ({
   onVqaQuestionChange,
   isTrackModeActive,
   onToggleTrackMode,
-  isChatbotMode = false, // ✅ NEW: Default to false
+  isChatbotMode = false,
+
+  // --- MODIFICATIONS START ---
+  // 2. Destructure the new props
+  isBroadcastOpen,
+  onToggleBroadcastFeed,
+  // --- MODIFICATIONS END ---
 }) => {
-  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  // 3. REMOVE the local state and handler. They are now managed by the parent.
+  // const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  // const toggleBroadcast = () => {
+  //   setIsBroadcastOpen(!isBroadcastOpen);
+  // };
 
-  const toggleBroadcast = () => {
-    setIsBroadcastOpen(!isBroadcastOpen);
-  };
-
-  // ✅ NEW: Dynamic width based on mode
   const leftPanelWidth = isChatbotMode ? 'w-[420px] min-w-[420px] max-w-[420px]' : 'w-[200px] min-w-[200px] max-w-[360px]';
 
   return (
@@ -100,7 +110,7 @@ const AppShell: React.FC<AppShellProps> = ({
                 <button
                   onClick={onClearBroadcastFeed}
                   className="flex items-center gap-1.5 px-2 py-1 text-xs text-red-600 bg-white/60 hover:bg-red-100/80 rounded-md transition-colors duration-200 backdrop-blur-sm border border-slate-200"
-                  title="Clear all submissions from the feed"
+                  title="Clear all submissions from the feed (Alt + C)"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Clear
@@ -133,7 +143,8 @@ const AppShell: React.FC<AppShellProps> = ({
           </div>
 
           <button
-            onClick={toggleBroadcast}
+            // 4. Use the handler from props
+            onClick={onToggleBroadcastFeed}
             className={`
               pointer-events-auto
               relative px-6 py-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700
@@ -141,23 +152,16 @@ const AppShell: React.FC<AppShellProps> = ({
               flex items-center gap-2 border-t border-l border-r border-blue-300/30
               ${isBroadcastOpen ? 'shadow-xl -translate-y-0.5' : 'shadow-lg'}
             `}
+            title="Toggle Live Feed (Alt + L)"
           >
             <div className="flex items-center gap-2">
-              {/* Connection Status Indicator */}
-
-
-                <span className="font-medium text-sm">Live Feed</span>
-              
-              {/* Message Count Badge */}
+              <span className="font-medium text-sm">Live Feed</span>
               {broadcastMessages.length > 0 && (
                 <span className="bg-white/25 text-white text-xs px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center">
                   {broadcastMessages.length}
                 </span>
               )}
-
             </div>
-
-            {/* Pulse animation for new messages */}
             {broadcastMessages.length > 0 && (
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-400 rounded-full animate-pulse" />
             )}
@@ -165,6 +169,7 @@ const AppShell: React.FC<AppShellProps> = ({
         </div>
 
         {/* Broadcast Panel */}
+        {/* 5. The className correctly uses the `isBroadcastOpen` prop */}
         <div className={`
           bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md border-t border-gray-200/50 shadow-2xl
            overflow-hidden
@@ -178,7 +183,6 @@ const AppShell: React.FC<AppShellProps> = ({
             )}
           </div>
 
-          {/* Broadcast Feed Content */}
           <BroadcastFeed 
             messages={broadcastMessages} 
             onRemoveMessage={onRemoveBroadcastMessage}

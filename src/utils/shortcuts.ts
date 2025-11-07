@@ -40,6 +40,10 @@ export const SHORTCUTS = {
   CLOSE_MODAL: { key: 'Escape', modifier: 'none' },
   TOGGLE_DISLIKE_PANEL: { key: 'd', modifier: 'Ctrl/Cmd' },
   SHOW_HISTORY: { key: 'e', modifier: 'Ctrl/Cmd' },
+
+  // Broadcast Feed shortcuts
+  TOGGLE_BROADCAST_FEED: { key: 'l', modifier: 'Alt' },
+  CLEAR_BROADCAST_FEED: { key: 'c', modifier: 'Alt' },
 } as const;
 
 // Keep TypeScript happy with a clear type definition

@@ -40,6 +40,7 @@ import { useShortcuts } from './utils/shortcuts';
 import type { ViewMode } from './features/results/types';
 import type { ModelSelection } from './features/search/types';
 import { dresService } from './utils/DresService';
+
 const App: React.FC = () => {
   // =================================================================
   // 1. ALL HOOKS ARE CALLED UNCONDITIONALLY AT THE TOP
@@ -47,6 +48,8 @@ const App: React.FC = () => {
   const inputPanelRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>('manual');
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  
   // Core State Hooks
   const appState = useAppState();
   const modalState = useModalState();
@@ -60,8 +63,8 @@ const App: React.FC = () => {
     fetchObjectMetadata, // Destructure this directly
     isLoadingMetadata,
     globalObjectCounts,
-
   } = useObjectFilter(); 
+  
   // Notification System
   const {
     NotificationContainer,
@@ -127,12 +130,11 @@ const App: React.FC = () => {
   const handleShowShortcuts = useCallback(() => {
     modalState.setShowShortcuts(true);
   }, [modalState.setShowShortcuts]);
-  // ✅ FIX: Create stable callback for submissions
+
   const handleResultSubmission = useCallback((item: ResultItem) => {
     submissionState.handleSubmission(item, user, sendMessage);
   }, [submissionState, user, sendMessage]);
 
-  // ✅ FIX: Create stable callback for dislikes
   const handleResultDislike = useCallback((item: ResultItem) => {
     dislikeState.handleDislike(
       item,
@@ -141,17 +143,16 @@ const App: React.FC = () => {
       modalState.handleToggleDislikePanel
     );
   }, [dislikeState, user, modalState.isDislikePanelOpen, modalState.handleToggleDislikePanel]);
-    // ✅ 3. Create the master connection handler
-  // ✅ 1. Update the connection handler to accept all three parameters
+
   const handleConnect = useCallback(async (username: string, dresSessionId: string, dresBaseUrl: string) => {
-    // Step A: Configure the dresService with DRES-specific credentials
     dresService.setConfig(dresBaseUrl, dresSessionId);
-    
-    // Step B: Create the application session using the username.
-    // This will communicate with your backend (localhost:9991).
     await createSession(username);
-    
   }, [createSession]);
+
+  // ✅ FIX 1: Define the function to toggle the broadcast feed's visibility.
+  const handleToggleBroadcastFeed = useCallback(() => {
+    setIsBroadcastOpen(prev => !prev);
+  }, []);
 
   const shortcutHandlers = useMemo(() => ({
     TOGGLE_VIEW_MODE: appState.toggleViewMode,
@@ -160,27 +161,30 @@ const App: React.FC = () => {
     CLOSE_MODAL: modalState.handleCloseModal,
     TOGGLE_DISLIKE_PANEL: modalState.handleToggleDislikePanel,
     GO_TO_PAGE: searchHandlers.handlePageChange,
+    
+    // ✅ FIX 2: Correctly wire the shortcut to the new handler.
+    TOGGLE_BROADCAST_FEED: handleToggleBroadcastFeed,
+    CLEAR_BROADCAST_FEED: broadcastState.handleClearBroadcastFeed,
   }), [
     appState.toggleViewMode,
     appState.toggleAutoTranslate,
     modalState.handleCloseModal,
     modalState.handleToggleDislikePanel,
     searchHandlers.handlePageChange,
+    
+    // ✅ FIX 3: Add the new handler to the dependency array.
+    handleToggleBroadcastFeed,
+    broadcastState.handleClearBroadcastFeed,
   ]);
 
-  // ✅ SOLUTION: Activate the global keyboard shortcuts by calling the hook.
   useShortcuts(shortcutHandlers);
 
-
-
-  // Apply filtering to results
-   const filteredResults = useMemo(
+  const filteredResults = useMemo(
     () => filterResults(appState.results),
-    [appState.results, selectedObjects, filterResults] // Use filterResults directly
+    [appState.results, selectedObjects, filterResults]
   );
+
   const handleRemoveBroadcastMessage = useCallback((messageId: string) => {
-    // The original signature in AppShell had an 'index', but the hook doesn't use it.
-    // We align with the hook's implementation for correctness.
     broadcastState.handleRemoveBroadcastMessage(messageId);
   }, [broadcastState.handleRemoveBroadcastMessage]);
 
@@ -193,188 +197,159 @@ const App: React.FC = () => {
   }, [broadcastState.handleToggleTrackMode]);
 
   const handleBroadcastResultSubmission = useCallback((item: ResultItem) => {
-    // This was previously an inline arrow function, which is a common
-    // cause of performance issues with memoized components.
     submissionState.handleSubmission(item, user, sendMessage);
-  }, [submissionState, user, sendMessage]); // Dependencies that the function relies on
+  }, [submissionState, user, sendMessage]);
+
   const handleSimilaritySearchAdapter = useCallback((imageSrc: string, cardId: string) => {
     console.log(`Adapter triggered for similarity search on card: ${cardId}`);
-    // We ignore the cardId here and just call the clean handler from useSearch.
     searchHandlers.handleSimilaritySearch(imageSrc);
-  }, [searchHandlers.handleSimilaritySearch]); // Dependency is the stable handler from the hook
-  // =================================================================
-  // 2. DEFINE UI LOGIC (Can use hooks' return values)
-  // =================================================================
-  // 4. Memoize panel components
+  }, [searchHandlers.handleSimilaritySearch]);
 
-
-
-
-const leftPanel = useMemo(() => (
-  <div ref={inputPanelRef} tabIndex={-1} className="h-full">
-    {searchMode === 'manual' ? (
-      <InputPanel
-        onSearch={searchHandlers.handleInitiateSearch}
-        onSingleSearchResult={searchHandlers.handleSingleItemSearch}
-        isAutoTranslateEnabled={appState.isAutoTranslateEnabled}  
-        isLoading={appState.isLoading}
-        user={user}
-        modelSelection={appState.modelSelection}
-      />
-    ) : (
-      <Chatbot
-        isLoading={appState.isLoading}
-      />
-    )}
-  </div>
-), [
-  searchMode,
-  searchHandlers.handleInitiateSearch,
-  searchHandlers.handleSingleItemSearch,
-  appState.isAutoTranslateEnabled,
-  appState.isLoading,
-  appState.modelSelection,
-  user,
-  eventHandlers.handleAgentToolOutputs
-]);
-
-  const rightPanel = (
-    <div className="relative h-full flex flex-col">
-      {/* ✅ MODIFICATION: The container is now a flexbox layout */}
-      <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70 flex justify-between items-center">
-        {/* 1. The now-static TopControlBar */}
-        <TopControlBar
-          viewMode={appState.viewMode}
-          onViewModeChange={handleViewModeChange}
-          onShowShortcuts={handleShowShortcuts}
-          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
-          onAutoTranslateChange={handleAutoTranslateChange}
+  // (The rest of the component remains the same)
+  // ... leftPanel, rightPanel, etc.
+  const leftPanel = useMemo(() => (
+    <div ref={inputPanelRef} tabIndex={-1} className="h-full">
+      {searchMode === 'manual' ? (
+        <InputPanel
+          onSearch={searchHandlers.handleInitiateSearch}
+          onSingleSearchResult={searchHandlers.handleSingleItemSearch}
+          isAutoTranslateEnabled={appState.isAutoTranslateEnabled}  
+          isLoading={appState.isLoading}
+          user={user}
           modelSelection={appState.modelSelection}
-          onModelSelectionChange={handleModelSelectionChange}
-          searchMode={searchMode}
-          onSearchModeChange={setSearchMode}
-                  objectFilterSlot={
-            <ObjectFilterDropdown
-              results={appState.results} // Pass results directly here
-              selectedObjects={selectedObjects}
-              onFilterChange={handleFilterChange}
-              globalObjectCounts={globalObjectCounts}
-              isLoading={isLoadingMetadata}
-            />
-            }
         />
-
-        {/* 2. The new dynamic PaginationContainer, centered */}
-        <div className="flex-grow flex justify-center">
-          <PaginationContainer
-            currentPage={appState.currentPage}
-            onPageChange={searchHandlers.handlePageChange}
-            hasNextPage={appState.hasNextPage}
-            totalResults={filteredResults.length} // Reflect total filtered results
-          />
-        </div>
-      </div>
-      {/* 2. Main content area - NOW A FLEX CONTAINER */}
-      {/* ✅ FIX: This container now uses Flexbox to manage its children side-by-side. */}
-      <div
-        className="flex flex-1 overflow-hidden" // Use flex and hide potential overflow
-      >
-        {/* ResultsPanel container will grow and shrink */}
-        {/* ✅ FIX: This div is now a flex item that grows to fill available space. */}
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{ scrollbarGutter: 'stable' }}
-        >
-          <ResultsPanel
-            viewMode={appState.viewMode}
-            results={filteredResults} // <--- CHANGED: Pass filteredResults here
-            onResultClick={eventHandlers.handleMasterResultClick}
-            onSimilaritySearch={handleSimilaritySearchAdapter}
-            onResultRightClick={eventHandlers.handleResultRightClick}
-            currentUser={user?.username ?? ''}
-            sendMessage={sendMessage}
-            onResultDoubleClick={modalState.handleOpenDetailModal}
-            onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
-            submissionStatuses={submissionState.submissionStatuses}
-            optimisticSubmissions={submissionState.optimisticSubmissions}
-            onResultDislike={handleResultDislike} // ✅ USE STABLE HANDLER
-            onToggleViewMode={appState.toggleViewMode}
-          />
-        </div>
-
-        {/* DislikePanel is now a direct flex child. */}
-        {/* ✅ FIX: No more absolute positioning. It's now part of the flex layout and will "push" the ResultsPanel. */}
-        <DislikePanel
-          isOpen={modalState.isDislikePanelOpen}
-          items={dislikeState.dislikedItems}
-          onClose={modalState.handleToggleDislikePanel}
-          onClear={() => dislikeState.handleClearDislikes(user)}
-          onUndislike={(item) => dislikeState.handleUndislike(item, user)}
-          onResultClick={eventHandlers.handleMasterResultClick}
-            onSimilaritySearch={handleSimilaritySearchAdapter}
+      ) : (
+        <Chatbot
+          isLoading={appState.isLoading}
         />
-      </div>
+      )}
     </div>
-  );
+  ), [
+    searchMode,
+    searchHandlers.handleInitiateSearch,
+    searchHandlers.handleSingleItemSearch,
+    appState.isAutoTranslateEnabled,
+    appState.isLoading,
+    appState.modelSelection,
+    user,
+  ]);
+  
+    const rightPanel = (
+      <div className="relative h-full flex flex-col">
+        <div className="flex-shrink-0 z-30 bg-white/60 backdrop-blur-sm border-b border-slate-200/70 flex justify-between items-center">
+          <TopControlBar
+            viewMode={appState.viewMode}
+            onViewModeChange={handleViewModeChange}
+            onShowShortcuts={handleShowShortcuts}
+            isAutoTranslateEnabled={appState.isAutoTranslateEnabled}
+            onAutoTranslateChange={handleAutoTranslateChange}
+            modelSelection={appState.modelSelection}
+            onModelSelectionChange={handleModelSelectionChange}
+            searchMode={searchMode}
+            onSearchModeChange={setSearchMode}
+                    objectFilterSlot={
+              <ObjectFilterDropdown
+                results={appState.results}
+                selectedObjects={selectedObjects}
+                onFilterChange={handleFilterChange}
+                globalObjectCounts={globalObjectCounts}
+                isLoading={isLoadingMetadata}
+              />
+              }
+          />
+          <div className="flex-grow flex justify-center">
+            <PaginationContainer
+              currentPage={appState.currentPage}
+              onPageChange={searchHandlers.handlePageChange}
+              hasNextPage={appState.hasNextPage}
+              totalResults={filteredResults.length}
+            />
+          </div>
+        </div>
+        <div
+          className="flex flex-1 overflow-hidden"
+        >
+          <div
+            className="flex-1 overflow-y-auto"
+            style={{ scrollbarGutter: 'stable' }}
+          >
+            <ResultsPanel
+              viewMode={appState.viewMode}
+              results={filteredResults}
+              onResultClick={eventHandlers.handleMasterResultClick}
+              onSimilaritySearch={handleSimilaritySearchAdapter}
+              onResultRightClick={eventHandlers.handleResultRightClick}
+              currentUser={user?.username ?? ''}
+              sendMessage={sendMessage}
+              onResultDoubleClick={modalState.handleOpenDetailModal}
+              onSubmission={handleResultSubmission}
+              submissionStatuses={submissionState.submissionStatuses}
+              optimisticSubmissions={submissionState.optimisticSubmissions}
+              onResultDislike={handleResultDislike}
+              onToggleViewMode={appState.toggleViewMode}
+            />
+          </div>
+          <DislikePanel
+            isOpen={modalState.isDislikePanelOpen}
+            items={dislikeState.dislikedItems}
+            onClose={modalState.handleToggleDislikePanel}
+            onClear={() => dislikeState.handleClearDislikes(user)}
+            onUndislike={(item) => dislikeState.handleUndislike(item, user)}
+            onResultClick={eventHandlers.handleMasterResultClick}
+              onSimilaritySearch={handleSimilaritySearchAdapter}
+          />
+        </div>
+      </div>
+    );
+  
+    const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
+      <FramesPanel
+        frames={keyframeLoader.carouselFrames}
+        videoTitle={appState.currentVideoTitle}
+        isLoading={keyframeLoader.isLoading}
+        activeFrameId={keyframeLoader.activeFrameId}
+        loadNextFrames={keyframeLoader.loadNextFrames}
+        loadPreviousFrames={keyframeLoader.loadPreviousFrames}
+        hasMoreNext={keyframeLoader.hasMoreNext}
+        hasMorePrev={keyframeLoader.hasMorePrev}
+        onClose={keyframeLoader.handleCarouselClose}
+        onFrameClick={eventHandlers.handleFrameClickInPanel}
+        onRightClick={eventHandlers.handleFrameRightClickInPanel}
+              onSimilaritySearch={handleSimilaritySearchAdapter}
+        currentUser={user?.username ?? ''}
+        sendMessage={sendMessage}
+        onResultDoubleClick={modalState.handleOpenDetailModal}
+        onSubmission={handleResultSubmission}
+        isFetchingNext={keyframeLoader.isFetchingNext}
+        isFetchingPrev={keyframeLoader.isFetchingPrev}
+      />
+    ) : null;
+  
+    const videoPanelInstance = modalState.videoPanelState.isOpen &&
+      modalState.videoPanelState.videoId &&
+      modalState.videoPanelState.timestamp ? (
+      <VideoPanel
+        videoId={modalState.videoPanelState.videoId}
+        timestamp={modalState.videoPanelState.timestamp}
+        onClose={modalState.handleCloseVideoPanel}
+        onBroadcast={eventHandlers.handleItemBroadcast}
+        currentUser={user?.username ?? ''}
+        sendMessage={sendMessage}
+        lastMessage={lastMessage}
+      />
+    ) : null;
+  
+    const detailModalInstance = modalState.detailModalItem ? (
+      <FrameDetailModal
+        item={modalState.detailModalItem}
+        onClose={modalState.handleCloseDetailModal}
+      />
+    ) : null;
 
-  const framesPanelInstance = keyframeLoader.carouselFrames !== null ? (
-    <FramesPanel
-      frames={keyframeLoader.carouselFrames}
-      videoTitle={appState.currentVideoTitle}
-      isLoading={keyframeLoader.isLoading}
-      activeFrameId={keyframeLoader.activeFrameId}
-      loadNextFrames={keyframeLoader.loadNextFrames}
-      loadPreviousFrames={keyframeLoader.loadPreviousFrames}
-      hasMoreNext={keyframeLoader.hasMoreNext}
-      hasMorePrev={keyframeLoader.hasMorePrev}
-      onClose={keyframeLoader.handleCarouselClose}
-      onFrameClick={eventHandlers.handleFrameClickInPanel}
-      onRightClick={eventHandlers.handleFrameRightClickInPanel}
-            onSimilaritySearch={handleSimilaritySearchAdapter}
-      currentUser={user?.username ?? ''}
-      sendMessage={sendMessage}
-      onResultDoubleClick={modalState.handleOpenDetailModal}
-      onSubmission={handleResultSubmission} // ✅ USE STABLE HANDLER
-      // ✅ FIX: Pass the correct props from the hook
-      isFetchingNext={keyframeLoader.isFetchingNext}
-      isFetchingPrev={keyframeLoader.isFetchingPrev}
-    />
-  ) : null;
-
-  const videoPanelInstance = modalState.videoPanelState.isOpen &&
-    modalState.videoPanelState.videoId &&
-    modalState.videoPanelState.timestamp ? (
-    <VideoPanel
-      videoId={modalState.videoPanelState.videoId}
-      timestamp={modalState.videoPanelState.timestamp}
-      onClose={modalState.handleCloseVideoPanel}
-      onBroadcast={eventHandlers.handleItemBroadcast}
-      currentUser={user?.username ?? ''}
-      sendMessage={sendMessage}
-      // ✅ FIX 2: Pass the `lastMessage` prop down to the VideoPanel.
-      lastMessage={lastMessage}
-    />
-  ) : null;
-
-  const detailModalInstance = modalState.detailModalItem ? (
-    <FrameDetailModal
-      item={modalState.detailModalItem}
-      onClose={modalState.handleCloseDetailModal}
-    />
-  ) : null;
-
-  // =================================================================
-  // 3. ✅ FIX: Moved the early return for authentication HERE.
-  //    This is now AFTER all hooks have been called.
-  // =================================================================
-
-  // ✅ 2. Early return with the updated ConnectionPrompt
   if (!user) {
-    // The onConnect prop now correctly matches the new signature of handleConnect
     return <ConnectionPrompt onConnect={handleConnect} isLoading={isSessionLoading} />;
   }
-  // 4. FINAL RENDER (when user exists)
-  // =================================================================
+  
   return (
     <>
       <AppShell
@@ -395,8 +370,8 @@ const leftPanel = useMemo(() => (
         vqaQuestions={broadcastState.vqaQuestions}
         onVqaQuestionChange={broadcastState.handleVqaQuestionChange}
         isChatbotMode={searchMode === 'chatbot'}
-
-        // ✅ FIX: Pass the newly created stable handlers
+        isBroadcastOpen={isBroadcastOpen}
+        onToggleBroadcastFeed={handleToggleBroadcastFeed}
         onRemoveBroadcastMessage={handleRemoveBroadcastMessage}
         onClearBroadcastFeed={handleClearBroadcastFeed}
         onToggleTrackMode={handleToggleTrackMode}

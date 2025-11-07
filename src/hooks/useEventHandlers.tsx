@@ -2,9 +2,7 @@
 import { useCallback,useMemo } from 'react'; // ❌ REMOVED useRef as it's no longer needed here
 import { convertAgentOutputToResults } from '../utils/AgentUtils';
 import type { AgentToolOutput } from '../utils/AgentUtils';
-import { useState } from 'react';
 import type { ResultItem } from '../features/results/types';
-import { fullSubmissionFlow } from '../features/submit/components/SubmitAPI';
 interface UseEventHandlersProps {
   appState: any;
   modalState: any;
