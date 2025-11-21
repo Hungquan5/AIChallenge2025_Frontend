@@ -1,0 +1,16 @@
+docker run -d `
+  --name nginx-dataset `
+  -p 1406:80 `
+  -v "C:\Users\mkim\Desktop\aic\AIClub\dataset\merge_keyframes:/data/merge_keyframes" `
+  -v "C:\Users\mkim\Desktop\aic\AIClub\dataset\keyframe_json_db:/data/keyframe_json_db" `
+  -v "${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro" `
+  nginx
+
+
+docker run -d `
+  --name nginx-frontend `
+  -p 8081:80 `
+  -v "${PWD}/nginx_web.conf:/etc/nginx/conf.d/default.conf:ro" `
+  -v "C:\Users\mkim\Desktop\aic\AIClub\AIChallenge2025_Frontend\dist:/usr/share/nginx/html:ro" `
+  nginx
+

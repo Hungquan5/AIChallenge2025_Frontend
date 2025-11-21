@@ -91,7 +91,7 @@ export const searchBySimilarImage = async (
     const partialData = await response.json();
     
     return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
-      const thumbnailPath = `/dataset/full/merge/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+      const thumbnailPath = `/dataset/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
       
       return {
         videoId: item.videoId,

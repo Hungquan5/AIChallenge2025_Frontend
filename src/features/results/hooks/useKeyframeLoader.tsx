@@ -12,7 +12,7 @@ interface KeyframeWithVideoId extends Keyframe {
   video_id: string;
 }
 
-const FETCH_ALL_BATCH_SIZE = 10;
+const FETCH_ALL_BATCH_SIZE = 30;
 // The base URL of your Python http.server
 const API_BASE_URL = 'http://localhost:1406';
 
@@ -40,7 +40,7 @@ export const useKeyframeLoader = () => {
       id: frameId,
       videoId: kf.video_id,
       title: `${kf.video_id}/${kf.frame_index}`,
-      thumbnail: `${API_BASE_URL}/${kf.filename}`,
+      thumbnail: `${API_BASE_URL}/dataset/${kf.filename}`,
       confidence: 1.0,
       timestamp: kf.frame_index.toString(),
     };

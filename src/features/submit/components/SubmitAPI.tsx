@@ -15,7 +15,7 @@ const submitTrakeToDres = async (
   sessionId: string,
   evaluationId: string
 ) => {
-  try {
+try {
     if (!frames || frames.length === 0) {
       throw new Error("TRAKE submission requires at least one frame.");
     }
@@ -129,7 +129,7 @@ const submitToDres = async (
         ],
       };
     }
-  const dresUrl = (dresService as any).baseUrl; // Quick access for now
+  const dresUrl = (dresService as any).dresBaseUrl; // Quick access for now
 
     const response = await fetch(`${dresUrl}/api/v2/submit/${evaluationId}?session=${sessionId}`, {
       method: 'POST',

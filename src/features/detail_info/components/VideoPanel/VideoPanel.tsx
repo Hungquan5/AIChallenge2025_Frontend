@@ -58,7 +58,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1); // New state for playback speed
+  const [playbackRate, setPlaybackRate] = useState(1);
 
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -85,10 +85,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
   const videoUrl = useMemo(() => {
     const mediaPlaylistName = `playlist.m3u8`;
-    return `http://localhost:1406/video/${videoId}/${mediaPlaylistName}`;
+    return `http://localhost:1407/video/${videoId}/${mediaPlaylistName}`;
   }, [videoId]);
   
-  // Custom video controls
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
@@ -135,13 +134,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   };
 
-  // New function to toggle playback speed
   const togglePlaybackSpeed = () => {
     const newRate = playbackRate === 1 ? 2 : 1;
     setPlaybackRate(newRate);
   };
 
-  // Effect to update video element's playback rate
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.playbackRate = playbackRate;
@@ -149,11 +146,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   }, [playbackRate]);
 
 
-  // Update custom controls state from video element
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onDurationChange = () => setDuration(video.duration);
@@ -161,13 +156,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       setVolume(video.volume);
       setIsMuted(video.muted);
     };
-
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
     video.addEventListener('durationchange', onDurationChange);
     video.addEventListener('volumechange', onVolumeChange);
     video.addEventListener('timeupdate', handleTimeUpdate);
-
     return () => {
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
@@ -180,61 +173,33 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (!videoRef.current || !videoLoaded) return;
     if (event.target instanceof HTMLInputElement) return;
-
     const video = videoRef.current;
-    
     switch (event.code) {
-      case 'Space':
-        event.preventDefault();
-        togglePlay();
-        break;
-      case 'ArrowLeft':
-        event.preventDefault();
-        video.currentTime = Math.max(0, video.currentTime - (event.shiftKey ? 5 : 1));
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        video.currentTime = Math.min(video.duration, video.currentTime + (event.shiftKey ? 5 : 1));
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        video.volume = Math.min(1, video.volume + 0.1);
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        video.volume = Math.max(0, video.volume - 0.1);
-        break;
-      case 'KeyM':
-        event.preventDefault();
-        toggleMute();
-        break;
-      case 'Escape':
-        event.preventDefault();
-        onClose();
-        break;
+      case 'Space': event.preventDefault(); togglePlay(); break;
+      case 'ArrowLeft': event.preventDefault(); video.currentTime = Math.max(0, video.currentTime - (event.shiftKey ? 5 : 1)); break;
+      case 'ArrowRight': event.preventDefault(); video.currentTime = Math.min(video.duration, video.currentTime + (event.shiftKey ? 5 : 1)); break;
+      case 'ArrowUp': event.preventDefault(); video.volume = Math.min(1, video.volume + 0.1); break;
+      case 'ArrowDown': event.preventDefault(); video.volume = Math.max(0, video.volume - 0.1); break;
+      case 'KeyM': event.preventDefault(); toggleMute(); break;
+      case 'Escape': event.preventDefault(); onClose(); break;
     }
   }, [onClose, videoLoaded, togglePlay, toggleMute]);
 
   const handleWheel = useCallback((event: WheelEvent) => {
     if (!videoRef.current || !videoLoaded) return;
     event.preventDefault();
-
     const video = videoRef.current;
-    
     if (!video.paused) video.pause();
     if (scrubbingTimeoutRef.current) clearTimeout(scrubbingTimeoutRef.current);
-    
     setIsScrubbing(true);
     wheelAccumulatorRef.current += event.deltaY;
     const framesToSeek = Math.floor(Math.abs(wheelAccumulatorRef.current) / 50);
-    
     if (framesToSeek >= 1) {
       const direction = wheelAccumulatorRef.current > 0 ? -1 : 1;
       const timeIncrement = (framesToSeek * direction) / frameRate;
       video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + timeIncrement));
       wheelAccumulatorRef.current %= 50;
     }
-
     scrubbingTimeoutRef.current = setTimeout(() => {
       setIsScrubbing(false);
       wheelAccumulatorRef.current = 0;
@@ -257,31 +222,24 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
-    
     if (hlsRef.current) hlsRef.current.destroy();
-
     setVideoLoaded(false);
     setVideoError(null);
-
     const onError = () => {
       setVideoError('Failed to load video. Please check the source.');
       setVideoLoaded(false);
     };
-
     videoEl.addEventListener('error', onError);
-
     if (Hls.isSupported()) {
       const hls = new Hls();
       hlsRef.current = hls;
       hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
-      
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         videoEl.currentTime = startTimeInSeconds;
         videoEl.play().catch(console.error);
         setVideoLoaded(true);
       });
-      
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           console.error('HLS Error:', data);
@@ -298,7 +256,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     } else {
       setVideoError('HLS is not supported in your browser.');
     }
-
     return () => {
       videoEl.removeEventListener('error', onError);
       if (hlsRef.current) hlsRef.current.destroy();
@@ -309,12 +266,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     if (videoRef.current && videoLoaded) {
       const currentTime = videoRef.current.currentTime;
       const frameId = Math.floor(currentTime * frameRate);
-
       try {
         const response = await fetch(`http://localhost:9991/keyframes/nearest?video_id=${videoId}&frame_index=${frameId}`);
         if (!response.ok) throw new Error('Failed to fetch nearest keyframe');
         const keyframe = await response.json();
-
         const itemToBroadcast: ResultItem = {
           id: `${keyframe.video_id}-${frameId}`,
           videoId: keyframe.video_id,
@@ -341,12 +296,27 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
     sendMessage(JSON.stringify(syncMessage));
   };
+  
+  // ✅ NEW: Helper to clear ALL events and sync
+  const clearAndSyncAllEvents = () => {
+    // Create a new object with the same keys but empty arrays for values
+    const clearedEventFrames = Object.keys(eventFrames).reduce((acc, key) => {
+        acc[key] = [];
+        return acc;
+    }, {} as { [key: string]: ResultItem[] });
+
+    setEventFrames(clearedEventFrames);
+    const syncMessage = {
+        type: 'event_list_updated',
+        payload: { videoId, eventFrames: clearedEventFrames, submittedBy: currentUser }
+    };
+    sendMessage(JSON.stringify(syncMessage));
+  };
 
   const handleSubmitTrakeToDres = async () => {
     if (!selectedEvent) return alert('Please select an event first');
     const framesToSubmit = eventFrames[selectedEvent];
     if (framesToSubmit.length === 0) return alert('No frames to submit for this event.');
-
     setIsSubmitting(true);
     try {
       await fullTrakeSubmissionFlow(videoId, framesToSubmit);
@@ -355,6 +325,35 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     } catch (error: any) {
       console.error('TRAKE submission failed:', error);
       alert(`TRAKE submission failed: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ✅ REWORKED: Function to submit all events with frames in a SINGLE request
+  const handleSubmitAllEventsToDres = async () => {
+    // 1. Flatten all frames from all events into a single array.
+    const allFramesToSubmit = Object.values(eventFrames).flat();
+
+    // 2. Check if there are any frames to submit.
+    if (allFramesToSubmit.length === 0) {
+      alert('No frames in any event to submit.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 3. Call the submission flow ONCE with the combined list of frames.
+      await fullTrakeSubmissionFlow(videoId, allFramesToSubmit);
+
+      alert(`Successfully submitted ${allFramesToSubmit.length} frames from all events as a single TRAKE submission.`);
+      
+      // 4. Clear all events and sync with others upon success.
+      clearAndSyncAllEvents();
+
+    } catch (error: any) {
+      console.error('Combined TRAKE submission failed:', error);
+      alert(`Combined TRAKE submission failed: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -379,12 +378,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     if (!selectedEvent || !videoRef.current || !videoLoaded) return;
     const currentFrameTime = videoRef.current.currentTime;
     const frameId = Math.floor(currentFrameTime * frameRate);
-
     try {
       const response = await fetch(`http://localhost:9991/keyframes/nearest?video_id=${videoId}&frame_index=${frameId}`);
       if (!response.ok) throw new Error('Failed to fetch nearest keyframe');
       const keyframe = await response.json();
-
       const newFrame: ResultItem = {
         id: `${keyframe.video_id}-${frameId}-${Date.now()}`,
         videoId: keyframe.video_id,
@@ -395,7 +392,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         confidence: 1,
         submittedBy: currentUser,
       };
-
       const newEventFrames = {
         ...eventFrames,
         [selectedEvent]: [...eventFrames[selectedEvent], newFrame],
@@ -428,15 +424,17 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+  
+  const hasFramesToSubmit = useMemo(() => 
+    Object.values(eventFrames).some(frames => frames.length > 0),
+    [eventFrames]
+  );
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-2 sm:p-4">
       <div className="relative w-full h-full max-w-7xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row border border-gray-700/50">
         
-        {/* Main Video Panel */}
         <div className="flex-1 flex flex-col min-h-0">
-          
-          {/* Header */}
           <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-900/80 border-b border-gray-700/50 backdrop-blur-sm">
             <div className="flex items-center space-x-2 flex-1 min-w-0">
               <div className="flex space-x-1.5">
@@ -474,7 +472,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             </div>
           </div>
             
-          {/* Video Container */}
           <div 
             ref={videoContainerRef}
             className="relative bg-black flex-1 w-full overflow-hidden group"
@@ -512,7 +509,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
               )}
             </div>
 
-            {/* Custom Controls */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 sm:p-4 transition-opacity duration-300 opacity-0 group-hover:opacity-100">
                 <div className="flex items-center gap-3 text-white">
                     <button onClick={togglePlay} className="p-2 rounded-full hover:bg-white/10 transition-colors">
@@ -523,24 +519,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                     </button>
                     
                     <span className="text-sm font-mono">{formatTime(currentTime)}</span>
-
-                    <input
-                      type="range"
-                      min="0"
-                      max={duration}
-                      value={currentTime}
-                      onChange={handleSeek}
-                      className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer range-thumb"
-                    />
-
+                    <input type="range" min="0" max={duration} value={currentTime} onChange={handleSeek} className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer range-thumb" />
                     <span className="text-sm font-mono">{formatTime(duration)}</span>
 
-                    {/* New Playback Speed Button */}
-                    <button 
-                      onClick={togglePlaybackSpeed} 
-                      className="px-2.5 py-1 rounded-md hover:bg-white/10 transition-colors text-sm font-mono w-16 text-center"
-                      title="Toggle playback speed"
-                    >
+                    <button onClick={togglePlaybackSpeed} className="px-2.5 py-1 rounded-md hover:bg-white/10 transition-colors text-sm font-mono w-16 text-center" title="Toggle playback speed">
                       {playbackRate}x
                     </button>
 
@@ -551,49 +533,29 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                           }
                         </button>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={isMuted ? 0 : volume}
-                          onChange={handleVolumeChange}
-                          className="w-20 h-1 bg-white/20 rounded-full appearance-none cursor-pointer range-thumb"
-                        />
+                        <input type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume} onChange={handleVolumeChange} className="w-20 h-1 bg-white/20 rounded-full appearance-none cursor-pointer range-thumb" />
                     </div>
                 </div>
             </div>
           </div>
 
-          {/* Action Buttons Panel */}
           <div className="p-2 sm:p-3 bg-gray-900/80 border-t border-gray-700/50 backdrop-blur-sm">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-4">
-              <button
-                onClick={handleBroadcastVideo}
-                disabled={!videoLoaded}
-                className="px-3 sm:px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(249,115,22,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2 text-xs sm:text-sm"
-              >
+              <button onClick={handleBroadcastVideo} disabled={!videoLoaded} className="px-3 sm:px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(249,115,22,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2 text-xs sm:text-sm">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
                 <span>Share Video</span>
               </button>
-
-              <button
-                onClick={handleBroadcastCurrentFrame}
-                disabled={!videoLoaded}
-                className="px-3 sm:px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2 text-xs sm:text-sm"
-              >
+              <button onClick={handleBroadcastCurrentFrame} disabled={!videoLoaded} className="px-3 sm:px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center space-x-2 text-xs sm:text-sm">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span>Broadcast Frame</span>
               </button>
             </div>
-            
             <div className="mt-2 text-center text-xs text-gray-500">
               <span className="hidden sm:inline">Space: Play/Pause • ←/→: Seek • Shift+←/→: Seek 5s • Scroll: Frame-by-frame • ESC: Close</span>
             </div>
           </div>
         </div>
 
-        {/* Event Panel */}
         {showEventPanel && (
            <div className="w-full lg:w-96 bg-gray-800/90 backdrop-blur-sm border-t lg:border-t-0 lg:border-l border-gray-700/50 flex flex-col max-h-[50vh] lg:max-h-none">
            <div className="p-3 sm:p-4 border-b border-gray-700/50">
@@ -602,20 +564,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
              </h3>
              <div className="relative mb-4 bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-500 to-purple-500 rounded-r-full"></div>
-                 <p className="pl-4 text-gray-300 text-xs sm:text-sm">Select an event and add frames to create submissions.</p>
+                 <p className="pl-4 text-gray-300 text-xs sm:text-sm">Select an event, add frames, then submit individually or all at once.</p>
              </div>
              
              <div className="space-y-2 mb-3">
                {EVENT_TYPES.map((event) => (
-                 <button
-                   key={event.id}
-                   onClick={() => setSelectedEvent(event.id)}
-                   className={`w-full p-2.5 sm:p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
-                     selectedEvent === event.id 
-                       ? `${event.borderColor} bg-gray-700/80 ${event.shadowColor} shadow-lg scale-[1.02]` 
-                       : 'border-gray-600/50 hover:border-gray-500 hover:bg-gray-700/50'
-                   }`}
-                 >
+                 <button key={event.id} onClick={() => setSelectedEvent(event.id)} className={`w-full p-2.5 sm:p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${ selectedEvent === event.id ? `${event.borderColor} bg-gray-700/80 ${event.shadowColor} shadow-lg scale-[1.02]` : 'border-gray-600/50 hover:border-gray-500 hover:bg-gray-700/50' }`}>
                    <div className="flex items-center space-x-2 sm:space-x-3">
                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${event.color} ${selectedEvent === event.id ? 'animate-pulse' : ''}`}></div>
                      <span className="text-white font-semibold text-sm sm:text-base">{event.name}</span>
@@ -628,34 +582,28 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
              </div>
 
              <div className="space-y-2">
-               <button
-                 onClick={handleAddToEvent}
-                 disabled={!selectedEvent || !videoLoaded}
-                 className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(59,130,246,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-               >
+               <button onClick={handleAddToEvent} disabled={!selectedEvent || !videoLoaded} className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(59,130,246,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm">
                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
                  <span>Add Current Frame</span>
                </button>
 
-               <button
-                 onClick={handleSubmitTrakeToDres}
-                 disabled={!selectedEvent || (eventFrames[selectedEvent]?.length === 0) || isSubmitting}
-                 className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-red-600 to-pink-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(220,38,38,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-               >
+               <button onClick={handleSubmitTrakeToDres} disabled={!selectedEvent || (eventFrames[selectedEvent]?.length === 0) || isSubmitting} className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-red-600 to-pink-500 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(220,38,38,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm">
                  {isSubmitting ? (
-                   <>
-                     <svg className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                     </svg>
-                     <span>Submitting...</span>
-                   </>
+                   <><svg className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Submitting...</span></>
                  ) : (
-                   <>
-                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                     <span>Submit to DRES</span>
-                   </>
+                   <><svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg><span>Submit Selected Event</span></>
                  )}
+               </button>
+               
+               <button onClick={handleSubmitAllEventsToDres} disabled={!hasFramesToSubmit || isSubmitting} className="w-full p-2.5 sm:p-3 bg-gradient-to-r from-teal-500 to-green-600 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(20,184,166,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm">
+                  {isSubmitting ? (
+                    <><svg className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Submitting...</span></>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2 12.5C2 17.15 5.85 21 10.5 21S19 17.15 19 12.5 15.15 4 10.5 4 2 7.85 2 12.5zM10.5 23C4.7 23 0 18.3 0 12.5S4.7 2 10.5 2 21 6.7 21 12.5 16.3 23 10.5 23zm4.2-11.3L12 14.4l-2.7-2.7L7.9 13l4.1 4.1 5.8-5.8-1.4-1.4z"/></svg>
+                      <span>Submit All Events</span>
+                    </>
+                  )}
                </button>
              </div>
            </div>
@@ -669,14 +617,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                      {EVENT_TYPES.find(e => e.id === selectedEvent)?.name}
                    </h4>
                    {eventFrames[selectedEvent].length > 0 && (
-                     <button
-                       onClick={() => {
-                         if (confirm(`Clear all ${eventFrames[selectedEvent].length} frames from this event?`)) {
-                           clearAndSyncEvent(selectedEvent);
-                         }
-                       }}
-                       className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
-                     >
+                     <button onClick={() => { if (confirm(`Clear all ${eventFrames[selectedEvent].length} frames from this event?`)) { clearAndSyncEvent(selectedEvent); } }} className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition-colors">
                        Clear All
                      </button>
                    )}
@@ -686,11 +627,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                    {eventFrames[selectedEvent].map((frame, index) => (
                      <div key={frame.id} className="bg-gradient-to-r from-gray-700/50 to-gray-700/30 rounded-lg p-2 flex items-center space-x-2 sm:space-x-3 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg border border-gray-600/30 hover:border-gray-500/50 group">
                        <div className="relative flex-shrink-0">
-                         <img 
-                           src={`http://localhost:1406/dataset/full/merge/${frame.videoId}/keyframes/${frame.thumbnail}`} 
-                           alt={`Frame ${frame.timestamp}`} 
-                           className="w-16 h-10 sm:w-20 sm:h-12 object-cover rounded shadow-md border border-gray-600/50"
-                         />
+                         <img src={`http://localhost:1407/dataset/${frame.videoId}/keyframes/${frame.thumbnail}`} alt={`Frame ${frame.timestamp}`} className="w-16 h-10 sm:w-20 sm:h-12 object-cover rounded shadow-md border border-gray-600/50" />
                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded"></div>
                        </div>
                        <div className="flex-1 min-w-0">
@@ -698,11 +635,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                          <p className="text-gray-400 text-xs truncate">{frame.videoId}</p>
                          <p className="text-gray-500 text-xs mt-0.5">#{index + 1}</p>
                        </div>
-                       <button
-                         onClick={() => handleRemoveFrame(selectedEvent, index)}
-                         className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/20 transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100"
-                         title="Remove frame"
-                       >
+                       <button onClick={() => handleRemoveFrame(selectedEvent, index)} className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/20 transition-all duration-200 flex-shrink-0 opacity-0 group-hover:opacity-100" title="Remove frame">
                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                        </button>
                      </div>
@@ -736,46 +669,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       </div>
 
       <style>{`
-        .range-thumb::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 14px;
-          height: 14px;
-          background: #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-          margin-top: -6px; /* Center thumb on track */
-          transition: background 0.2s;
-        }
-        .range-thumb::-moz-range-thumb {
-          width: 14px;
-          height: 14px;
-          background: #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-        .range-thumb:hover::-webkit-slider-thumb {
-          background: #60a5fa;
-        }
-        .range-thumb:hover::-moz-range-thumb {
-          background: #60a5fa;
-        }
-        
-        /* Custom scrollbar for event list */
-        .overflow-y-auto::-webkit-scrollbar {
-          width: 6px;
-        }
-        .overflow-y-auto::-webkit-scrollbar-track {
-          background: rgba(31, 41, 55, 0.5);
-          border-radius: 3px;
-        }
-        .overflow-y-auto::-webkit-scrollbar-thumb {
-          background: rgba(75, 85, 99, 0.8);
-          border-radius: 3px;
-        }
-        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-          background: rgba(107, 114, 128, 1);
-        }
+        .range-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #3b82f6; border-radius: 50%; cursor: pointer; margin-top: -6px; transition: background 0.2s; }
+        .range-thumb::-moz-range-thumb { width: 14px; height: 14px; background: #3b82f6; border-radius: 50%; cursor: pointer; }
+        .range-thumb:hover::-webkit-slider-thumb { background: #60a5fa; }
+        .range-thumb:hover::-moz-range-thumb { background: #60a5fa; }
+        .overflow-y-auto::-webkit-scrollbar { width: 6px; }
+        .overflow-y-auto::-webkit-scrollbar-track { background: rgba(31, 41, 55, 0.5); border-radius: 3px; }
+        .overflow-y-auto::-webkit-scrollbar-thumb { background: rgba(75, 85, 99, 0.8); border-radius: 3px; }
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 1); }
       `}</style>
     </div>
   );
