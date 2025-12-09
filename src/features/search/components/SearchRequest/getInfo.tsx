@@ -14,7 +14,7 @@ export interface InformationOfFrame {
     videoId: string,
     frameId: string
   ): Promise<InformationOfFrame | null> => {
-    const url = new URL('http://localhost:5731/embeddings/information');
+    const url = new URL('http://localhost:2311/embeddings/information');
     // Pass video_id and frame_id as query parameters
     url.searchParams.append('video_id', videoId);
     url.searchParams.append('frame_id', frameId);

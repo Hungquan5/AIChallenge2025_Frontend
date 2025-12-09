@@ -11,7 +11,7 @@ import type { ResultItem } from "../results/types";
  */
 
 // ✅ This should point to your FastAPI backend server
-const API_BASE_URL = 'http://localhost:9991'; 
+const API_BASE_URL = 'http://localhost:23111'; 
 
 export const dislikeCluster = async (item: ResultItem, userId: string): Promise<any> => {
   const { videoId, timestamp } = item;

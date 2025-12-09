@@ -51,7 +51,7 @@ export const convertAgentOutputToResults = (
 
   // Map EXACTLY like searchByText()
   return items.map((item, index) => {
-    const thumbnailPath = `/dataset/full/merge/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+    const thumbnailPath = `/dataset/${item.videoId}/${item.videoId}_keyframe_${item.timestamp}.webp`;
     return {
       videoId: item.videoId,
       timestamp: item.timestamp,

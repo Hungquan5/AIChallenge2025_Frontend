@@ -68,7 +68,7 @@ export const fullTrakeSubmissionFlow = async (videoId: string, frames: ResultIte
 // This helper function remains the same.
 const getEvaluationId = async (sessionId: string) => {
   const dresUrl = (dresService as any).dresBaseUrl;
-
+  console.log("DRES URL:", dresUrl);
   // ✅ 2. CRITICAL FIX: Added a '/' to correctly construct the URL path.
   const response = await fetch(`${dresUrl}/api/v2/client/evaluation/list?session=${sessionId}`, {
     method: 'GET',
@@ -77,8 +77,10 @@ const getEvaluationId = async (sessionId: string) => {
   if (!response.ok) {
     throw new Error(`Get evaluation list failed: ${response.statusText}`);
   }
+console.log(response);
 
   const evaluations = await response.json();
+
   const activeEval = evaluations.find((e: any) => e.status === 'ACTIVE');
 
   if (!activeEval) {
@@ -129,7 +131,7 @@ const submitToDres = async (
         ],
       };
     }
-  const dresUrl = (dresService as any).baseUrl; // Quick access for now
+  const dresUrl = (dresService as any).dresBaseUrl; // Quick access for now
 
     const response = await fetch(`${dresUrl}/api/v2/submit/${evaluationId}?session=${sessionId}`, {
       method: 'POST',
@@ -155,6 +157,7 @@ const submitToDres = async (
 
 export const fullSubmissionFlow = async (result: ResultItem, question?: string) => {
   // ✅ 3. Get the session ID dynamically from the configured service.
+  console.log("DRES Service:", dresService);
   const sessionId = dresService.getSessionId();
   
   // ✅ 4. Add a safety check.

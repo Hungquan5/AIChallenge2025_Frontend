@@ -34,7 +34,7 @@ export const useWebSocket = ({
   const shouldReconnectRef = useRef(true);
   const currentUsernameRef = useRef<string>('');
   
-  const WS_URL = 'ws://localhost:9991/ws';
+  const WS_URL = 'ws://localhost:23111/ws';
   
   // Stable callback refs to prevent reconnections
   const onMessageRef = useRef(onMessage);

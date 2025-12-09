@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 // CHANGED: Thêm biểu tượng Image
 import { MessageSquare, User, Bot, Loader2, X, Minimize2, ExternalLink, Clipboard, Check, Search, Image } from 'lucide-react';
-const API_BASE_URL = 'http://localhost:5731'; // Assuming your FastAPI runs on port 8000
+const API_BASE_URL = 'http://localhost:2311'; // Assuming your FastAPI runs on port 8000
 
 // --- TYPES ---
 interface ToolOutput {

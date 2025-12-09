@@ -1,11 +1,19 @@
 // src/features/search/components/SimilaritySearch/SimilaritySearch.ts
 
+import { historyItemClass } from '../../../history/components/styles';
 import type { ResultItem, SearchMode, ApiQuery } from '../../types';
 import type { ModelSelection } from '../../types';
-const API_BASE_URL = 'http://localhost:5731';
+
+const API_BASE_URL = 'http://localhost:2311';
 const LOCAL_DATASET_URL = 'http://localhost:1406';
 
 const adjustThumbnail = (thumbnail: string): string => {
+  // If the thumbnail is already a full URL, return it.
+  if (thumbnail.startsWith('http')) {
+    return thumbnail;
+  }
+  
+  // Appends the local dataset server URL if it starts with /dataset/
   const datasetIndex = thumbnail.indexOf('/dataset/');
   return datasetIndex !== -1
     ? `${LOCAL_DATASET_URL}${thumbnail.slice(datasetIndex)}`
@@ -24,6 +32,7 @@ const imageUrlToBase64 = async (imageUrl: string): Promise<string> => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
+          // Remove the "data:image/jpeg;base64," prefix
           const base64 = reader.result.split(',')[1];
           resolve(base64);
         } else {
@@ -47,7 +56,7 @@ export const searchBySimilarImage = async (
   modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<ResultItem[]> => {
   try {
-    
+    // Convert the source image to Base64 to send to the backend
     const imageBase64 = await imageUrlToBase64(imageSrc);
     
     const apiQuery: ApiQuery = {
@@ -68,11 +77,11 @@ export const searchBySimilarImage = async (
     url.searchParams.append('page', page.toString());
     url.searchParams.append('page_size', pageSize.toString());
 
+    // Pass model selection params
     url.searchParams.append('use_clip', modelSelection.use_clip.toString());
     url.searchParams.append('use_siglip2', modelSelection.use_siglip2.toString());
     url.searchParams.append('use_beit3', modelSelection.use_beit3.toString());
 
-    
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -90,14 +99,21 @@ export const searchBySimilarImage = async (
 
     const partialData = await response.json();
     
-    return partialData.map((item: { videoId: string, timestamp: string, confidence: number }, index: number) => {
-      const thumbnailPath = `/dataset/full/merge/${item.videoId}/keyframes/keyframe_${item.timestamp}.webp`;
+    return partialData.map((item: { videoId: string, timestamp: string | number, confidence: number }, index: number) => {
+      // === UPDATED LOGIC ===
+      // Convert timestamp (frame ID) to string and pad with zeros to 6 digits
+      // e.g., 123 -> "000123"
+      const frameIdStr = item.timestamp.toString().padStart(6, '0');
+      
+      // Construct path: /dataset/VideoID/000123.webp
+      const thumbnailPath = `/dataset/${item.videoId}/${frameIdStr}.webp`;
+      // =====================
       
       return {
         videoId: item.videoId,
-        timestamp: item.timestamp,
+        timestamp: item.timestamp, // Keep original timestamp (frame number) for logic
         confidence: item.confidence,
-        id: `${page}-${index}`,
+        id: `${page}-${index}`, // Unique ID for React lists
         title: `${item.videoId} - ${item.timestamp}`,
         thumbnail: adjustThumbnail(thumbnailPath),
       };
@@ -121,7 +137,6 @@ export const performSimilaritySearch = async (
   modelSelection: ModelSelection = { use_clip: true, use_siglip2: true, use_beit3: true }
 ): Promise<void> => {
   try {
-    
     onLoading?.(true);
     
     const results = await searchBySimilarImage(imageSrc, searchMode, page, pageSize, modelSelection);
