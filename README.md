@@ -1,4 +1,3 @@
-````markdown
 # AIChallenge2025 Frontend
 
 An interactive React + TypeScript + Vite frontend for **video search and retrieval** in the context of **AIChallenge 2025 / VBS-style** tasks.
